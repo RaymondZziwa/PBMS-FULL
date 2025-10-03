@@ -2,9 +2,12 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { FaChevronDown } from "react-icons/fa";
 import { Routes } from "../pages/routes/routes";
+import { useSelector } from "react-redux";
+import type { RootState } from "../redux/store";
+import type { IPermission } from "../redux/types/systemSettings";
 
 // Mocked permission check — replace with your real auth
-const hasPermission = (permission?: string) => {
+ const hasPermission = (permission?: string) => {
   if (!permission) return true;
   const userPermissions = [
     "view_dashboard",
@@ -85,11 +88,17 @@ const hasPermission = (permission?: string) => {
 const SidebarItem = ({ route, level = 0 }: { route: any; level?: number }) => {
   const { pathname } = useLocation();
   const [expanded, setExpanded] = useState(false);
+  const permissions = useSelector((state: RootState) => state.userAuth.data.role.permissions)
+
+  const checkPermission = (permission?: string) => {
+    if (!permission) return true;
+    return permissions.some(p => p.value === permission);
+  }
 
   const hasChildren = route.routes && route.routes.length > 0;
   const isActive = pathname === route.path;
 
-  if (!hasPermission(route.requiredPermission)) return null;
+  if (!checkPermission (route.requiredPermission)) return null;
 
   return (
     <div>

@@ -1,10 +1,13 @@
 import React, { useState, useRef, useEffect } from "react";
 import { FaUserCircle, FaSignOutAlt } from "react-icons/fa";
 import { FiChevronDown } from "react-icons/fi";
+import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
+import type { RootState } from "../redux/store";
 
 const TopNavBar: React.FC = () => {
   const navigate = useNavigate()
+  const user = useSelector((state: RootState) => state.userAuth.data.lastName)
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -20,8 +23,9 @@ const TopNavBar: React.FC = () => {
   }, []);
 
   const handleOptionClick = (option: string) => {
-    console.log(option); // Replace with actual navigation or action
+    console.log(option);
     setDropdownOpen(false);
+    navigate('/');
   };
 
   return (
@@ -31,7 +35,7 @@ const TopNavBar: React.FC = () => {
 
       {/* User menu */}
       <div className="relative flex gap-2" ref={dropdownRef}>
-        <span>Hello Raymond</span>
+        <span>Hello {user}</span>
         <button
           className="flex items-center gap-1 text-gray-700 hover:text-gray-900 focus:outline-none"
           onClick={() => setDropdownOpen((prev) => !prev)}

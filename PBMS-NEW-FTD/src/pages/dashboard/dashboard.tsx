@@ -158,7 +158,7 @@ const SalesDashboard = () => {
               <YAxis />
               <Tooltip formatter={(value) => [`UGX ${value}`, 'Sales']} />
               <Legend />
-              <Bar dataKey="sales" fill="#3B82F6" name="Sales (UGX)" />
+              <Bar dataKey="sales" fill="#374151" name="Sales (UGX)" />
             </BarChart>
           </ResponsiveContainer>
         </div>

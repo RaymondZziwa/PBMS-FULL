@@ -10,12 +10,17 @@ import EmployeeProfile from './endpoints/settings/accountSettings';
 import ParticipantsManagement from './pages/events/viewEventParticipants';
 import DepartmentManagement from './pages/humanResource/departments';
 import EmployeeManagement from './pages/humanResource/employees';
+import ReportsComponent from './pages/reports/reports';
+import ItemCategoriesManagement from './pages/inventory/categories';
+import StoresManagement from './pages/inventory/stores';
+import ServicesManagement from './pages/inventory/services';
+import ItemsManagement from './pages/inventory/items';
 
 function App() {
   return (
     <Routes>
       <Route
-          path="/login"
+          path="/"
           element={
             <LoginComponent />
           }
@@ -25,6 +30,50 @@ function App() {
           element={
             <LayoutSkeleton>
               <SalesDashboard />
+            </LayoutSkeleton>
+          }
+      />
+
+      {/* Inventory */}
+          <Route
+          path="/inventory/items-categories"
+          element={
+            <LayoutSkeleton>
+              <ItemCategoriesManagement />
+            </LayoutSkeleton>
+          }
+      />
+      <Route
+          path="/inventory/stores"
+          element={
+            <LayoutSkeleton>
+              <StoresManagement />
+            </LayoutSkeleton>
+          }
+      />
+       <Route
+          path="/inventory/items"
+          element={
+            <LayoutSkeleton>
+              <ItemsManagement />
+            </LayoutSkeleton>
+          }
+      />
+      <Route
+          path="/inventory/services"
+          element={
+            <LayoutSkeleton>
+              <ServicesManagement />
+            </LayoutSkeleton>
+          }
+      />
+
+      {/* Reports */}
+      <Route
+          path="/reports"
+          element={
+            <LayoutSkeleton>
+              <ReportsComponent />
             </LayoutSkeleton>
           }
       />

@@ -11,7 +11,7 @@ export interface IBranch {
 export interface IRole {
     id: string;
     name: string;
-    Employee: IEmployee[];
+    Employee?: IEmployee[];
     permissions: string[];
 }
 
