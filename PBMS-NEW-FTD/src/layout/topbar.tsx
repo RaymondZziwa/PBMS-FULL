@@ -25,13 +25,14 @@ const TopNavBar: React.FC = () => {
   const handleOptionClick = (option: string) => {
     console.log(option);
     setDropdownOpen(false);
+    if (option === "signout") localStorage.clear();
     navigate('/');
   };
 
   return (
     <header className="w-full h-16 bg-white flex items-center justify-between px-6">
       {/* System Name */}
-      <div className="text-xl font-bold text-gray-800">PBMS</div>
+      <div className="text-xl font-bold text-gray-800">PBMS <span className="text-center text-sm">V 3.0.1</span></div>
 
       {/* User menu */}
       <div className="relative flex gap-2" ref={dropdownRef}>
@@ -49,7 +50,10 @@ const TopNavBar: React.FC = () => {
           <div className="absolute right-0 mt-10 w-60 bg-white border border-gray-200 rounded shadow-lg z-50">
             <button
               className="flex items-center gap-2 px-4 py-2 w-full text-left hover:bg-gray-100 hover:text-[#3d5aa0]"
-              onClickCapture={()=> navigate('/account_settings')}
+              onClickCapture={() => {
+                navigate('/account_settings')
+                setDropdownOpen(false)
+              }}
             >
               <FaUserCircle /> Account Settings
             </button>

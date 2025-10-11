@@ -115,7 +115,7 @@ const handleSubmit = async (e: React.FormEvent) => {
               Welcome Back
             </h2>
             <p className="mt-2 text-gray-600 text-sm">
-              Sign in to access your research dashboard
+              Sign in to access your account
             </p>
 
             {/* Login Method Toggle */}

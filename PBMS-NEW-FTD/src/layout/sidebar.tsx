@@ -98,7 +98,7 @@ const SidebarItem = ({ route, level = 0 }: { route: any; level?: number }) => {
   const hasChildren = route.routes && route.routes.length > 0;
   const isActive = pathname === route.path;
 
-  if (!checkPermission (route.requiredPermission)) return null;
+  if (!hasPermission (route.requiredPermission)) return null;
 
   return (
     <div>

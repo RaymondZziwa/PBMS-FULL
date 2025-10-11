@@ -15,6 +15,18 @@ import ItemCategoriesManagement from './pages/inventory/categories';
 import StoresManagement from './pages/inventory/stores';
 import ServicesManagement from './pages/inventory/services';
 import ItemsManagement from './pages/inventory/items';
+import StockMovementRecords from './pages/inventory/stockMovement';
+import ClientsManagement from './pages/sales/customers';
+import PointOfSale from './pages/sales/pos';
+import ProjectsManagement from './pages/projects';
+import ProjectSales from './pages/projects/sales';
+import SalePayments from './pages/projects/payments';
+import ExhibitionManagement from './pages/exhibition/exhibitions';
+import ExhibitionExpensesManagement from './pages/exhibition/exhibitionExpenses';
+import ExpoStockMovementRecords from './pages/exhibition/inventory';
+import ExhibitionPOS from './pages/exhibition/exhibitionPos';
+import BranchExpensesManagement from './pages/expenses';
+import CreditSalesManagement from './pages/sales/creditSales';
 
 function App() {
   return (
@@ -67,6 +79,42 @@ function App() {
             </LayoutSkeleton>
           }
       />
+      <Route
+          path="/inventory/stock-movement"
+          element={
+            <LayoutSkeleton>
+              <StockMovementRecords />
+            </LayoutSkeleton>
+          }
+      />
+
+       {/* Sales */}
+      <Route
+          path="/sales/customers"
+          element={
+            <LayoutSkeleton>
+              <ClientsManagement />
+            </LayoutSkeleton>
+          }
+      />
+
+       <Route
+          path="/sales/pos"
+          element={
+            <LayoutSkeleton>
+              <PointOfSale />
+            </LayoutSkeleton>
+          }
+      />
+
+      <Route
+          path="/sales/credit-sales"
+          element={
+            <LayoutSkeleton>
+              <CreditSalesManagement />
+            </LayoutSkeleton>
+          }
+      />
 
       {/* Reports */}
       <Route
@@ -77,6 +125,74 @@ function App() {
             </LayoutSkeleton>
           }
       />
+
+      {/* Projects */}
+      <Route
+          path="/projects"
+          element={
+            <LayoutSkeleton>
+              <ProjectsManagement />
+            </LayoutSkeleton>
+          }
+      />
+      <Route
+          path="/projects/sales"
+          element={
+            <LayoutSkeleton>
+              <ProjectSales/>
+            </LayoutSkeleton>
+          }
+      />
+       <Route
+          path="/projects/sales/:id/payments"
+          element={
+            <LayoutSkeleton>
+              <SalePayments />
+            </LayoutSkeleton>
+          }
+      />
+
+      {/* Exhibition */}
+      <Route
+          path="/exhibitions"
+          element={
+            <LayoutSkeleton>
+              <ExhibitionManagement />
+            </LayoutSkeleton>
+          }
+      />
+      <Route
+          path="/exhibitions/stores/inventory"
+          element={
+            <LayoutSkeleton>
+              <ExpoStockMovementRecords />
+            </LayoutSkeleton>
+          }
+      />
+      <Route
+          path="/exhibitions/pos"
+          element={
+            <LayoutSkeleton>
+              <ExhibitionPOS />
+            </LayoutSkeleton>
+          }
+      />
+      <Route
+          path="/exhibitions/expenses"
+          element={
+            <LayoutSkeleton>
+              <ExhibitionExpensesManagement />
+            </LayoutSkeleton>
+          }
+      />
+      {/* <Route
+          path="/hr/departments"
+          element={
+            <LayoutSkeleton>
+              <DepartmentManagement />
+            </LayoutSkeleton>
+          }
+      /> */}
 
       {/* Human Resource */}
       <Route
@@ -112,6 +228,24 @@ function App() {
             </LayoutSkeleton>
           }
       />
+
+      {/* Expenses */}
+      <Route
+          path="/expenses"
+          element={
+            <LayoutSkeleton>
+              <BranchExpensesManagement />
+            </LayoutSkeleton>
+          }
+      />
+      {/* <Route
+          path="/tickets/events/:id"
+          element={
+            <LayoutSkeleton>
+              <ParticipantsManagement />
+            </LayoutSkeleton>
+          }
+      /> */}
       {/* Settings */}
       <Route
           path="/settings/company"

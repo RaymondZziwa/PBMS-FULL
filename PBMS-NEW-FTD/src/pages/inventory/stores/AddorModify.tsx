@@ -122,6 +122,12 @@ const AddorModifyStore: React.FC<AddorModifyStoreProps> = ({
         authorizedPersonnel: formData.authorizedPersonnel,
       });
 
+      setFormData({
+        branchId: '',
+        deptId: '',
+        name: '',
+        authorizedPersonnel: [] as string[], // store IDs
+      })
       refresh();
       onCancel();
     } catch (error: any) {

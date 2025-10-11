@@ -60,9 +60,16 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
     }
   }, [value]);
 
+  // FIXED: Proper date handling without timezone issues
   const handleDateSelect = (date: Date) => {
+    // Create a date string in YYYY-MM-DD format without timezone issues
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateString = `${year}-${month}-${day}`;
+    
     setSelectedDate(date);
-    onChange(date.toISOString().split("T")[0]);
+    onChange(dateString);
     setIsOpen(false);
   };
 
@@ -79,6 +86,15 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
       day: "numeric",
       year: "numeric",
     });
+  };
+
+  // FIXED: Date comparison functions that handle timezone issues
+  const isSameDay = (date1: Date, date2: Date): boolean => {
+    return (
+      date1.getFullYear() === date2.getFullYear() &&
+      date1.getMonth() === date2.getMonth() &&
+      date1.getDate() === date2.getDate()
+    );
   };
 
   const generateCalendarDays = () => {
@@ -104,25 +120,28 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
     // Add cells for each day of the month
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(year, month, day);
-      const isSelected =
-        selectedDate &&
-        date.getDate() === selectedDate.getDate() &&
-        date.getMonth() === selectedDate.getMonth() &&
-        date.getFullYear() === selectedDate.getFullYear();
-      const isToday =
-        date.getDate() === new Date().getDate() &&
-        date.getMonth() === new Date().getMonth() &&
-        date.getFullYear() === new Date().getFullYear();
+      const isSelected = selectedDate && isSameDay(date, selectedDate);
+      const isToday = isSameDay(date, new Date());
 
       // Check if date is within min/max constraints
       let isDisabled = false;
       if (min) {
         const minDate = new Date(min);
-        isDisabled = date < minDate;
+        // Compare dates without time
+        const compareDate = new Date(date);
+        compareDate.setHours(0, 0, 0, 0);
+        const compareMinDate = new Date(minDate);
+        compareMinDate.setHours(0, 0, 0, 0);
+        isDisabled = compareDate < compareMinDate;
       }
       if (max && !isDisabled) {
         const maxDate = new Date(max);
-        isDisabled = date > maxDate;
+        // Compare dates without time
+        const compareDate = new Date(date);
+        compareDate.setHours(0, 0, 0, 0);
+        const compareMaxDate = new Date(maxDate);
+        compareMaxDate.setHours(0, 0, 0, 0);
+        isDisabled = compareDate > compareMaxDate;
       }
 
       days.push(
@@ -148,6 +167,19 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
     }
 
     return days;
+  };
+
+  // FIXED: Today button handler
+  const handleTodayClick = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    const dateString = `${year}-${month}-${day}`;
+    
+    setSelectedDate(today);
+    onChange(dateString);
+    setIsOpen(false);
   };
 
   return (
@@ -225,7 +257,7 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
             <button
               type="button"
               className="rounded-md bg-[#3d5aa0] px-3 py-1 text-sm text-white hover:bg-[#3d5aa0]"
-              onClick={() => handleDateSelect(new Date())}
+              onClick={handleTodayClick}
             >
               Today
             </button>

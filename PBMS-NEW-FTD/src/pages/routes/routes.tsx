@@ -13,7 +13,8 @@ import {
     FaBoxes,
     FaTicketAlt,
     FaSeedling,
-    FaProjectDiagram
+    FaProjectDiagram,
+    FaReceipt
   } from 'react-icons/fa';
 import { SystemConfigRoutes } from './systemConfigRoutes';
 import { ExhibitionRoutes } from './exhibitionRoutes';
@@ -28,6 +29,7 @@ import { AssetRoutes } from './assetRoutes';
 import { ProcurementRoutes } from './procurementRoutes';
 import { ProjectsRoutes } from './projectsRoutes';
 import { FarmRoutes } from './farmRoutes';
+import { ExpensesRoutes } from './expensesRoutes';
   
   export const Routes = [
     {
@@ -49,7 +51,7 @@ import { FarmRoutes } from './farmRoutes';
         icon: FaBoxes, 
         routes: InventoryRoutes,
         requiredPermission: "access_inventory_module"
-      },
+    },
       // {
       //   name: "Requisitions",
       //   icon: FaClipboardList,
@@ -73,6 +75,12 @@ import { FarmRoutes } from './farmRoutes';
         icon: FaShoppingCart,
         routes: SalesRoutes,
         requiredPermission: "access_sales_module"
+    },
+      {
+        name: "Expenses",
+        icon: FaReceipt,
+        routes: ExpensesRoutes,
+        requiredPermission: "access_sales_module"
       },
       // {
       //   name: "Farm",
@@ -80,12 +88,12 @@ import { FarmRoutes } from './farmRoutes';
       //   routes: FarmRoutes,
       //   requiredPermission: "access_farm_module"
       // },
-      // {
-      //   name: "Projects",
-      //   icon: FaProjectDiagram,
-      //   routes: ProjectsRoutes,
-      //   requiredPermission: "access_project_module"
-      //   },
+      {
+        name: "Projects",
+        icon: FaProjectDiagram,
+        routes: ProjectsRoutes,
+        requiredPermission: "access_project_module"
+      },
     {
       name: "Human Resource",
       icon: FaUsers,
@@ -105,7 +113,6 @@ import { FarmRoutes } from './farmRoutes';
     //   routes: ChequeManagementRoutes,
     //   requiredPermission: "access_cheque_management_module"
     // },
-   
     {
       name: "Exhibition",
       icon: FaPalette,

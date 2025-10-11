@@ -1,26 +1,33 @@
 import React, { useState } from 'react';
 import { FiUser, FiMail, FiPhone, FiLock, FiCamera, FiSave, FiX, FiSettings, FiBell, FiDatabase, FiShield, FiGlobe } from 'react-icons/fi';
+import { useDispatch, useSelector } from 'react-redux';
+import type { RootState } from '../../redux/store';
+import { fetchDataSuccess } from '../../redux/slices/auth/userAuthSlice';
+import { apiRequest, baseURL } from '../../libs/apiConfig';
+import { toast } from 'sonner';
+import axios from 'axios';
+import { EmployeeEndpoints } from '../humanResource/employee';
+import DisableAccountConfirmationModal from './disableAccountConfirmationModal';
+import { useNavigate } from 'react-router-dom';
 
 const EmployeeProfile = () => {
-    const employee = {
-        id: '123',
-        firstName: 'John',
-        lastName: 'Doe',
-        gender: 'Male',
-        email: 'john.doe@example.com',
-        tel: '+1234567890',
-        salary: 50000,
-        role: { name: 'Manager' },
-        dept: { name: 'Sales' },
-        branch: { name: 'Headquarters' },
-        profileImage: ''
-    };
+  const dispatch = useDispatch()
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const navigate = useNavigate();
+  const employee = useSelector((state: RootState) => state.userAuth.data)
     
-    const onUpdate = (updatedData) => {
-        // Send the updated data to your backend
-        console.log('Updated data:', updatedData);
-      };
+  const disableAccount = async () => { 
+    try {
+      await apiRequest(EmployeeEndpoints.EMPLOYEE_PROFILE.DISABLE(employee.id), 'PUT');
+      setIsModalOpen(false);
+      navigate('/')
+    } catch (error) {
+      toast.error(error?.response?.data?.message || 'Failed to disable account');
+    }
+  }
+
   const [isEditing, setIsEditing] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
   const [formData, setFormData] = useState({
     email: employee.email || '',
@@ -30,7 +37,7 @@ const EmployeeProfile = () => {
   });
   const [previewImage, setPreviewImage] = useState(employee.profileImage || '');
   const [settings, setSettings] = useState({
-    notifications: true,
+    systemEmails: false,
     autoSave: false,
     language: 'en',
     theme: 'light',
@@ -54,24 +61,46 @@ const EmployeeProfile = () => {
     }));
   };
 
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewImage(reader.result);
-        setFormData(prev => ({
-          ...prev,
-          profileImage: reader.result
-        }));
-      };
-      reader.readAsDataURL(file);
+    const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setPreviewImage(URL.createObjectURL(file));
+    setUploading(true);
+
+    try {
+      const formDataToSend = new FormData();
+      formDataToSend.append('file', file);
+
+      const { data } = await axios.post(
+        `${baseURL}/api/employees/upload-profile-picture/${employee.id}`,
+        formDataToSend,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            Authorization: ''
+          }
+        }
+      );
+
+      if (data?.updatedEmployee) {
+        console.log('Upload response:', data);
+        dispatch(fetchDataSuccess(data.updatedEmployee));
+        toast.success('Profile picture updated successfully');
+      } else {
+        toast.success('Profile picture updated');
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to upload profile picture');
+    } finally {
+      setUploading(false);
     }
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onUpdate(formData);
+    apiRequest(EmployeeEndpoints.EMPLOYEE_PROFILE.UPDATE_PROFILE(employee.id), 'PUT', '', formData)
     setIsEditing(false);
   };
 
@@ -113,10 +142,17 @@ const EmployeeProfile = () => {
             <div className="md:w-1/3 flex flex-col items-center">
               <div className="relative mb-4">
                 <img
-                  src={previewImage || "/default-avatar.png"}
+                  src={
+                    previewImage
+                      ? previewImage.startsWith('blob:')
+                        ? previewImage // it's a local preview
+                        : `${baseURL|| ''}${previewImage}` // backend URL
+                      : "https://cdn-icons-png.flaticon.com/512/847/847969.png" // fallback icon
+                  }
                   alt="Profile"
                   className="w-48 h-48 rounded-full object-cover border-4 border-gray-200"
                 />
+
                 {isEditing && (
                   <label htmlFor="image-upload" className="absolute bottom-2 right-2 bg-gray-700 rounded-full p-2 cursor-pointer">
                     <FiCamera className="h-5 w-5 text-white" />
@@ -129,6 +165,7 @@ const EmployeeProfile = () => {
                     />
                   </label>
                 )}
+                
               </div>
               
               <h3 className="text-xl font-semibold text-gray-800">{employee.firstName} {employee.lastName}</h3>
@@ -147,6 +184,7 @@ const EmployeeProfile = () => {
             
             {/* Profile Information Section */}
             <div className="md:w-2/3">
+                <span className='text-sm italic text-gray-400'>*Profile Changes will reflect on your next login*</span>
               {isEditing ? (
                 <form onSubmit={handleSubmit}>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -188,7 +226,7 @@ const EmployeeProfile = () => {
                       <label className="block text-sm font-medium text-gray-700">Salary</label>
                       <input
                         type="text"
-                        value={`$${employee.salary}`}
+                        value={`UGX ${employee.salary}`}
                         disabled
                         className="mt-1 block w-full rounded-md border-gray-300 bg-gray-100 shadow-sm focus:border-gray-500 focus:ring-gray-500 p-2"
                       />
@@ -265,7 +303,7 @@ const EmployeeProfile = () => {
                   </div>
                 </form>
               ) : (
-                <div>
+                  <div>
                   <h3 className="text-lg font-semibold text-gray-700 mb-4">Personal Information</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="flex items-center">
@@ -304,7 +342,7 @@ const EmployeeProfile = () => {
                       <div className="h-5 w-5 text-gray-400 mr-2"></div>
                       <div>
                         <p className="text-sm text-gray-500">Salary</p>
-                        <p className="text-gray-800">${employee.salary}</p>
+                        <p className="text-gray-800">UGX {employee.salary}</p>
                       </div>
                     </div>
                     
@@ -351,22 +389,22 @@ const EmployeeProfile = () => {
               
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <label htmlFor="notifications" className="text-gray-700">Enable Notifications</label>
+                  <label htmlFor="systemEmails" className="text-gray-700">Enable System Emails</label>
                   <div className="relative inline-block w-12 h-6">
                     <input
-                      id="notifications"
-                      name="notifications"
+                      id="systemEmails"
+                      name="systemEmails"
                       type="checkbox"
-                      checked={settings.notifications}
+                      checked={settings.systemEmails}
                       onChange={handleSettingsChange}
                       className="opacity-0 w-0 h-0"
                     />
-                    <span className={`absolute cursor-pointer top-0 left-0 right-0 bottom-0 rounded-full transition-colors ${settings.notifications ? 'bg-gray-700' : 'bg-gray-300'}`}></span>
-                    <span className={`absolute h-4 w-4 top-1 rounded-full bg-white transition-transform ${settings.notifications ? 'left-7' : 'left-1'}`}></span>
+                    <span className={`absolute cursor-pointer top-0 left-0 right-0 bottom-0 rounded-full transition-colors ${settings.systemEmails ? 'bg-gray-700' : 'bg-gray-300'}`}></span>
+                    <span className={`absolute h-4 w-4 top-1 rounded-full bg-white transition-transform ${settings.systemEmails ? 'left-7' : 'left-1'}`}></span>
                   </div>
                 </div>
                 
-                <div className="flex items-center justify-between">
+                {/* <div className="flex items-center justify-between">
                   <label htmlFor="autoSave" className="text-gray-700">Auto-Save Changes</label>
                   <div className="relative inline-block w-12 h-6">
                     <input
@@ -380,7 +418,7 @@ const EmployeeProfile = () => {
                     <span className={`absolute cursor-pointer top-0 left-0 right-0 bottom-0 rounded-full transition-colors ${settings.autoSave ? 'bg-gray-700' : 'bg-gray-300'}`}></span>
                     <span className={`absolute h-4 w-4 top-1 rounded-full bg-white transition-transform ${settings.autoSave ? 'left-7' : 'left-1'}`}></span>
                   </div>
-                </div>
+                </div> */}
               </div>
             </div>
             
@@ -408,7 +446,7 @@ const EmployeeProfile = () => {
                   </div>
                 </div>
                 
-                <div className="flex items-center justify-between">
+                {/* <div className="flex items-center justify-between">
                   <label htmlFor="dataRetention" className="text-gray-700">Data Retention (days)</label>
                   <select
                     id="dataRetention"
@@ -422,7 +460,7 @@ const EmployeeProfile = () => {
                     <option value={90}>90 days</option>
                     <option value={365}>1 year</option>
                   </select>
-                </div>
+                </div> */}
               </div>
             </div>
             
@@ -440,7 +478,8 @@ const EmployeeProfile = () => {
                     id="language"
                     name="language"
                     value={settings.language}
-                    onChange={handleSettingsChange}
+                      onChange={handleSettingsChange}
+                      disabled
                     className="w-full rounded-md border-gray-300 shadow-sm focus:border-gray-500 focus:ring-gray-500 p-2"
                   >
                     <option value="en">English</option>
@@ -455,7 +494,8 @@ const EmployeeProfile = () => {
                   <select
                     id="theme"
                     name="theme"
-                    value={settings.theme}
+                      value={settings.theme}
+                      disabled
                     onChange={handleSettingsChange}
                     className="w-full rounded-md border-gray-300 shadow-sm focus:border-gray-500 focus:ring-gray-500 p-2"
                   >
@@ -475,28 +515,31 @@ const EmployeeProfile = () => {
               </div>
               
               <div className="space-y-4">
-                <button className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 px-4 rounded-md transition-colors">
+                {/* <button className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 px-4 rounded-md transition-colors">
                   Export Data
-                </button>
-                
-                <button className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 px-4 rounded-md transition-colors">
-                  Clear Cache
-                </button>
-                
-                <button className="w-full bg-red-100 hover:bg-red-200 text-red-700 py-2 px-4 rounded-md transition-colors">
-                  Delete Account
+                </button> */}
+
+                <button className="w-full bg-red-100 hover:bg-red-200 text-red-700 py-2 px-4 rounded-md transition-colors" onClick={() => setIsModalOpen(true)}>
+                  Disable Account
                 </button>
               </div>
             </div>
           </div>
           
-          <div className="mt-6 flex justify-end">
+          {/* <div className="mt-6 flex justify-end">
             <button className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 flex items-center">
               <FiSave className="mr-2" /> Save Settings
             </button>
-          </div>
+          </div> */}
         </div>
       )}
+       <DisableAccountConfirmationModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onConfirm={disableAccount}
+        userName={employee.firstName + ' ' + employee.lastName}
+        userEmail={employee.email}
+      />
     </div>
   );
 };

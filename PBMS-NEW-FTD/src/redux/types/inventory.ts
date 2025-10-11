@@ -1,4 +1,4 @@
-import type { IDepartment } from "./hr";
+import type { IDepartment, IEmployee } from "./hr";
 import type { IBranch } from "./systemSettings";
 
 export interface IItemCategory {
@@ -34,4 +34,41 @@ export interface IService {
     price: number;
     updatedAt: Date
     createdAt: Date
+}
+
+export interface IUnit {
+    id: string;
+    name: string;
+    abr?: string;
+    updatedAt: Date
+    createdAt: Date
+}
+
+export interface IStockMovement {
+    id: string;
+    itemId: string;
+    item: IItem;
+    category: string;
+    storeId: string;
+    store: IStore;
+    qty: number;
+    unitId: string;
+    unit: IUnit;
+    source: string;
+    description?: string;
+    recordedBy : string;
+    employee: IEmployee;
+}
+
+export interface IStockStore {
+  id: string;
+  itemId: string;
+  storeId: string;
+  qty: number;
+  unitId: string;
+  createdAt: string;
+  updatedAt: string;
+  item: IItem;
+  store: IStore;
+  unit: IUnit;
 }

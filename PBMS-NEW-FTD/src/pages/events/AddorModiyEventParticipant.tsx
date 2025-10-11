@@ -10,7 +10,7 @@ import useEvents from "../../hooks/events/useEvent";
 interface Participant {
   id: string;
   firstName: string;
-  lastname: string;
+  lastName: string;
   tel: string;
   tel2?: string;
   amountPaid: number;
@@ -53,7 +53,7 @@ const AddParticipantModal: React.FC<AddParticipantModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<{
     firstName: string;
-    lastname: string;
+    lastName: string;
     tel: string;
     tel2: string;
     amountPaid: number;
@@ -62,7 +62,7 @@ const AddParticipantModal: React.FC<AddParticipantModalProps> = ({
     notes: string;
   }>({
     firstName: '',
-    lastname: '',
+    lastName: '',
     tel: '',
     tel2: '',
     amountPaid: 0,
@@ -75,7 +75,7 @@ const AddParticipantModal: React.FC<AddParticipantModalProps> = ({
     if (editingParticipant) {
       setFormData({
         firstName: editingParticipant.firstName,
-        lastname: editingParticipant.lastname,
+        lastName: editingParticipant.lastName,
         tel: editingParticipant.tel,
         tel2: editingParticipant.tel2 || '',
         amountPaid: editingParticipant.amountPaid,
@@ -86,7 +86,7 @@ const AddParticipantModal: React.FC<AddParticipantModalProps> = ({
     } else {
       setFormData({
         firstName: '',
-        lastname: '',
+        lastName: '',
         tel: '',
         tel2: '',
         amountPaid: 0,
@@ -135,7 +135,7 @@ const AddParticipantModal: React.FC<AddParticipantModalProps> = ({
     e.preventDefault();
     
     // Simple validation - check if required fields are filled
-    if (!formData.firstName.trim() || !formData.lastname.trim() || !formData.tel.trim()) {
+    if (!formData.firstName.trim() || !formData.lastName.trim() || !formData.tel.trim()) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -144,7 +144,7 @@ const AddParticipantModal: React.FC<AddParticipantModalProps> = ({
     try {
       const payload = {
         firstName: formData.firstName,
-        lastname: formData.lastname,
+        lastName: formData.lastName,
         tel: formData.tel,
         ...(formData.tel2 && { tel2: formData.tel2 }),
         amountPaid: formData.amountPaid,
@@ -196,8 +196,8 @@ const AddParticipantModal: React.FC<AddParticipantModalProps> = ({
 
             <CustomTextInput
               label="Last Name"
-              value={formData.lastname}
-              onChange={(value) => handleInputChange('lastname', value)}
+              value={formData.lastName}
+              onChange={(value) => handleInputChange('lastName', value)}
               placeholder="Enter last name"
               isRequired
               disabled={loading}
@@ -305,7 +305,6 @@ const AddParticipantModal: React.FC<AddParticipantModalProps> = ({
               label={editingParticipant ? "Update Participant" : "Create Participant"}
               fn={handleSubmit}
               disabled={loading}
-              loading={loading}
             />
           </div>
         </form>

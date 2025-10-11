@@ -124,30 +124,30 @@ const ReportsComponent = () => {
         'Event ROI Analysis'
       ]
     },
-    {
-      name: 'Budget Reports',
-      icon: <FaChartPie className="mr-3" />,
-      reports: [
-        'Departmental Budget',
-        'Budget vs Actual',
-        'Budget Variance Analysis',
-        'Quarterly Budget Forecast',
-        'Capital Expenditure Budget',
-        'Annual Budget Summary'
-      ]
-    },
-    {
-      name: 'Procurement Reports',
-      icon: <FaShoppingCart className="mr-3" />,
-      reports: [
-        'Purchase Order Status',
-        'Vendor Performance',
-        'Procurement Timeline',
-        'Spend Analysis',
-        'Contract Compliance',
-        'Supplier Evaluation'
-      ]
-    }
+    // {
+    //   name: 'Budget Reports',
+    //   icon: <FaChartPie className="mr-3" />,
+    //   reports: [
+    //     'Departmental Budget',
+    //     'Budget vs Actual',
+    //     'Budget Variance Analysis',
+    //     'Quarterly Budget Forecast',
+    //     'Capital Expenditure Budget',
+    //     'Annual Budget Summary'
+    //   ]
+    // },
+    // {
+    //   name: 'Procurement Reports',
+    //   icon: <FaShoppingCart className="mr-3" />,
+    //   reports: [
+    //     'Purchase Order Status',
+    //     'Vendor Performance',
+    //     'Procurement Timeline',
+    //     'Spend Analysis',
+    //     'Contract Compliance',
+    //     'Supplier Evaluation'
+    //   ]
+    // }
   ];
 
   return (

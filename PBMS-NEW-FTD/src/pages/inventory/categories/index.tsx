@@ -42,7 +42,6 @@ const ItemCategoriesManagement = () => {
   // Table columns configuration
   const columns = [
     { key: 'name', label: 'Name', sortable: true, filterable: true },
-    { key: 'location', label: 'Location', sortable: true, filterable: true },
     { key: 'createdAt', label: 'Created At', sortable: true, filterable: false },
     { key: 'actions', label: 'Actions', sortable: false, filterable: false },
   ];

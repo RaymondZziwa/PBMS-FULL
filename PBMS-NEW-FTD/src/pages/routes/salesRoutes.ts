@@ -6,6 +6,6 @@
 
 export const SalesRoutes = [
     { name: "POS", path: "/sales/pos" },
-    { name: "Sales History", path: "/sales/history" },
+    { name: "Credit Sales", path: "/sales/credit-sales" },
     { name: "Customers", path: "/sales/customers" },
 ]

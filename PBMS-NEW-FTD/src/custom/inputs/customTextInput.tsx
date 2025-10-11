@@ -25,6 +25,7 @@ const CustomTextInput: React.FC<CustomTextInputProps> = ({
       <input
         type={type ? type : "text"}
         value={value}
+        min={0}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         disabled={disabled}
