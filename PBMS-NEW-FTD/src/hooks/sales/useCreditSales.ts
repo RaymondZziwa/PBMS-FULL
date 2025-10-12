@@ -5,18 +5,18 @@ import { apiRequest } from "../../libs/apiConfig";
 import type { RootState } from "../../redux/store";
 import { SALESENDPOINTS } from "../../endpoints/sales/salesEndpoints";
 
-const useCreditSale = () => {
+const useCreditSale = (id: string) => {
   const dispatch = useDispatch();
   //const { token, isFetchingLocalToken } = useAuth();
 
-  const fetchDataFromApi = async () => {
+  const fetchDataFromApi = async (id: string) => {
     //if (isFetchingLocalToken || !token?.access_token) return;
 
     dispatch(fetchDataStart()); // Dispatch action to indicate data fetching has started
 
     try {
       const response = await apiRequest(
-          SALESENDPOINTS.POS.get_credit_sales,
+          SALESENDPOINTS.POS.get_credit_sales(id),
           "GET",
             '',
       );
@@ -38,8 +38,8 @@ const useCreditSale = () => {
   };
 
   useEffect(()=> {
-    fetchDataFromApi()
-  }, [])
+    fetchDataFromApi(id)
+  }, [id])
 
 
 const data = useSelector((state: RootState) => state.creditSale);

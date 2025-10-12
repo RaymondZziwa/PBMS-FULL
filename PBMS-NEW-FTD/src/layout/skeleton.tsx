@@ -2,12 +2,29 @@ import React, { useState } from "react";
 import SidebarNavigation from "./sidebar";
 import TopNavBar from "./topbar";
 import { Toaster } from "sonner";
+import { useAutoLogout } from "../hooks/useAutoLogout";
+import { AutoLogoutWarning } from "../custom/modals/autoLogoutModal";
+import { useAuth } from "../hooks/useAuth";
 
 const LayoutSkeleton: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const {handleLogout} = useAuth()
+
+  const { 
+    showWarning, 
+    timeLeft, 
+    handleStayLoggedIn,
+  } = useAutoLogout();
 
   return (
     <div className="flex h-screen bg-gray-100">
+      <AutoLogoutWarning
+        isOpen={showWarning}
+        timeLeft={timeLeft}
+        onStayLoggedIn={handleStayLoggedIn}
+        onLogout={handleLogout}
+      />
+      
       {/* Sidebar */}
       <Toaster
         position="top-right"

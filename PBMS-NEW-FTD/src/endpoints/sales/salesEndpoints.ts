@@ -10,6 +10,7 @@ export const SALESENDPOINTS = {
         modify:(id: string) => `/api/sales/modify/${id}`,
         delete:(id: string) => `/api/sales/delete/${id}`,
         fetch_all: '/api/sales/fetch-all',
-        get_credit_sales: '/api/sales/credit-sales',
+        get_credit_sales: (id: string) => `/api/sales/credit-sales/${id}`,
+        collect_payment: `/api/sales/credit-payment`,
     }
 }

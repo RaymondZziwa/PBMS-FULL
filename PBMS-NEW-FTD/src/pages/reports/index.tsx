@@ -5,17 +5,14 @@ import {
   FaUsers, 
   FaMoneyBillWave, 
   FaImages, 
-  FaSpa, 
-  FaTasks, 
-  FaCalendarAlt, 
-  FaChartPie, 
-  FaShoppingCart,
   FaChevronDown,
   FaFileAlt
 } from 'react-icons/fa';
+import { useNavigate } from 'react-router-dom';
 
 const ReportsComponent = () => {
   const [openCategories, setOpenCategories] = useState(new Set());
+  const navigate = useNavigate()
 
   const toggleCategory = (categoryName) => {
     const newOpenCategories = new Set(openCategories);
@@ -32,12 +29,8 @@ const ReportsComponent = () => {
       name: 'Inventory Reports',
       icon: <FaBoxes className="mr-3" />,
       reports: [
-        'Stock Level Report',
-        'Inventory Valuation',
-        'Stock Movement Analysis',
-        'Reorder Point Report',
-        'Inventory Aging',
-        'Product Performance'
+        'Store Stock Level Analysis',
+        'Store Stock Movement Analysis',
       ]
     },
     {
@@ -45,23 +38,21 @@ const ReportsComponent = () => {
       icon: <FaChartLine className="mr-3" />,
       reports: [
         'Daily Sales Summary',
-        'Sales by Product',
-        'Sales by Region',
-        'Customer Sales Analysis',
-        'Sales Trend Analysis',
-        'Top Performing Products'
+        'Product Performance',
+        'Store Sales Comparison',
+        'Massage Services Report',
       ]
     },
     {
       name: 'Human Resource Reports',
       icon: <FaUsers className="mr-3" />,
       reports: [
-        'Employee Directory',
+        //'Employee Directory',
         'Attendance Report',
-        'Payroll Summary',
-        'Leave Balance Report',
-        'Performance Review Summary',
-        'Training Completion Report'
+        //'Payroll Summary',
+        //'Leave Balance Report',
+        //'Performance Review Summary',
+        //'Training Completion Report'
       ]
     },
     {
@@ -69,61 +60,56 @@ const ReportsComponent = () => {
       icon: <FaMoneyBillWave className="mr-3" />,
       reports: [
         'Expense by Category',
-        'Departmental Expenses',
-        'Vendor Payment Summary',
-        'Monthly Expense Trend',
-        'Expense Approval Status',
-        'Budget vs Actual Expense'
+        // 'Vendor Payment Summary',
+        // 'Monthly Expense Trend',
+       // 'Budget vs Actual Expense'
       ]
     },
     {
       name: 'Exhibition Reports',
       icon: <FaImages className="mr-3" />,
       reports: [
-        'Exhibition Attendance',
-        'Exhibition Revenue',
-        'Exhibitor Performance',
-        'Visitor Demographics',
-        'Exhibition Feedback Summary',
-        'Exhibition ROI Analysis'
+        'Exhibition Revenue Comparison',
+        'Exhibition Sales Summary',
+        'Exhibition Expenses Summary',
       ]
     },
-    {
-      name: 'Massage Reports',
-      icon: <FaSpa className="mr-3" />,
-      reports: [
-        'Therapist Performance',
-        'Service Utilization',
-        'Customer Satisfaction',
-        'Appointment Schedule',
-        'Revenue by Service Type',
-        'Membership Usage Report'
-      ]
-    },
-    {
-      name: 'Projects Reports',
-      icon: <FaTasks className="mr-3" />,
-      reports: [
-        'Project Status Summary',
-        'Project Timeline',
-        'Resource Allocation',
-        'Budget vs Actual Cost',
-        'Milestone Completion',
-        'Project Risk Assessment'
-      ]
-    },
-    {
-      name: 'Events Reports',
-      icon: <FaCalendarAlt className="mr-3" />,
-      reports: [
-        'Event Attendance',
-        'Event Revenue',
-        'Participant Feedback',
-        'Event Cost Analysis',
-        'Speaker Performance',
-        'Event ROI Analysis'
-      ]
-    },
+    // {
+    //   name: 'Massage Reports',
+    //   icon: <FaSpa className="mr-3" />,
+    //   reports: [
+    //     'Therapist Performance',
+    //     'Service Utilization',
+    //     'Customer Satisfaction',
+    //     'Appointment Schedule',
+    //     'Revenue by Service Type',
+    //     'Membership Usage Report'
+    //   ]
+    // },
+    // {
+    //   name: 'Projects Reports',
+    //   icon: <FaTasks className="mr-3" />,
+    //   reports: [
+    //     'Project Status Summary',
+    //     'Project Timeline',
+    //     'Resource Allocation',
+    //     'Budget vs Actual Cost',
+    //     'Milestone Completion',
+    //     'Project Risk Assessment'
+    //   ]
+    // },
+    // {
+    //   name: 'Events Reports',
+    //   icon: <FaCalendarAlt className="mr-3" />,
+    //   reports: [
+    //     'Event Attendance',
+    //     'Event Revenue',
+    //     'Participant Feedback',
+    //     'Event Cost Analysis',
+    //     'Speaker Performance',
+    //     'Event ROI Analysis'
+    //   ]
+    // },
     // {
     //   name: 'Budget Reports',
     //   icon: <FaChartPie className="mr-3" />,
@@ -181,6 +167,11 @@ const ReportsComponent = () => {
                         <li 
                           key={reportIndex}
                           className="p-2 hover:bg-gray-200 rounded cursor-pointer transition-colors flex items-center"
+                          onClick={() => {
+                            const route = report.toLowerCase().replace(/ /g, '-');
+                            navigate(`/reports/${route}`)
+                            console.log(`Navigating to /reports/${route}`);
+                          }}
                         >
                           <FaFileAlt className="mr-2 text-gray-700" />
                           {report}

@@ -4,9 +4,11 @@ import { FiChevronDown } from "react-icons/fi";
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import type { RootState } from "../redux/store";
+import { useAuth } from "../hooks/useAuth";
 
 const TopNavBar: React.FC = () => {
   const navigate = useNavigate()
+  const { handleLogout } = useAuth();
   const user = useSelector((state: RootState) => state.userAuth.data.lastName)
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -22,11 +24,14 @@ const TopNavBar: React.FC = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleOptionClick = (option: string) => {
+  const handleOptionClick = async (option: string) => {
     console.log(option);
     setDropdownOpen(false);
-    if (option === "signout") localStorage.clear();
-    navigate('/');
+    if (option === "signout") {
+      await handleLogout();
+      localStorage.clear();
+      navigate('/');
+    }
   };
 
   return (

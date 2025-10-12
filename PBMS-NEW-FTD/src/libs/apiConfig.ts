@@ -4,9 +4,6 @@ import { toast } from "sonner";
 export const baseURL = "http://localhost:3005"
 export const imageURL = "http://localhost:3005/storage"
 
-// export const baseURL = "https://api.pbms.com/api"
-// export const imageURL = "https://api.pbms.com/storage"
-
 let isRefreshing = false;
 let failedQueue: Array<{ resolve: (value: any) => void; reject: (error: any) => void }> = [];
 
@@ -24,8 +21,8 @@ const processQueue = (error: any = null) => {
 export const apiRequest = async <T>(
   endpoint: string,
   method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE" = "GET",
-  token?: string,
-  data?: any,
+  token?: string, //--- IGNORE ---
+  data?: any, // Remove token parameter since we're using cookies
   retry = true
 ): Promise<T> => {
   const url = `${baseURL}${endpoint}`;
@@ -36,7 +33,7 @@ export const apiRequest = async <T>(
     headers: {
       "Content-Type": "application/json",
     },
-    withCredentials: true,
+    withCredentials: true, // This sends cookies automatically
     ...(data && { data }),
   };
 
@@ -72,13 +69,18 @@ export const apiRequest = async <T>(
             withCredentials: true 
           });
           
-          processQueue();
-          return apiRequest<T>(endpoint, method, data, false);
+          processQueue(null); // Process queued requests with success
+          return apiRequest<T>(endpoint, method, data, false); // Retry original request
         } catch (refreshError) {
-          processQueue(refreshError); 
+          processQueue(refreshError); // Process queued requests with error
+          
+          // Clear any stored user data and redirect to login
+          localStorage.removeItem('persist:userAuth');
+          sessionStorage.clear();
+          
           toast.error("Session expired. Please login again.");
           setTimeout(() => {
-            window.location.href = "/login";
+            window.location.href = "/"; // Your login page
           }, 2000);
           throw refreshError;
         } finally {
@@ -86,10 +88,15 @@ export const apiRequest = async <T>(
         }
       }
 
+      // Handle other error cases
       if (responseData?.message) {
         toast.error(responseData.message);
       } else if (error.response?.status === 403) {
         toast.error("You don't have permission to perform this action");
+      } else if (error.response?.status === 404) {
+        toast.error("Resource not found");
+      } else if (error.response?.status >= 500) {
+        toast.error("Server error. Please try again later.");
       } else {
         toast.error("An error occurred");
       }
@@ -97,8 +104,8 @@ export const apiRequest = async <T>(
       throw error;
     }
     
-    // Handle non-Axios related errors
-    toast.error("An error occurred during the API request.");
-    throw new Error("An error occurred during the API request.");
+    // Handle non-Axios related errors (network errors, etc.)
+    toast.error("Network error. Please check your connection.");
+    throw new Error("Network error occurred");
   }
 };

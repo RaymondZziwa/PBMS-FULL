@@ -20,6 +20,15 @@ interface CheckoutModalProps {
   onCompleteSale: () => void;
 }
 
+// Map the enum values to display labels
+const PAYMENT_METHOD_OPTIONS = [
+  { value: 'CASH', label: 'Cash' },
+  { value: 'MTN_MOMO', label: 'MTN Momo' },
+  { value: 'AIRTELL_MOMO', label: 'Airtel Momo' },
+  { value: 'CARD', label: 'Card' },
+  { value: 'PROF_MOMO', label: 'Prof Momo' }
+];
+
 const CheckoutModal: React.FC<CheckoutModalProps> = ({
   visible,
   cart,
@@ -27,29 +36,29 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   onClose,
   onCompleteSale,
 }) => {
-  const { data: clients, refresh } = useClients();
+  const { data: clients } = useClients();
   const user = useSelector((state: RootState) => state.userAuth.data);
 
   const [selectedCustomer, setSelectedCustomer] = useState<string>('');
   const [paymentStatus, setPaymentStatus] = useState<'FULLY_PAID' | 'UNPAID' | 'PARTIALLY_PAID'>('FULLY_PAID');
   const [paymentMethods, setPaymentMethods] = useState<IPaymentMethod[]>([
-    { type: 'cash', amount: total }
+    { type: 'CASH', amount: total }
   ]);
   const [notes, setNotes] = useState('');
   const [amountPaid, setAmountPaid] = useState(total);
 
-    const [modalProps, setModalProps] = useState<{
-      isOpen: boolean;
-      mode: 'create' | 'edit' | '';
-      client: IClient | null;
-    }>({
-      isOpen: false,
-      mode: 'create',
-      client: null
-    });
-  
-    const receiptRef = useRef<HTMLDivElement>(null);
-    const handlePrint = useReactToPrint({
+  const [modalProps, setModalProps] = useState<{
+    isOpen: boolean;
+    mode: 'create' | 'edit' | '';
+    client: IClient | null;
+  }>({
+    isOpen: false,
+    mode: 'create',
+    client: null
+  });
+
+  const receiptRef = useRef<HTMLDivElement>(null);
+  const handlePrint = useReactToPrint({
     contentRef: receiptRef,
     documentTitle: `Receipt-${new Date().getTime()}`,
   });
@@ -68,21 +77,15 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     if (paymentMethods.length === 0) return 'UNPAID';
     if (paymentMethods.length === 1) {
       const method = paymentMethods[0];
-      switch (method.type) {
-        case 'cash': return 'Cash';
-        case 'mtn_momo': return 'MTN mobile money';
-        case 'airtel_momo': return 'Airtel money';
-        case 'card': return 'Card';
-        case 'prof_momo': return 'Prof Momo';
-        default: return method.type;
-      }
+      const methodOption = PAYMENT_METHOD_OPTIONS.find(opt => opt.value === method.type);
+      return methodOption ? methodOption.label : method.type;
     }
     return 'Multiple Methods';
   };
 
   const getTransactionIdForReceipt = () => {
     const momoMethod = paymentMethods.find(method => 
-      method.type === 'mtn_momo' || method.type === 'airtel_momo'
+      method.type === 'MTN_MOMO' || method.type === 'AIRTELL_MOMO' || method.type === 'PROF_MOMO'
     );
     return momoMethod?.transactionId || '';
   };
@@ -91,7 +94,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     if (paymentStatus === 'FULLY_PAID') {
       setAmountPaid(total);
       if (paymentMethods.length === 0) {
-        setPaymentMethods([{ type: 'cash', amount: total }]);
+        setPaymentMethods([{ type: 'CASH', amount: total }]);
       } else if (paymentMethods.length === 1) {
         setPaymentMethods([{ ...paymentMethods[0], amount: total }]);
       }
@@ -101,6 +104,12 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   }, [paymentStatus, total]);
 
+  // Calculate total from payment methods
+  useEffect(() => {
+    const paymentTotal = paymentMethods.reduce((sum, method) => sum + (method.amount || 0), 0);
+    setAmountPaid(paymentTotal);
+  }, [paymentMethods]);
+
   const handlePaymentMethodChange = (index: number, field: keyof IPaymentMethod, value: any) => {
     setPaymentMethods(prev => prev.map((method, i) => 
       i === index ? { ...method, [field]: value } : method
@@ -108,7 +117,11 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   };
 
   const addPaymentMethod = () => {
-    setPaymentMethods(prev => [...prev, { type: 'cash', amount: 0 }]);
+    if (paymentMethods.length >= 3) {
+      toast.error('Maximum of 3 payment methods allowed');
+      return;
+    }
+    setPaymentMethods(prev => [...prev, { type: 'CASH', amount: 0 }]);
   };
 
   const removePaymentMethod = (index: number) => {
@@ -122,29 +135,51 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   };
 
+  // Check if payment method requires transaction ID
+  const requiresTransactionId = (methodType: string) => {
+    return methodType === 'MTN_MOMO' || methodType === 'AIRTELL_MOMO' || methodType === 'PROF_MOMO' || methodType === 'CARD';
+  };
+
+  const validatePaymentMethods = () => {
+    // Check if any payment method has invalid amount
+    if (paymentMethods.some(method => method.amount <= 0)) {
+      toast.error('Please enter valid amounts for all payment methods');
+      return false;
+    }
+
+    // Check if total payment methods amount matches amount paid
+    const paymentTotal = paymentMethods.reduce((sum, method) => sum + method.amount, 0);
+    if (paymentTotal !== amountPaid) {
+      toast.error('Payment methods total must match amount paid');
+      return false;
+    }
+
+    // Validate transaction IDs for required methods
+    for (const method of paymentMethods) {
+      if (requiresTransactionId(method.type) && !method.transactionId?.trim()) {
+        const methodName = PAYMENT_METHOD_OPTIONS.find(opt => opt.value === method.type)?.label || method.type;
+        toast.error(`Please enter transaction ID for ${methodName}`);
+        return false;
+      }
+    }
+
+    return true;
+  };
+
   const handleCompleteSale = async () => {
     if (paymentStatus === 'PARTIALLY_PAID' && amountPaid <= 0) {
-      alert('Please enter a valid amount paid');
+      toast.error('Please enter a valid amount paid');
       return;
     }
 
-    if (paymentMethods.some(method => method.amount <= 0)) {
-      alert('Please enter valid amounts for all payment methods');
+    if (paymentStatus !== 'UNPAID' && !validatePaymentMethods()) {
       return;
-    }
-
-    // Validate transaction IDs for mobile money and card payments
-    for (const method of paymentMethods) {
-      if ((method.type.includes('momo') || method.type === 'card') && !method.transactionId) {
-        alert(`Please enter transaction ID for ${method.type}`);
-        return;
-      }
     }
 
     const checkoutData: ICheckoutData = {
       customerId: selectedCustomer || undefined,
       status: paymentStatus,
-      paymentMethods: paymentMethods.filter(method => method.amount > 0),
+      paymentMethods: paymentStatus === 'UNPAID' ? [] : paymentMethods.filter(method => method.amount > 0),
       notes,
       total,
       balance,
@@ -155,9 +190,16 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
     try {
       await apiRequest(SALESENDPOINTS.POS.complete_sale, 'POST', '', checkoutData);
-      handlePrint()
+      
+      setSelectedCustomer('');
+      setPaymentStatus('FULLY_PAID');
+      // Print receipt after successful sale
+      setTimeout(() => {
+        handlePrint();
+      }, 500);
+      
       onCompleteSale();
-    } catch (error) {
+    } catch (error: any) {
       toast.error(error?.response?.data?.message || 'An error occurred while processing the sale.');
     }
   };
@@ -172,7 +214,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
           <h2 className="text-2xl font-bold text-gray-800">Checkout</h2>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
+            className="text-gray-500 hover:text-gray-700 transition-colors"
           >
             <FaTimes size={20} />
           </button>
@@ -205,7 +247,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   />
                   <button
                     onClick={() => setModalProps({ isOpen: true, mode: 'create', client: null })}
-                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 flex items-center"
+                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 flex items-center transition-colors"
                   >
                     <FaUserPlus className="mr-2" />
                     New
@@ -223,15 +265,14 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     { value: 'FULLY_PAID', label: 'FULLY PAID' },
                     { value: 'PARTIALLY_PAID', label: 'PARTIAL' },
                     { value: 'UNPAID', label: 'UNPAID' }
-
                   ].map(status => (
                     <button
                       key={status.value}
                       onClick={() => setPaymentStatus(status.value as any)}
-                      className={`p-3 border rounded-lg text-center ${
+                      className={`p-3 border rounded-lg text-center transition-colors ${
                         paymentStatus === status.value
-                          ? 'border-gray-500 bg-gray-50 text-gray-700'
-                          : 'border-gray-300 hover:border-gray-400'
+                          ? 'border-blue-500 bg-blue-50 text-blue-700 font-semibold'
+                          : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
                       }`}
                     >
                       {status.label}
@@ -251,10 +292,13 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     value={amountPaid}
                     onChange={(e) => handleAmountPaidChange(Number(e.target.value))}
                     disabled={paymentStatus === 'FULLY_PAID'}
-                    className="w-full p-3 border border-gray-300 rounded-lg text-lg font-semibold"
+                    className="w-full p-3 border border-gray-300 rounded-lg text-lg font-semibold disabled:bg-gray-100 disabled:cursor-not-allowed"
                     min="0"
                     max={total}
                   />
+                  <div className="text-xs text-gray-500 mt-1">
+                    Total due: {total.toLocaleString()} UGX
+                  </div>
                 </div>
               )}
 
@@ -268,7 +312,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     {paymentMethods.length < 3 && (
                       <button
                         onClick={addPaymentMethod}
-                        className="text-sm text-gray-600 hover:text-gray-800"
+                        className="text-sm text-blue-600 hover:text-blue-800 font-medium"
                       >
                         + Add Method
                       </button>
@@ -278,21 +322,17 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   <div className="space-y-3">
                     {paymentMethods.map((method, index) => (
                       <div key={index} className="flex gap-2 items-start">
-                        <CustomDropdown
-                          options={[
-                            { value: 'cash', label: 'Cash' },
-                            { value: 'mtn_momo', label: 'MTN Momo' },
-                            { value: 'airtel_momo', label: 'Airtel Momo' },
-                            { value: 'card', label: 'Card' },
-                            { value: 'prof_momo', label: 'Prof Momo' }
-                          ]}
-                          value={[method.type]} // Wrap in array since your component expects string[]
-                          onChange={(selectedValues) => handlePaymentMethodChange(index, 'type', selectedValues[0] || 'cash')}
-                          placeholder="Select payment method..."
-                          searchPlaceholder="Search payment methods..."
-                          singleSelect={true}
-                          maxHeight={200}
-                        />
+                        <div className="flex-1">
+                          <CustomDropdown
+                            options={PAYMENT_METHOD_OPTIONS}
+                            value={[method.type]}
+                            onChange={(selectedValues) => handlePaymentMethodChange(index, 'type', selectedValues[0] || 'CASH')}
+                            placeholder="Select payment method..."
+                            searchPlaceholder="Search payment methods..."
+                            singleSelect={true}
+                            maxHeight={200}
+                          />
+                        </div>
                         
                         <input
                           type="number"
@@ -304,28 +344,34 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                           max={amountPaid}
                         />
                         
-                        {(method.type.includes('momo') || method.type === 'card') && (
+                        {requiresTransactionId(method.type) && (
                           <input
                             type="text"
                             value={method.transactionId || ''}
                             onChange={(e) => handlePaymentMethodChange(index, 'transactionId', e.target.value)}
                             className="flex-1 p-2 border border-gray-300 rounded-lg"
                             placeholder="Transaction ID"
-                            required
                           />
                         )}
                         
                         {paymentMethods.length > 1 && (
                           <button
                             onClick={() => removePaymentMethod(index)}
-                            className="p-2 text-red-600 hover:text-red-800"
+                            className="p-2 text-red-600 hover:text-red-800 transition-colors"
+                            title="Remove payment method"
                           >
-                            <FaTimes />
+                            <FaTimes size={14} />
                           </button>
                         )}
                       </div>
                     ))}
                   </div>
+                  
+                  {paymentMethods.length > 0 && (
+                    <div className="mt-2 text-xs text-gray-500">
+                      Total from payment methods: {paymentMethods.reduce((sum, method) => sum + method.amount, 0).toLocaleString()} UGX
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -338,45 +384,52 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   rows={3}
-                  className="w-full p-3 border border-gray-300 rounded-lg"
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Add any notes about this sale..."
                 />
               </div>
             </div>
 
             {/* Right Column - Order Summary */}
-            <div className="bg-gray-50 p-6 rounded-lg">
+            <div className="bg-gray-50 p-6 rounded-lg border">
               <h3 className="text-lg font-semibold mb-4">Order Summary</h3>
               
               {/* Cart Items */}
-              <div className="space-y-3 mb-4">
+              <div className="space-y-3 mb-4 max-h-60 overflow-y-auto">
                 {cart.map(item => (
-                  <div key={item.id} className="flex justify-between text-sm">
-                    <div>
-                      <span className="font-medium">{item.quantity}x </span>
-                      {item.name}
+                  <div key={item.id} className="flex justify-between text-sm pb-2 border-b border-gray-200">
+                    <div className="flex-1">
+                      <div className="font-medium">
+                        <span className="text-gray-600">{item.quantity}x </span>
+                        {item.name}
+                      </div>
                       {item.discount > 0 && (
-                        <span className="text-red-600 text-xs ml-2">
-                          (-{item.discount.toLocaleString()} UGX)
-                        </span>
+                        <div className="text-red-600 text-xs">
+                          Discount: -{item.discount.toLocaleString()} UGX
+                        </div>
                       )}
                     </div>
-                    <span className="font-medium">
-                      {item.total.toLocaleString()} UGX
-                    </span>
+                    <div className="text-right">
+                      <div className="font-medium">
+                        {item.total.toLocaleString()} UGX
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {item.price.toLocaleString()} UGX each
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
 
               {/* Totals */}
               <div className="border-t pt-4 space-y-2">
-                <div className="flex justify-between">
-                  <span>Subtotal:</span>
-                  <span>{total.toLocaleString()} UGX</span>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Subtotal:</span>
+                  <span className="font-medium">{total.toLocaleString()} UGX</span>
                 </div>
-                <div className="flex justify-between">
-                  <span>Amount Paid:</span>
-                  <span className="text-green-600">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Amount Paid:</span>
+                  <span className="font-medium text-green-600">
                     {amountPaid.toLocaleString()} UGX
                   </span>
                 </div>
@@ -387,6 +440,21 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   </span>
                 </div>
               </div>
+
+              {/* Payment Status Summary */}
+              <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="text-sm text-blue-800">
+                  <div className="font-semibold">Payment Status: {paymentStatus.replace('_', ' ')}</div>
+                  {paymentStatus !== 'UNPAID' && (
+                    <div className="mt-1">
+                      Methods: {paymentMethods.map(method => {
+                        const methodOption = PAYMENT_METHOD_OPTIONS.find(opt => opt.value === method.type);
+                        return `${methodOption?.label} (${method.amount.toLocaleString()} UGX)`;
+                      }).join(', ')}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -395,7 +463,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         <div className="flex justify-between items-center p-6 border-t bg-gray-50">
           <button
             onClick={handlePrint}
-            className="flex items-center px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-100"
+            className="flex items-center px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
           >
             <FaPrint className="mr-2" />
             Print Receipt
@@ -404,13 +472,13 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
           <div className="flex gap-3">
             <button
               onClick={onClose}
-              className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-100"
+              className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={handleCompleteSale}
-              className="flex items-center px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              className="flex items-center px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold"
             >
               <FaCheck className="mr-2" />
               Complete Sale
@@ -442,6 +510,8 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
           </div>
         </div>
       </div>
+      
+      {/* Add Client Modal */}
       <AddOrModifyClient
         visible={modalProps.isOpen}
         client={modalProps.client}
