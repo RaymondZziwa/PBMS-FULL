@@ -48,6 +48,7 @@ const EmployeeManagement = () => {
     { key: 'role', label: 'Role', sortable: true, filterable: true },
     { key: 'salary', label: 'Salary', sortable: true, filterable: true },
     { key: 'hasAccess', label: 'Has System Access', sortable: true, filterable: true },
+    { key: 'hasPrescriptionAccess', label: 'Has Prescription DB Access', sortable: true, filterable: true },
     { key: 'isActive', label: 'Is Active', sortable: true, filterable: true },
     { key: 'createdAt', label: 'Created At', sortable: true, filterable: false },
     { key: 'actions', label: 'Actions', sortable: false, filterable: false },
@@ -68,6 +69,7 @@ const EmployeeManagement = () => {
     branch: employee.branch.name,
     role: employee.role.name,
     hasAccess: employee.hasAccess ? "Yes" : "No",
+    hasPrescriptionAccess: employee.hasPrescriptionAccess ? "Yes" : "No",
     isActive: employee.isActive ? "Yes" : "No",
     createdAt: formatDate(employee.createdAt),
     actions: (

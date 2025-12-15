@@ -28,6 +28,7 @@ export interface ISale {
   };
   status: 'FULLY_PAID' | 'PARTIALLY_PAID' | 'UNPAID';
   total: number;
+  deliverNoteImage?: string;
   balance: number; 
   paymentMethods: PaymentMethodDto[];
   notes?: string;
@@ -95,7 +96,7 @@ export interface IProjectSale {
   cashierId: string;
   createdAt: Date;
   updatedAt: Date;
-  
+  deliveryNoteImage?: string;
   // Computed fields (from API)
   totalPaid?: number;
   remainingBalance?: number;
@@ -130,9 +131,11 @@ export interface IProjectPayment {
   id: string;
   saleId: string;
   amount: number;
-    exhibitionId?: string;
-    paymentMethod?: string;
-    referenceId?: string;
+  exhibitionId?: string;
+  paymentMethod?: string;
+  referenceId?: string;
+  bankDepositSlipImage: string;
+  receiptImage: string;
   cashierId: string;
   createdAt: Date;
   updatedAt: Date;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FaArrowLeft, FaPlus, FaEdit, FaTrash, FaMoneyBillWave, FaReceipt, FaFilter, FaSearch } from 'react-icons/fa';
+import { FaArrowLeft, FaPlus, FaEdit, FaTrash, FaMoneyBillWave, FaReceipt, FaFilter, FaSearch, FaFileUpload, FaEye, FaExclamationTriangle } from 'react-icons/fa';
 import useProjectSale from '../../hooks/projects/useProjectSale';
 import type { IProjectSale, IProjectPayment } from '../../redux/types/sales';
 import CustomDropdown from '../../custom/inputs/customDropdown';
@@ -9,6 +9,8 @@ import { apiRequest } from '../../libs/apiConfig';
 import { PROJECTENDPOINTS } from '../../endpoints/projects/projectEndpoints';
 import { toast } from 'sonner';
 import CustomTable from '../../custom/table/customTable';
+import ImagePreviewModal from '../../custom/modals/imagePreviewModal';
+import UploadEvidenceModal from './uploadEvidenceModal';
 
 const SalePayments: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -19,6 +21,16 @@ const SalePayments: React.FC = () => {
   const [editingPayment, setEditingPayment] = useState<IProjectPayment | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
+    const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [selectedPaymentForUpload, setSelectedPaymentForUpload] = useState<IProjectPayment | null>(null);
+  const [uploadType, setUploadType] = useState<"DeliveryNote" | "BankSlip" | "PaymentReceipt">()
+  
+  const handleEvidence = (sale: IProjectPayment, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedPaymentForUpload(sale);
+    setIsUploadModalOpen(true);
+  };
 
   // Find the specific sale when sales data loads
   useEffect(() => {
@@ -28,8 +40,71 @@ const SalePayments: React.FC = () => {
     }
   }, [sales, id]);
 
+  // Handle image preview
+  const handleImagePreview = (imageUrl: string, title: string) => {
+    setPreviewImage({ url: imageUrl, title });
+  };
+
+  // Check if any payments are missing images
+  const hasMissingImages = sale?.ProjectPayments?.some(payment => 
+    !payment.receiptImage || !payment.bankDepositSlipImage
+  );
+
+  // Get row class based on missing images
+  const getRowClass = (payment: IProjectPayment) => {
+    const missingReceipt = !payment.receiptImage;
+    const missingDepositSlip = !payment.bankDepositSlipImage;
+    
+    if (missingReceipt && missingDepositSlip) {
+      return 'bg-red-50 border-l-4 border-l-red-400 hover:bg-red-100';
+    } else if (missingReceipt || missingDepositSlip) {
+      return 'bg-yellow-50 border-l-4 border-l-yellow-400 hover:bg-yellow-100';
+    }
+    return '';
+  };
+
   // Table columns configuration for payments
   const paymentColumns = [
+    { 
+      key: 'imageStatus', 
+      label: 'Document Status', 
+      sortable: true, 
+      filterable: true,
+      render: (value: any, payment: IProjectPayment) => {
+        const missingReceipt = !payment.receiptImage;
+        const missingDepositSlip = !payment.bankDepositSlipImage;
+        
+        if (missingReceipt && missingDepositSlip) {
+          return (
+            <div className="flex items-center gap-2 text-red-600">
+              <FaExclamationTriangle />
+              <span className="text-sm font-medium">Missing Both</span>
+            </div>
+          );
+        } else if (missingReceipt) {
+          return (
+            <div className="flex items-center gap-2 text-yellow-600">
+              <FaExclamationTriangle />
+              <span className="text-sm font-medium">Missing Receipt</span>
+            </div>
+          );
+        } else if (missingDepositSlip) {
+          return (
+            <div className="flex items-center gap-2 text-yellow-600">
+              <FaExclamationTriangle />
+              <span className="text-sm font-medium">Missing Deposit Slip</span>
+            </div>
+          );
+        } else {
+          return (
+            <div className="flex items-center gap-2 text-green-600">
+              <FaReceipt />
+              <span className="text-sm font-medium">Complete</span>
+            </div>
+          );
+        }
+      }
+    },
     { 
       key: 'createdAt', 
       label: 'Payment Date', 
@@ -61,7 +136,6 @@ const SalePayments: React.FC = () => {
       sortable: true, 
       filterable: true,
     },
-  
     { 
       key: 'notes', 
       label: 'Notes', 
@@ -76,26 +150,97 @@ const SalePayments: React.FC = () => {
       filterable: false,
       render: (value: any, payment: IProjectPayment) => (
         <div className="flex space-x-2">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleEditPayment(payment);
-            }}
-            className="p-1 text-blue-600 hover:text-blue-800 transition-colors"
-            title="Edit Payment"
-          >
-            <FaEdit size={14} />
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDeletePayment(payment.id);
-            }}
-            className="p-1 text-red-600 hover:text-red-800 transition-colors"
-            title="Delete Payment"
-          >
-            <FaTrash size={14} />
-          </button>
+          {/* Bank Deposit Slip Action */}
+          <div className="relative group">
+            {payment.bankDepositSlipImage ? (
+              <button
+                className="text-green-600 hover:text-green-800 transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleImagePreview(payment.bankDepositSlipImage!, 'Bank Deposit Slip');
+                }}
+              >
+                <FaEye />
+              </button>
+            ) : (
+              <button
+                className="text-yellow-600 hover:text-yellow-800 transition-colors"
+                  onClick={(e) => {
+                  setUploadType('BankSlip')
+                  e.stopPropagation();
+                  setSelectedPaymentForUpload(payment);
+                  setIsUploadModalOpen(true);
+                }}
+              >
+                <FaFileUpload />
+              </button>
+            )}
+            <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+              {payment.bankDepositSlipImage ? 'View Bank Deposit Slip' : 'Upload Bank Deposit Slip'}
+            </span>
+          </div>
+
+          {/* Receipt Image Action */}
+          <div className="relative group">
+            {payment.receiptImage ? (
+              <button
+                className="text-green-600 hover:text-green-800 transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleImagePreview(payment.receiptImage!, 'Payment Receipt');
+                }}
+              >
+                <FaEye />
+              </button>
+            ) : (
+              <button
+                className="text-yellow-600 hover:text-yellow-800 transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setUploadType('PaymentReceipt')
+                  setSelectedPaymentForUpload(payment);
+                  setIsUploadModalOpen(true);
+                }}
+              >
+                <FaFileUpload />
+              </button>
+            )}
+            <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+              {payment.receiptImage ? 'View Payment Receipt' : 'Upload Payment Receipt'}
+            </span>
+          </div>
+
+          {/* Edit Action */}
+          <div className="relative group">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleEditPayment(payment);
+              }}
+              className="p-1 text-blue-600 hover:text-blue-800 transition-colors"
+            >
+              <FaEdit size={14} />
+            </button>
+            <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+              Edit Payment
+            </span>
+          </div>
+
+          {/* Delete Action */}
+          <div className="relative group">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeletePayment(payment.id);
+              }}
+              className="p-1 text-red-600 hover:text-red-800 transition-colors"
+            >
+              <FaTrash size={14} />
+            </button>
+            <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+              Delete Payment
+            </span>
+          </div>
         </div>
       )
     }
@@ -122,12 +267,14 @@ const SalePayments: React.FC = () => {
   };
 
   const handleDeletePayment = async (paymentId: string) => {
-    
-    try {
-      await apiRequest(PROJECTENDPOINTS.PROJECT_PAYMENTS.delete(paymentId), "DELETE", '');
-      refresh(); // Refresh the data
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Failed to delete payment');
+    if (window.confirm('Are you sure you want to delete this payment?')) {
+      try {
+        await apiRequest(PROJECTENDPOINTS.PROJECT_PAYMENTS.delete(paymentId), "DELETE", '');
+        toast.success('Payment deleted successfully');
+        refresh();
+      } catch (error: any) {
+        toast.error(error?.response?.data?.message || 'Failed to delete payment');
+      }
     }
   };
 
@@ -139,13 +286,12 @@ const SalePayments: React.FC = () => {
   const handleModalClose = () => {
     setIsCreateModalOpen(false);
     setEditingPayment(null);
-    refresh(); // Refresh data after any payment operation
+    refresh();
   };
 
   const handlePaymentSubmit = async (paymentData: any) => {
     try {
       if (editingPayment) {
-        // Update existing payment
         await apiRequest(
           PROJECTENDPOINTS.PROJECT_PAYMENTS.update(editingPayment.id),
           "PUT",
@@ -153,7 +299,6 @@ const SalePayments: React.FC = () => {
         );
         toast.success('Payment updated successfully');
       } else {
-        // Create new payment
         await apiRequest(
           PROJECTENDPOINTS.PROJECT_PAYMENTS.create,
           "POST",
@@ -172,12 +317,27 @@ const SalePayments: React.FC = () => {
     console.log('Payment clicked:', payment);
   };
 
-  // Prepare table data with flattened employee name
-  const tableData = filteredPayments.map(payment => ({
-    ...payment,
-    servedBy: payment.employee ? `${payment.employee.firstName} ${payment.employee.lastName}` : '-',
-    createdAt: new Date(payment.createdAt),
-  }));
+  // Prepare table data with flattened employee name and image status
+  const tableData = filteredPayments.map(payment => {
+    const missingReceipt = !payment.receiptImage;
+    const missingDepositSlip = !payment.bankDepositSlipImage;
+    
+    let imageStatus = 'complete';
+    if (missingReceipt && missingDepositSlip) {
+      imageStatus = 'missing-both';
+    } else if (missingReceipt || missingDepositSlip) {
+      imageStatus = 'missing-one';
+    }
+    
+    return {
+      ...payment,
+      imageStatus,
+      servedBy: payment.employee ? `${payment.employee.firstName} ${payment.employee.lastName}` : '-',
+      createdAt: new Date(payment.createdAt),
+      // Store the row class for highlighting
+      _rowClass: getRowClass(payment)
+    };
+  });
 
   if (loading) {
     return (
@@ -233,13 +393,38 @@ const SalePayments: React.FC = () => {
                 ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
                 : 'bg-green-600 text-white hover:bg-green-700'
               }`}
-              title={remainingBalance <= 0 ? 'Sale is fully paid' : 'Add new payment'}
             >
               <FaPlus className="mr-2" />
               New Payment
             </button>
           </div>
           
+          {/* Warning banner for missing images */}
+          {hasMissingImages && (
+            <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center gap-3">
+              <FaExclamationTriangle className="text-yellow-500 text-xl" />
+              <div>
+                <p className="text-yellow-800 font-medium">
+                  Document Alert
+                </p>
+                <p className="text-yellow-700 text-sm">
+                  Some payments are missing receipt images or bank deposit slips. 
+                  Highlighted rows indicate missing documents:
+                </p>
+                <div className="flex gap-4 mt-1 text-xs">
+                  <span className="flex items-center gap-1">
+                    <div className="w-3 h-3 bg-red-400 rounded"></div>
+                    Missing both documents
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <div className="w-3 h-3 bg-yellow-400 rounded"></div>
+                    Missing one document
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Sale Summary */}
           <div className="bg-white p-4 rounded-lg shadow-sm mb-4">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -387,6 +572,7 @@ const SalePayments: React.FC = () => {
           onRowClick={handleRowClick}
           loading={false}
           emptyMessage="No payments found. Add your first payment to get started."
+          getRowClass={(row: any) => row._rowClass || ''}
         />
       </div>
 
@@ -398,6 +584,26 @@ const SalePayments: React.FC = () => {
         payment={editingPayment}
         onSubmit={handlePaymentSubmit}
       />
+
+      {/* Image Preview Modal */}
+      {previewImage && (
+        <ImagePreviewModal
+          imageUrl={previewImage.url}
+          title={previewImage.title}
+          onClose={() => setPreviewImage(null)}
+        />
+      )}
+      <UploadEvidenceModal
+        visible={isUploadModalOpen}
+        onCancel={() => {
+          setIsUploadModalOpen(false);
+          setSelectedPaymentForUpload(null);
+        } }
+        onSuccess={() => {
+          refresh();
+          setIsUploadModalOpen(false);
+        }}
+        projectSale={null} projectPayment={selectedPaymentForUpload} type={uploadType} />
     </div>
   );
 };

@@ -13,12 +13,14 @@ interface CustomTableProps {
   columns: Column[];
   data: Record<string, any>[];
   pageSize?: number;
+  getRowClass?: (row: any) => string;
 }
 
 const CustomTable: React.FC<CustomTableProps> = ({ 
   columns, 
   data, 
-  pageSize = 10 
+  pageSize = 10,
+  getRowClass
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
@@ -271,7 +273,7 @@ const CustomTable: React.FC<CustomTableProps> = ({
               paginatedData.map((row, idx) => (
                 <tr 
                   key={idx} 
-                  className="hover:bg-gray-50 transition-colors"
+                  className={`hover:bg-gray-50 transition-colors ${getRowClass ? getRowClass(row) : ''}`}
                 >
                   {columns.map((col) => (
                     <td key={col.key} className="p-3 text-sm text-gray-700">

@@ -8,6 +8,8 @@ import useStores from '../../../hooks/inventory/useStores';
 import type { ICartItem } from '../../../redux/types/sales';
 import CheckoutModal from './checkoutModal';
 import useStoreInventory from '../../../hooks/inventory/useStoreInventory';
+import { useSelector } from 'react-redux';
+import type { RootState } from '../../../redux/store';
 
 interface POSStore {
   storeId: string;
@@ -24,6 +26,13 @@ const PointOfSale: React.FC = () => {
   const [cart, setCart] = useState<ICartItem[]>([]);
   const [showCheckout, setShowCheckout] = useState(false);
   const [filterCategory, setFilterCategory] = useState<string>('all');
+    const user = useSelector((state: RootState) => state.userAuth.data);
+
+  const currentUserId = user.id;
+
+  const userStores = stores.filter(store =>
+    store.authorizedPersonnel.includes(currentUserId)
+  );
 
   useEffect(() => {
     // Check for stored store selection
@@ -151,12 +160,14 @@ const PointOfSale: React.FC = () => {
       {/* Items Section - 70% */}
       <div className="w-3/4 p-4">
         <ItemsGrid
-          items={allItems || []}
+          items={allItems.filter((item) => item.item.showInPos === true) || []}
           selectedStore={selectedStore}
           filterCategory={filterCategory}
           onCategoryChange={setFilterCategory}
           onAddToCart={handleAddToCart}
           onBarcodeScan={handleBarcodeScan}
+          stores={userStores}
+          activeStore={selectedStore}
         />
       </div>
 

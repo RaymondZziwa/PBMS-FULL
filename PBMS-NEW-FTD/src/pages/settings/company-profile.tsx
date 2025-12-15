@@ -21,6 +21,7 @@ interface CompanyProfileType {
   description: string;
   foundedYear: number;
   industry: string;
+  workHours: number;
   employees: string;
 }
 
@@ -39,6 +40,7 @@ const CompanyProfile = () => {
     tinNumber: '12-3456789',
     description: 'We provide excellent products and services to our customers.',
     foundedYear: 2010,
+    workHours: 10,
     industry: 'Technology',
     employees: '50-100',
   });
@@ -76,6 +78,7 @@ const CompanyProfile = () => {
             tinNumber: data.tinNumber || '12-3456789',
             description: data.description || '',
             foundedYear: data.foundedYear || 2010,
+            workHours: data.workHours || 10,
             industry: data.industry || '',
             employees: data.employees || '',
           });
@@ -147,6 +150,7 @@ const CompanyProfile = () => {
       formData.append('description', profile.description);
       formData.append('foundedYear', profile.foundedYear.toString());
       formData.append('industry', profile.industry);
+      formData.append('workHours', profile.workHours.toString());
       formData.append('employees', profile.employees);
       profile.phoneNumbers.forEach((num, idx) => formData.append(`phoneNumbers[${idx}]`, num));
 
@@ -365,6 +369,14 @@ const CompanyProfile = () => {
                 <CustomTextInput value={profile.employees} onChange={val => handleInputChange('employees', val)} />
               ) : (
                 <p className="text-gray-800">{profile.employees}</p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Work Hours</label>
+              {isEditing ? (
+                <CustomNumberInput value={profile.workHours} onChange={val => handleInputChange('workHours', val)} />
+              ) : (
+                <p className="text-gray-800">{profile.workHours} hrs/day</p>
               )}
             </div>
           </div>

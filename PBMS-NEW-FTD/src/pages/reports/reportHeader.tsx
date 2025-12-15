@@ -23,6 +23,7 @@ interface ReportHeaderProps {
   companyInfo: CompanyInfo;
   reportName: string;
   storeName?: string;
+  branchName?: string;
   generatedDate?: Date;
 }
 
@@ -30,6 +31,7 @@ const ReportHeader: React.FC<ReportHeaderProps> = ({
   companyInfo, 
   reportName, 
   storeName,
+  branchName,
   generatedDate = new Date() 
 }) => {
   return (
@@ -88,6 +90,11 @@ const ReportHeader: React.FC<ReportHeaderProps> = ({
           {storeName && (
             <div>
               <span className="font-semibold">Store:</span> {storeName}
+            </div>
+          )}
+           {branchName && (
+            <div>
+              <span className="font-semibold">Branch:</span> {branchName}
             </div>
           )}
           <div>

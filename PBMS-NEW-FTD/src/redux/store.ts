@@ -34,6 +34,16 @@ import BranchExpenseReducer from './slices/expenses/branchExpenseSlice';
 import StoreInventoryReducer from './slices/inventory/storeInventorySlice';
 import ExhibitionStoreInventoryReducer from './slices/exhibition/exhibitionStoreInventory';
 import CreditSaleReducer from './slices/sales/creditSaleSlice';
+import AttendanceReducer from './slices/humanResource/attendanceSlice';
+import PayrollReducer from './slices/humanResource/payrollSlice';
+import DeliveryNoteReducer from './slices/inventory/deliveryNoteSlice';
+import SupplierReducer from './slices/inventory/supplierSlice';
+import pbpdReducer from './slices/humanResource/prescriptionDBSlice';
+import seedlingBatchReducer from './slices/farm/batchSlice';
+import seedlingDeathReducer from './slices/farm/deathSlice';
+import seedlingGrowthReducer from './slices/farm/growthSlice';
+import seedlingStageReducer from './slices/farm/stageSlice';
+import ManufacturingReducer from './slices/manufacturing/manufacturingSlice';
 
 // Persist config for userAuth
 const userAuthPersistConfig = {
@@ -45,7 +55,12 @@ const userAuthPersistConfig = {
 const persistedUserAuthReducer = persistReducer(userAuthPersistConfig, UserAuthReducer);
 
 export const store = configureStore({
-    reducer: {
+  reducer: {
+    seedlingStage: seedlingStageReducer,
+    seedlingBatch: seedlingBatchReducer,
+    seedlingDeath: seedlingDeathReducer,
+    seedlingGrowth: seedlingGrowthReducer,
+    pbpd: pbpdReducer,
     branch: branchReducer,
     permission: permissionReducer,
     role: roleReducer,
@@ -70,6 +85,11 @@ export const store = configureStore({
     storeInventory: StoreInventoryReducer,
     exhibitionStoreInventory: ExhibitionStoreInventoryReducer,
     creditSale: CreditSaleReducer,
+    attendance: AttendanceReducer,
+    payroll: PayrollReducer,
+    deliveryNotes: DeliveryNoteReducer,
+    supplier: SupplierReducer,
+    manufacturing: ManufacturingReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

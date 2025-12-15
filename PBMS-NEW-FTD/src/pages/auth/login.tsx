@@ -8,7 +8,7 @@ import {
   FiPhone
 } from 'react-icons/fi';
 import { fetchDataStart, fetchDataSuccess, fetchDataFailure } from "../../redux/slices/auth/userAuthSlice";
-import { baseURL } from '../../libs/apiConfig';
+import { baseURL, system } from '../../libs/apiConfig';
 import { AuthEndpoints } from '../../endpoints/auth/authEndpoints';
 import { useDispatch } from 'react-redux';
 import { toast, Toaster } from 'sonner';
@@ -107,7 +107,7 @@ const handleSubmit = async (e: React.FormEvent) => {
         {/* Header */}
         <div className="text-center flex flex-col items-center">
           <div className="w-full max-w-md bg-gray-700 rounded-xl flex items-center justify-center p-4 shadow-lg mb-6">
-            <span className="text-white font-bold text-md tracking-wide">Prof Bioresearch Management System</span>
+            <span className="text-white font-bold text-md tracking-wide">{ system === "PBMS" ? 'Prof Bioresearch Management System' : 'DEIN COMPANY LTD'}</span>
           </div>
           
           <div className="bg-white rounded-2xl p-8 border border-gray-200 shadow-sm w-full">
@@ -290,7 +290,7 @@ const handleSubmit = async (e: React.FormEvent) => {
         {/* Footer */}
         <div className="text-center">
           <p className="text-xs text-gray-500">
-            © 2024 Prof Bioresearch. All rights reserved.
+            © {new Date().getFullYear()} { system === "PBMS" ? 'Prof Bioresearch' : 'DEIN COMPANY LTD'}. All rights reserved.
           </p>
         </div>
       </div>

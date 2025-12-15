@@ -188,15 +188,17 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       servedBy: user.id
     };
 
+    if (!checkoutData.customerId) {
+          toast.error('Please select a customer')
+          return;
+    }
+
     try {
       await apiRequest(SALESENDPOINTS.POS.complete_sale, 'POST', '', checkoutData);
       
       setSelectedCustomer('');
       setPaymentStatus('FULLY_PAID');
-      // Print receipt after successful sale
-      setTimeout(() => {
         handlePrint();
-      }, 500);
       
       onCompleteSale();
     } catch (error: any) {
@@ -232,7 +234,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 <div className="flex gap-2">
                   <CustomDropdown
                     options={[
-                      { value: '', label: 'Walk-in Customer' },
                       ...(clients?.map(client => ({
                         value: client.id,
                         label: `${client.firstName} ${client.lastName} - ${client.contact}`

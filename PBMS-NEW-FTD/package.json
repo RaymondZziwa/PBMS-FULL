@@ -5,12 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite  --host --port 5170",
-    "build": "tsc -b && vite build",
+    "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@iconify/react": "^6.0.2",
     "@reduxjs/toolkit": "^2.9.0",
+    "antd": "^5.27.6",
     "axios": "^1.11.0",
     "lucide-react": "^0.545.0",
     "react": "^19.1.1",

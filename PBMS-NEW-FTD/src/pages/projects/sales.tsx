@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaPlus, FaSearch, FaFilter, FaTrash, FaEdit } from 'react-icons/fa';
+import { FaPlus, FaSearch, FaFilter, FaTrash, FaEdit, FaExclamationTriangle, FaFileUpload, FaEye } from 'react-icons/fa';
 import useProjectSale from '../../hooks/projects/useProjectSale';
 import type { IProjectSale } from '../../redux/types/sales';
 import AddOrModifyProjectSale from './AddorModifySale';
@@ -10,13 +10,19 @@ import { toast } from 'sonner';
 import { PROJECTENDPOINTS } from '../../endpoints/projects/projectEndpoints';
 import { apiRequest } from '../../libs/apiConfig';
 import CustomDeleteModal from '../../custom/modals/customDeleteModal';
+import UploadEvidenceModal from './uploadEvidenceModal';
+import ImagePreviewModal from '../../custom/modals/imagePreviewModal';
 
 const ProjectSales: React.FC = () => {
-    const navigate = useNavigate();
+  const navigate = useNavigate();
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [previewTitle, setPreviewTitle] = useState<string>('');
   const { data: sales, loading, refresh } = useProjectSale();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
- const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [selectedSaleForUpload, setSelectedSaleForUpload] = useState<IProjectSale | null>(null);
       const [modalProps, setModalProps] = useState<{
         isOpen: boolean;
         mode: 'create' | 'edit' | '';
@@ -28,7 +34,14 @@ const ProjectSales: React.FC = () => {
       });
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedSale, setSelectedSale] = useState<IProjectSale | null>(null);
-  
+
+    // Handle upload delivery note action
+  const handleUploadDeliveryNote = (sale: IProjectSale, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedSaleForUpload(sale);
+    setIsUploadModalOpen(true);
+  };
+
   const deleteProjectSale = async () => {
     try {
       if (selectedSale) {
@@ -58,6 +71,24 @@ const ProjectSales: React.FC = () => {
 
   // Table columns configuration
   const columns = [
+    { 
+      key: 'deliveryNoteStatus', 
+      label: 'Delivery Note', 
+      sortable: true, 
+      filterable: true,
+      render: (value: any, row: IProjectSale) => (
+        <div className="flex items-center gap-2">
+          {row.deliveryNoteImage === null ? (
+            <>
+              <FaExclamationTriangle className="text-yellow-500" />
+              <span className="text-yellow-600 font-medium">Missing</span>
+            </>
+          ) : (
+            <span className="text-green-600 font-medium">Available</span>
+          )}
+        </div>
+      )
+    },
     { 
       key: 'client', 
       label: 'Client Name', 
@@ -146,40 +177,84 @@ const ProjectSales: React.FC = () => {
       render: (value: Date) => new Date(value).toLocaleDateString()
     },
     {
-      key: 'actions',
-      label: 'Actions',
-      sortable: false,
-      filterable: false,
-      render: (value: any, row: IProjectSale) => (
-        <div className="flex gap-3" onClick={(e) => e.stopPropagation()}>
-          {/* Edit Button with Tooltip */}
-          <div className="relative group">
-            <button
-              className="text-blue-600 hover:text-blue-800 transition-colors"
-              onClick={(e) => handleEdit(row, e)}
-            >
-              <FaEdit />
-            </button>
-            <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-              Edit
-            </span>
-          </div>
-          
-          {/* Delete Button with Tooltip */}
-          <div className="relative group">
-            <button
-              className="text-red-600 hover:text-red-800 transition-colors"
-              onClick={(e) => handleDelete(row, e)}
-            >
-              <FaTrash />
-            </button>
-            <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-              Delete
-            </span>
-          </div>
+  key: 'actions',
+  label: 'Actions',
+  sortable: false,
+  filterable: false,
+  render: (value: any, row: IProjectSale) => (
+    <div className="flex gap-3" onClick={(e) => e.stopPropagation()}>
+      {/* Upload / Update Delivery Note */}
+      <div className="relative group">
+        <button
+          className={`transition-colors ${
+            row.deliveryNoteImage === null 
+              ? 'text-yellow-600 hover:text-yellow-800' 
+              : 'text-green-600 hover:text-green-800'
+          }`}
+          onClick={(e) => handleUploadDeliveryNote(row, e)}
+          title={
+            row.deliveryNoteImage === null
+              ? 'Upload Delivery Note'
+              : 'Update Delivery Note'
+          }
+        >
+          <FaFileUpload />
+        </button>
+        <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+          {row.deliveryNoteImage === null
+            ? 'Upload Delivery Note'
+            : 'Update Delivery Note'}
+        </span>
+      </div>
+
+      {/* 👁️ Preview Button (only if image exists) */}
+      {row.deliveryNoteImage && (
+        <div className="relative group">
+          <button
+            className="text-blue-600 hover:text-blue-800 transition-colors"
+            onClick={() => {
+              console.log('image', row.deliveryNoteImage)
+              setPreviewImage(row.deliveryNoteImage);
+              setPreviewTitle(`Delivery Note - ${row.project?.name || row.id}`);
+            }}
+          >
+            <FaEye />
+          </button>
+          <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+            Preview Delivery Note
+          </span>
         </div>
-      )
-    }
+      )}
+
+      {/* ✏️ Edit Button */}
+      <div className="relative group">
+        <button
+          className="text-blue-600 hover:text-blue-800 transition-colors"
+          onClick={(e) => handleEdit(row, e)}
+        >
+          <FaEdit />
+        </button>
+        <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+          Edit
+        </span>
+      </div>
+
+      {/* 🗑️ Delete Button */}
+      <div className="relative group">
+        <button
+          className="text-red-600 hover:text-red-800 transition-colors"
+          onClick={(e) => handleDelete(row, e)}
+        >
+          <FaTrash />
+        </button>
+        <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+          Delete
+        </span>
+      </div>
+    </div>
+  )
+}
+
   ];
 
   // Filter sales based on search and status
@@ -199,11 +274,27 @@ const ProjectSales: React.FC = () => {
     navigate(`/projects/sales/${sale.id}/payments`);
   };
 
-  // Format table data - WITHOUT including actions in the data
-  const tableData = filteredSales.map(sale => ({
-    ...sale,
-    createdAt: new Date(sale.createdAt),
-  }));
+  // Format table data with row classes for highlighting
+  // Format table data with row classes for highlighting
+  const tableData = filteredSales.map(sale => {
+    const hasMissingDeliveryNote = sale.deliveryNoteImage === null;
+    
+    return {
+      ...sale,
+      deliveryNoteStatus: hasMissingDeliveryNote ? 'missing' : 'available',
+      createdAt: sale.createdAt, // Keep as string for the render function to handle
+    };
+  });
+
+  // Function to get row class based on delivery note status
+  const getRowClass = (row: IProjectSale) => {
+    return row.deliveryNoteImage === null 
+      ? 'bg-yellow-50 border-l-4 border-l-yellow-400 hover:bg-yellow-100' 
+      : '';
+  };
+
+  // Check if there are any sales with missing delivery notes
+  const hasMissingDeliveryNotes = sales.some(sale => sale.deliveryNoteImage === null);
 
   return (
     <div className="p-6">
@@ -221,6 +312,21 @@ const ProjectSales: React.FC = () => {
           New Project Sale
         </button>
       </div>
+
+      {/* Warning message for missing delivery notes */}
+      {hasMissingDeliveryNotes && (
+        <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center gap-3">
+          <FaExclamationTriangle className="text-yellow-500 text-xl" />
+          <div>
+            <p className="text-yellow-800 font-medium">
+              Delivery Note Alert
+            </p>
+            <p className="text-yellow-700 text-sm">
+              Some sales are missing delivery note images. These rows are highlighted in yellow.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="bg-white p-4 rounded-lg shadow-sm mb-6">
@@ -291,6 +397,7 @@ const ProjectSales: React.FC = () => {
           onRowClick={handleRowClick}
           loading={loading}
           emptyMessage="No sales found. Create your first sale to get started."
+           getRowClass={getRowClass}
         />
       </div>
 
@@ -309,6 +416,30 @@ const ProjectSales: React.FC = () => {
         }}
         onConfirm={deleteProjectSale}
       />
+
+      <UploadEvidenceModal
+        visible={isUploadModalOpen}
+        onCancel={() => {
+          setIsUploadModalOpen(false);
+          setSelectedSaleForUpload(null);
+        } }
+        onSuccess={() => {
+          refresh();
+          setIsUploadModalOpen(false);
+        }}
+        projectSale={selectedSaleForUpload} projectPayment={null} type={'DeliveryNote'} />
+      
+      {previewImage && (
+        <ImagePreviewModal
+          imageUrl={previewImage}
+          title={previewTitle}
+          onClose={() => {
+            setPreviewImage(null);
+            setPreviewTitle('');
+          }}
+        />
+      )}
+
     </div>
   );
 };

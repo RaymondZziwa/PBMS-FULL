@@ -14,7 +14,9 @@ import {
     FaTicketAlt,
     FaSeedling,
     FaProjectDiagram,
-    FaReceipt
+    FaReceipt,
+    FaUserInjured,
+    FaIndustry
   } from 'react-icons/fa';
 import { SystemConfigRoutes } from './systemConfigRoutes';
 import { ExhibitionRoutes } from './exhibitionRoutes';
@@ -30,6 +32,7 @@ import { ProcurementRoutes } from './procurementRoutes';
 import { ProjectsRoutes } from './projectsRoutes';
 import { FarmRoutes } from './farmRoutes';
 import { ExpensesRoutes } from './expensesRoutes';
+import { ManufacturingRoutes } from './manufacturingRoutes';
   
   export const Routes = [
     {
@@ -37,7 +40,7 @@ import { ExpensesRoutes } from './expensesRoutes';
       icon: FaTachometerAlt,
       path: "/dashboard",
       routes: [],
-      requiredPermission: "view_dashboard"
+      //requiredPermission: "view_dashboard"
     },
     {
       name: "Reports",
@@ -52,6 +55,12 @@ import { ExpensesRoutes } from './expensesRoutes';
         routes: InventoryRoutes,
         requiredPermission: "access_inventory_module"
     },
+      {
+        name: "Manufacturing",
+        icon: FaIndustry,
+        routes: ManufacturingRoutes,
+        requiredPermission: "manage_manufacturing"
+      },
       // {
       //   name: "Requisitions",
       //   icon: FaClipboardList,
@@ -76,18 +85,24 @@ import { ExpensesRoutes } from './expensesRoutes';
         routes: SalesRoutes,
         requiredPermission: "access_sales_module"
     },
+     {
+        name: "PB Prescription Database",
+        icon: FaUserInjured,
+        path: "/client-prescriptions",
+        routes: [],
+    },
       {
         name: "Expenses",
         icon: FaReceipt,
         routes: ExpensesRoutes,
         requiredPermission: "access_sales_module"
       },
-      // {
-      //   name: "Farm",
-      //   icon: FaSeedling,
-      //   routes: FarmRoutes,
-      //   requiredPermission: "access_farm_module"
-      // },
+      {
+        name: "Farm",
+        icon: FaSeedling,
+        routes: FarmRoutes,
+        requiredPermission: "access_farm_module"
+      },
       {
         name: "Projects",
         icon: FaProjectDiagram,

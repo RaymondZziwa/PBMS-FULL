@@ -3,6 +3,9 @@ import { toast } from "sonner";
 
 export const baseURL = "http://localhost:3005"
 export const imageURL = "http://localhost:3005/storage"
+// export const baseURL = "https://deinapi.smartclinic360.com"
+// export const imageURL = "https://deinapi.smartclinic360.com/storage"
+export const system = 'PBMS'
 
 let isRefreshing = false;
 let failedQueue: Array<{ resolve: (value: any) => void; reject: (error: any) => void }> = [];
@@ -106,6 +109,7 @@ export const apiRequest = async <T>(
     
     // Handle non-Axios related errors (network errors, etc.)
     toast.error("Network error. Please check your connection.");
+    console.log(error)
     throw new Error("Network error occurred");
   }
 };

@@ -4,7 +4,6 @@ import { FaChevronDown } from "react-icons/fa";
 import { Routes } from "../pages/routes/routes";
 import { useSelector } from "react-redux";
 import type { RootState } from "../redux/store";
-import type { IPermission } from "../redux/types/systemSettings";
 
 // Mocked permission check — replace with your real auth
  const hasPermission = (permission?: string) => {
@@ -81,24 +80,37 @@ import type { IPermission } from "../redux/types/systemSettings";
     "manage_farm_inventory",
     "manage_seedlings",
     "manage_poultry",
+    "manage_batches",
+    "manage_seedling_growth",
+    "manage_seedling_death",
+    "manage_manufacturing",
   ];
   return userPermissions.includes(permission);
 };
-
-const SidebarItem = ({ route, level = 0 }: { route: any; level?: number }) => {
+const SidebarItem = ({
+  route,
+  level = 0,
+  collapsed = false,
+}: {
+  route: any;
+  level?: number;
+  collapsed?: boolean;
+}) => {
   const { pathname } = useLocation();
   const [expanded, setExpanded] = useState(false);
-  const permissions = useSelector((state: RootState) => state.userAuth.data.role.permissions)
+  const permissions = useSelector(
+    (state: RootState) => state.userAuth.data.role.permissions
+  );
 
   const checkPermission = (permission?: string) => {
     if (!permission) return true;
-    return permissions.some(p => p.value === permission);
-  }
+    return permissions.some((p) => p.value === permission);
+  };
 
   const hasChildren = route.routes && route.routes.length > 0;
   const isActive = pathname === route.path;
 
-  if (!hasPermission (route.requiredPermission)) return null;
+  if (!hasPermission(route.requiredPermission)) return null;
 
   return (
     <div>
@@ -108,7 +120,9 @@ const SidebarItem = ({ route, level = 0 }: { route: any; level?: number }) => {
         className={`flex items-center justify-between p-2 rounded cursor-pointer transition-colors ${
           isActive ? "bg-gray-700" : "hover:bg-gray-700"
         }`}
-        style={{ paddingLeft: `${level * 16 + 12}px` }}
+        style={{
+          paddingLeft: `${collapsed ? 8 : level * 16 + 12}px`,
+        }}
       >
         <Link
           to={route.path || "#"}
@@ -119,11 +133,25 @@ const SidebarItem = ({ route, level = 0 }: { route: any; level?: number }) => {
             if (hasChildren) e.preventDefault();
           }}
         >
-          {route.icon && <route.icon className="mr-3" />}
-          <span>{route.name}</span>
+          {/* Icon */}
+          {route.icon && (
+            <route.icon
+              className={`${
+                collapsed ? "mx-auto" : "mr-3"
+              } text-xl flex-shrink-0`}
+            />
+          )}
+
+          {/* Text label — hide when collapsed */}
+          {!collapsed && (
+            <span className="whitespace-nowrap overflow-hidden text-ellipsis">
+              {route.name}
+            </span>
+          )}
         </Link>
 
-        {hasChildren && (
+        {/* Dropdown arrow — only show when expanded and not collapsed */}
+        {!collapsed && hasChildren && (
           <FaChevronDown
             className={`ml-2 transition-transform ${
               expanded ? "rotate-180" : ""
@@ -133,11 +161,11 @@ const SidebarItem = ({ route, level = 0 }: { route: any; level?: number }) => {
       </div>
 
       {/* Child routes */}
-      {hasChildren && expanded && (
-        <ul className="ml-2">
+      {hasChildren && expanded && !collapsed && (
+        <ul className="ml-4">
           {route.routes.map((child: any) => (
             <li key={child.name} className="text-sm">
-              <SidebarItem route={child} level={level + 1} />
+              <SidebarItem route={child} level={level + 1} collapsed={collapsed} />
             </li>
           ))}
         </ul>
@@ -146,13 +174,17 @@ const SidebarItem = ({ route, level = 0 }: { route: any; level?: number }) => {
   );
 };
 
-const SidebarNavigation = () => {
+const SidebarNavigation = ({ collapsed = false }: { collapsed?: boolean }) => {
   return (
-    <nav className="w-64 bg-gray-800 text-white h-[calc(100vh-4rem)] overflow-y-auto p-4">
-      <ul>
+    <nav
+      className={`${
+        collapsed ? "w-20" : "w-64"
+      } bg-gray-800 text-white h-[calc(100vh-4rem)] overflow-y-auto p-2 transition-all duration-300 ease-in-out`}
+    >
+      <ul className="space-y-1">
         {Routes.map((route) => (
-          <li key={route.name} className="mb-2">
-            <SidebarItem route={route} />
+          <li key={route.name}>
+            <SidebarItem route={route} collapsed={collapsed} />
           </li>
         ))}
       </ul>

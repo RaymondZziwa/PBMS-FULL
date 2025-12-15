@@ -16,6 +16,7 @@ interface CustomTableProps {
   onRowClick?: (row: Record<string, any>) => void;
   loading?: boolean;
   emptyMessage?: string;
+  getRowClass?: (row: any) => string
 }
 
 const NestedCustomTable: React.FC<CustomTableProps> = ({ 
@@ -24,7 +25,8 @@ const NestedCustomTable: React.FC<CustomTableProps> = ({
   pageSize = 10,
   onRowClick,
   loading = false,
-  emptyMessage = "No results found"
+  emptyMessage = "No results found",
+  getRowClass
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
@@ -336,8 +338,9 @@ const NestedCustomTable: React.FC<CustomTableProps> = ({
                 <tr 
                   key={idx} 
                   className={`hover:bg-gray-50 transition-colors ${
-                    onRowClick ? 'cursor-pointer hover:bg-blue-50' : ''
-                  }`}
+                  getRowClass ? getRowClass(row) : ''
+                } ${onRowClick ? 'cursor-pointer hover:bg-blue-50' : ''}`}
+
                   onClick={() => handleRowClick(row)}
                 >
                   {columns.map((col) => (

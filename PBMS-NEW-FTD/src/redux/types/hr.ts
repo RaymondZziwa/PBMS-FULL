@@ -18,6 +18,7 @@ export interface IEmployee {
     password: string;
     salary: number;
     hasAccess: boolean;
+    hasPrescriptionAccess: boolean;
     isActive: boolean;
     profileImage?: string | null;
     roleId: string;
@@ -28,4 +29,55 @@ export interface IEmployee {
     department: IDepartment;
     updatedAt: Date;
     createdAt: Date;
+}
+
+export interface IAttendance {
+    id: string;
+    employeeId: string;
+    employee: IEmployee;
+    date: string;
+    timeIn: string;
+    timeOut?: string | null;
+    notes?: string | null;
+    updatedAt: Date;
+    createdAt: Date;
+}
+
+export interface IPayrollPeriod {
+  id: string;
+  startDate: string;
+  endDate: string;
+    payDate: string;
+    payroll: IPayrollDetail;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface IPayrollDetail {
+  id: string;
+  payrollPeriodId: string;
+  employeeId: string;
+  baseSalary: number;
+  bonuses: number;
+  deductions: number;
+  netPay: number;
+  employee: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    department: string;
+  };
+}
+
+export interface IPayrollEmployee {
+  id: string;
+  firstName: string;
+  lastName: string;
+  branch: string;
+  department: string;
+  baseSalary: string; // Add this
+  deductions: { name: string; value: string }[];
+  allowances: { name: string; value: string }[];
+  grossPay: string;
+  netPay: string;
 }

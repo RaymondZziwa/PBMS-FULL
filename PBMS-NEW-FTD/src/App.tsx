@@ -40,6 +40,20 @@ import ExhibitionExpensesSummaryReport from './pages/reports/exhibition/exhibiti
 import DailySalesSummaryReport from './pages/reports/sales/dailySalesSummary';
 import StoreSalesComparisonReport from './pages/reports/sales/storeSalesComparison';
 import ProductPerformanceReport from './pages/reports/sales/productPerformanceReport';
+import ServicePointOfSale from './pages/sales/massageServicePos';
+import MassageServiceSalesReport from './pages/reports/sales/massageServiceSales';
+import AttendanceManagement from './pages/humanResource/attendance';
+import PayrollManagement from './pages/humanResource/payroll/index';
+import ClientPurchases from './pages/sales/customers/customerPurchases';
+import DeliveryNotes from './pages/inventory/deliveryNotes';
+import ExpensesReport from './pages/reports/expenses/expensesReport';
+import SuppliersManagement from './pages/inventory/suppliers';
+import SupplierDetails from './pages/inventory/suppliers/supplierInfo';
+import SuppliersReport from './pages/reports/inventoryReports/supplierAnalysis';
+import ClientPrescriptionsManagement from './pages/prescriptionDB';
+import SeedlingStagesManagement from './pages/farm/stages';
+import SeedlingBatchesManagement from './pages/farm/batches';
+import ManufacturingManagement from './pages/manufacturing';
 
 // Protected Route Component
 interface ProtectedRouteProps {
@@ -144,6 +158,32 @@ function App() {
         }
       />
 
+      {/* Farm */}
+        <Route
+        path="/farms/seedlings-stages"
+        element={
+          <ProtectedRoute>
+            <SeedlingStagesManagement />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/farms/batches"
+        element={
+          <ProtectedRoute>
+            <SeedlingBatchesManagement />
+          </ProtectedRoute>
+        }
+      />
+      {/* Manufacturing */}
+      <Route
+        path="/manufacturing"
+        element={
+          <ProtectedRoute>
+            <ManufacturingManagement />
+          </ProtectedRoute>
+        }
+      />
       {/* Reports */}
       <Route
         path="/reports/store-stock-level-analysis"
@@ -158,6 +198,22 @@ function App() {
         element={
           <ProtectedRoute>
             <StockMovementAnalysisReport />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/reports/supplier-analysis"
+        element={
+          <ProtectedRoute>
+            <SuppliersReport />
+          </ProtectedRoute>
+        }
+      />
+       <Route
+        path="/client-prescriptions"
+        element={
+          <ProtectedRoute>
+            <ClientPrescriptionsManagement />
           </ProtectedRoute>
         }
       />
@@ -194,10 +250,26 @@ function App() {
         }
       />
       <Route
+        path="/reports/expense-report"
+        element={
+          <ProtectedRoute>
+            <ExpensesReport />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/reports/store-sales-comparison"
         element={
           <ProtectedRoute>
             <StoreSalesComparisonReport />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/reports/massage-services-report"
+        element={
+          <ProtectedRoute>
+            <MassageServiceSalesReport />
           </ProtectedRoute>
         }
       />
@@ -252,6 +324,31 @@ function App() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/inventory/suppliers"
+        element={
+          <ProtectedRoute>
+            <SuppliersManagement />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/inventory/supplier/:id"
+        element={
+          <ProtectedRoute>
+            <SupplierDetails />
+          </ProtectedRoute>
+        }
+      />
+       <Route
+        path="/inventory/delivery-notes"
+        element={
+          <ProtectedRoute>
+            <DeliveryNotes />
+          </ProtectedRoute>
+        }
+      />
 
       {/* Sales */}
       <Route
@@ -259,6 +356,14 @@ function App() {
         element={
           <ProtectedRoute>
             <ClientsManagement />
+          </ProtectedRoute>
+        }
+      />
+       <Route
+        path="/sales/client-purchases"
+        element={
+          <ProtectedRoute>
+            <ClientPurchases />
           </ProtectedRoute>
         }
       />
@@ -275,6 +380,15 @@ function App() {
         element={
           <ProtectedRoute>
             <CreditSalesManagement />
+          </ProtectedRoute>
+        }
+      />
+
+       <Route
+        path="/sales/service-pos"
+        element={
+          <ProtectedRoute>
+            <ServicePointOfSale />
           </ProtectedRoute>
         }
       />
@@ -366,6 +480,23 @@ function App() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/hr/attendance"
+        element={
+          <ProtectedRoute>
+            <AttendanceManagement />
+          </ProtectedRoute>
+        }
+      />
+       <Route
+        path="/hr/payroll"
+        element={
+          <ProtectedRoute>
+            <PayrollManagement />
+          </ProtectedRoute>
+        }
+      />
+
 
       {/* Events */}
       <Route

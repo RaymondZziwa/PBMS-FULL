@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { 
   FaBoxes, 
   FaChartLine, 
-  FaUsers, 
   FaMoneyBillWave, 
   FaImages, 
   FaChevronDown,
-  FaFileAlt
+  FaFileAlt,
+  FaUsers
 } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 
@@ -31,6 +31,7 @@ const ReportsComponent = () => {
       reports: [
         'Store Stock Level Analysis',
         'Store Stock Movement Analysis',
+        'Supplier Analysis'
       ]
     },
     {
@@ -47,19 +48,15 @@ const ReportsComponent = () => {
       name: 'Human Resource Reports',
       icon: <FaUsers className="mr-3" />,
       reports: [
-        //'Employee Directory',
         'Attendance Report',
-        //'Payroll Summary',
-        //'Leave Balance Report',
-        //'Performance Review Summary',
-        //'Training Completion Report'
+        // 'Payroll Summary',
       ]
     },
     {
       name: 'Expenditure Reports',
       icon: <FaMoneyBillWave className="mr-3" />,
       reports: [
-        'Expense by Category',
+        'Expense Report',
         // 'Vendor Payment Summary',
         // 'Monthly Expense Trend',
        // 'Budget vs Actual Expense'
@@ -74,18 +71,6 @@ const ReportsComponent = () => {
         'Exhibition Expenses Summary',
       ]
     },
-    // {
-    //   name: 'Massage Reports',
-    //   icon: <FaSpa className="mr-3" />,
-    //   reports: [
-    //     'Therapist Performance',
-    //     'Service Utilization',
-    //     'Customer Satisfaction',
-    //     'Appointment Schedule',
-    //     'Revenue by Service Type',
-    //     'Membership Usage Report'
-    //   ]
-    // },
     // {
     //   name: 'Projects Reports',
     //   icon: <FaTasks className="mr-3" />,

@@ -36,6 +36,7 @@ const AddorModifyEmployee: React.FC<AddorModifyEmployeeProps> = ({
     password: '',
     salary: '',
     hasAccess: false,
+    hasPrescriptionAccess: false,
     isActive: true,
     roleId: '',
     branchId: '',
@@ -54,6 +55,7 @@ const AddorModifyEmployee: React.FC<AddorModifyEmployeeProps> = ({
         password: '', // Don't pre-fill password for security
         salary: Employee.salary?.toString() || '',
         hasAccess: Employee.hasAccess || false,
+        hasPrescriptionAccess: Employee.hasPrescriptionAccess || false,
         isActive: Employee.isActive !== undefined ? Employee.isActive : true,
         roleId: Employee.roleId || '',
         branchId: Employee.branchId || '',
@@ -70,6 +72,7 @@ const AddorModifyEmployee: React.FC<AddorModifyEmployeeProps> = ({
         password: '',
         salary: '',
         hasAccess: false,
+        hasPrescriptionAccess: false,
         isActive: true,
         roleId: '',
         branchId: '',
@@ -114,6 +117,19 @@ const AddorModifyEmployee: React.FC<AddorModifyEmployeeProps> = ({
       toast.error("Please enter phone number");
       return;
     }
+    if (!formData.email.trim()) {
+      toast.error("Please enter employee email");
+      return;
+    }
+     if (!formData.deptId.trim()) {
+      toast.error("Please assign a department to the new employee");
+      return;
+     }
+    
+     if (!formData.branchId.trim()) {
+      toast.error("Please assign the new employee to a branch");
+      return;
+    }
     if (!Employee && !formData.password) { // Only require password for new employees
       toast.error("Please enter password");
       return;
@@ -138,6 +154,7 @@ const AddorModifyEmployee: React.FC<AddorModifyEmployeeProps> = ({
         password: formData.password, // For new employees or password updates
         salary: formData.salary,
         hasAccess: formData.hasAccess,
+        hasPrescriptionAccess: formData.hasPrescriptionAccess,
         isActive: formData.isActive,
         roleId: formData.roleId,
         branchId: formData.branchId || undefined, // Optional field
@@ -169,6 +186,7 @@ const AddorModifyEmployee: React.FC<AddorModifyEmployeeProps> = ({
         password: '',
         salary: '',
         hasAccess: false,
+        hasPrescriptionAccess: false,
         isActive: true,
         roleId: '',
         branchId: '',
@@ -251,13 +269,13 @@ const AddorModifyEmployee: React.FC<AddorModifyEmployeeProps> = ({
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email
+                  Email *
                 </label>
                 <CustomTextInput
                   type="email"
                   value={formData.email}
                   onChange={handleInputChange('email')}
-                  placeholder="Enter email (optional)"
+                  placeholder="Enter email"
                 />
               </div>
             </div>
@@ -284,7 +302,7 @@ const AddorModifyEmployee: React.FC<AddorModifyEmployeeProps> = ({
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Department
+                  Department *
                 </label>
                 <CustomDropdown
                   options={departments?.map(dept => ({
@@ -293,14 +311,14 @@ const AddorModifyEmployee: React.FC<AddorModifyEmployeeProps> = ({
                   })) || []}
                   value={formData.deptId ? [formData.deptId] : []}
                   onChange={handleDropdownChange('deptId')}
-                  placeholder="Select department (optional)"
+                  placeholder="Select department"
                   singleSelect={true}
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Branch
+                  Branch *
                 </label>
                 <CustomDropdown
                   options={branches?.map(branch => ({
@@ -309,7 +327,7 @@ const AddorModifyEmployee: React.FC<AddorModifyEmployeeProps> = ({
                   })) || []}
                   value={formData.branchId ? [formData.branchId] : []}
                   onChange={handleDropdownChange('branchId')}
-                  placeholder="Select branch (optional)"
+                  placeholder="Select branch"
                   singleSelect={true}
                 />
               </div>
@@ -350,6 +368,15 @@ const AddorModifyEmployee: React.FC<AddorModifyEmployeeProps> = ({
                     className="mr-2"
                   />
                   <span className="text-sm text-gray-700">Has System Access</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={formData.hasPrescriptionAccess}
+                    onChange={(e) => handleCheckboxChange('hasPrescriptionAccess')(e.target.checked)}
+                    className="mr-2"
+                  />
+                  <span className="text-sm text-gray-700">Has Prescription Database Access</span>
                 </label>
 
                 <label className="flex items-center">

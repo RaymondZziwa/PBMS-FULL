@@ -20,13 +20,14 @@ const AddOrModifyItem: React.FC<AddOrModifyItemProps> = ({
   item,
   onCancel,
 }) => {
-  const {refresh: refreshItems} = useItems()
+  const { refresh: refreshItems } = useItems();
   const { data: itemCategories } = useItemCategories();
   const [formData, setFormData] = useState({
     name: '',
     price: '',
     barcode: '',
     categoryId: '',
+    showInPos: false,
   });
 
   useEffect(() => {
@@ -36,6 +37,7 @@ const AddOrModifyItem: React.FC<AddOrModifyItemProps> = ({
         price: item.price?.toString() || '',
         barcode: item.barcode?.toString() || '',
         categoryId: item.category?.id || '',
+        showInPos: item.showInPos ?? false,
       });
     } else {
       setFormData({
@@ -43,6 +45,7 @@ const AddOrModifyItem: React.FC<AddOrModifyItemProps> = ({
         price: '',
         barcode: '',
         categoryId: '',
+        showInPos: false,
       });
     }
   }, [item]);
@@ -51,7 +54,7 @@ const AddOrModifyItem: React.FC<AddOrModifyItemProps> = ({
     e.preventDefault();
 
     if (!formData.name || !formData.price || !formData.categoryId) {
-      toast.error("Please fill in all the fields");
+      toast.error('Please fill in all required fields');
       return;
     }
 
@@ -61,6 +64,7 @@ const AddOrModifyItem: React.FC<AddOrModifyItemProps> = ({
         price: parseFloat(formData.price),
         barcode: formData.barcode.toString(),
         categoryId: formData.categoryId,
+        showInPos: formData.showInPos,
       };
 
       const endpoint = item
@@ -69,9 +73,15 @@ const AddOrModifyItem: React.FC<AddOrModifyItemProps> = ({
 
       const method = item ? 'PATCH' : 'POST';
       await apiRequest(endpoint, method, '', payload);
-      //toast.success(item ? 'Item updated successfully' : 'Item created successfully');
+
       refreshItems();
-      setFormData({ name: '', price: '', barcode: '', categoryId: '' });
+      setFormData({
+        name: '',
+        price: '',
+        barcode: '',
+        categoryId: '',
+        showInPos: false,
+      });
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Something went wrong');
     }
@@ -95,18 +105,16 @@ const AddOrModifyItem: React.FC<AddOrModifyItemProps> = ({
             <CustomDropdown
               options={itemCategories?.map((cat: IItemCategory) => ({
                 label: cat.name,
-                value: cat.id
+                value: cat.id,
               }))}
               value={formData.categoryId ? [formData.categoryId] : []}
-              onChange={(val: string) =>
+              onChange={(val: string[]) =>
                 setFormData((prev) => ({
                   ...prev,
                   categoryId: val[0] || '',
-                  deptId: '', 
                 }))
               }
               placeholder="Select a category"
-              isRequired
             />
           </div>
 
@@ -118,7 +126,7 @@ const AddOrModifyItem: React.FC<AddOrModifyItemProps> = ({
             <CustomTextInput
               type="text"
               value={formData.name}
-              onChange={(val) => setFormData(prev => ({ ...prev, name: val }))}
+              onChange={(val) => setFormData((prev) => ({ ...prev, name: val }))}
               placeholder="Enter item name"
             />
           </div>
@@ -131,27 +139,38 @@ const AddOrModifyItem: React.FC<AddOrModifyItemProps> = ({
             <CustomTextInput
               type="number"
               value={formData.price}
-              onChange={(val) => setFormData(prev => ({ ...prev, price: val }))}
+              onChange={(val) =>
+                setFormData((prev) => ({ ...prev, price: val }))
+              }
               placeholder="Enter item price"
             />
           </div>
 
-          {/* Barcode */}
-          {/* <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Barcode *
+          {/* Toggle: Show in POS */}
+          <div className="flex items-center justify-between mt-4">
+            <label className="text-sm font-medium text-gray-700">
+              Show item in POS
             </label>
-            <CustomTextInput
-              type="number"
-              value={formData.barcode}
-              onChange={(val) => setFormData(prev => ({ ...prev, barcode: val }))}
-              placeholder="Enter barcode"
-            />
-          </div> */}
+            <button
+              type="button"
+              onClick={() =>
+                setFormData((prev) => ({ ...prev, showInPos: !prev.showInPos }))
+              }
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 focus:outline-none ${
+                formData.showInPos ? 'bg-gray-700' : 'bg-gray-300'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 ${
+                  formData.showInPos ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
         </div>
 
         <div className="flex justify-end space-x-3 mt-6">
-          <CustomButton type='negative' fn={onCancel} />
+          <CustomButton type="negative" fn={onCancel} />
           <CustomButton
             autoCloseModal={onCancel}
             label={item ? 'Update Item' : 'Create Item'}

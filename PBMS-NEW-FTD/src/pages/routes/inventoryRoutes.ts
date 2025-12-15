@@ -10,5 +10,7 @@ export const InventoryRoutes = [
     { name: "Items", path: "/inventory/items" },
     { name: "Services", path: "/inventory/services" },
     { name: "Stock Movement", path: "/inventory/stock-movement" },
+    { name: "Delivery Notes", path: "/inventory/delivery-notes" },
+    { name: "Suppliers", path: "/inventory/suppliers" },
     { name: "Stores", path: "/inventory/stores" },
 ]
