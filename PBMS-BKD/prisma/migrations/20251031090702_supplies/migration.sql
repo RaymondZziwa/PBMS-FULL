@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE `Supply` MODIFY `paymentStatus` ENUM('PAID', 'PARTIALLY_PAID', 'UNPAID') NOT NULL DEFAULT 'UNPAID';

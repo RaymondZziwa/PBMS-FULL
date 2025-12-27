@@ -1,0 +1,1012 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ENUMS - Keep as is, they're efficient
+enum InventoryRecordCategory {
+  RESTOCK
+  DEPLETION
+  TRANSFER
+  ADJUSTMENT
+  MANUFACTURING
+}
+
+enum StockTransferStatus {
+  CONFIRMED
+  PENDING
+  REJECTED
+}
+
+enum PaymentType {
+  CASH
+  CHEQUE
+  MOBILE_MONEY
+  BARTER_PAYMENT
+}
+
+enum ExpenseCategory {
+  RENT
+  UTILITIES
+  SALARIES
+  SUPPLIES
+  MAINTENANCE
+  TRANSPORT
+  INSURANCE
+  MARKETING
+  TRAINING
+  TAXES
+  MEDICAL_SUPPLIES
+  OFFICE_SUPPLIES
+  EQUIPMENT_PURCHASE
+  EQUIPMENT_REPAIR
+  CLEANING
+  SECURITY
+  INTERNET
+  WATER
+  ELECTRICITY
+  COMMUNICATION
+  SOFTWARE_SUBSCRIPTIONS
+  MISCELLANEOUS
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum ChequeStatus {
+  PENDING
+  PAID
+  BOUNCED
+}
+
+enum Status {
+  APPROVED
+  PENDING
+  REJECTED
+}
+
+enum EventStatus {
+  OPEN
+  CLOSED
+}
+
+enum EventPaymentStatus {
+  PAID
+  PARTIALLY_PAID
+  UNPAID
+}
+
+enum SaleStatus {
+  FULLY_PAID
+  UNPAID
+  PARTIALLY_PAID
+}
+
+enum PaymentMethodType {
+  CASH
+  MTN_MOMO
+  AIRTEL_MOMO
+  CARD
+  PROF_MOMO
+}
+
+enum SeedlingGrowthStatus {
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+enum ManufacturingStatus {
+  PENDING
+  NORMAL
+  WASTAGE_DETECTED
+  GOOD_UTILIZATION
+}
+
+// System config - Optimized indexes
+model Company {
+  id          String   @id @default(uuid()) @db.Char(36)
+  name        String
+  email       String
+  tel1        String
+  tel2        String?
+  address     String
+  logo        String?
+  website     String?
+  tinNumber   String?
+  description String?
+  foundedYear Int?
+  industry    String?
+  employees   String?
+  workHours   Float?   @default(8.0)
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@index([email])
+  @@index([name])
+}
+
+model PaymentMethod {
+  id        String   @id @default(uuid()) @db.Char(36)
+  name      String
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@unique([name])
+}
+
+// Store with optimized relationships
+model Store {
+  id                  String     @id @default(uuid()) @db.Char(36)
+  name                String
+  branchId            String     @db.Char(36)
+  deptId              String     @db.Char(36)
+  branch              Branch     @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  dept                Department @relation(fields: [deptId], references: [id], onDelete: Cascade)
+  authorizedPersonnel Json? // Consider normalizing if frequently queried
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  // Relations
+  ProductInventory     ProductInventory[]
+  Sales                Sale[]
+  fromInventoryRecords InventoryRecord[]  @relation("FromStore")
+  toInventoryRecords   InventoryRecord[]  @relation("ToStore")
+  Supply               Supply[]
+  Manufacturing        Manufacturing[]
+
+  @@index([branchId, deptId])
+  @@index([name])
+  @@map("stores") // Explicit table name
+}
+
+model Unit {
+  id        String   @id @default(uuid()) @db.Char(36)
+  name      String
+  value     Float?
+  abr       String?
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  ProductInventory          ProductInventory[]
+  InventoryRecord           InventoryRecord[]
+  ExhibitionInventory       ExhibitionInventory[]
+  ExhibitionInventoryRecord ExhibitionInventoryRecord[]
+  Supply                    Supply[]
+  primaryUnitManufacturings Manufacturing[] @relation("PrimaryUnit")
+  packingUnitManufacturings Manufacturing[] @relation("PackingUnit")
+
+  @@unique([name])
+  @@map("units")
+}
+
+// Branch with composite indexes
+model Branch {
+  id        String   @id @default(uuid()) @db.Char(36)
+  name      String
+  location  String
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  Employee      Employee[]
+  Department    Department[]
+  Store         Store[]
+  branchExpense branchExpense[]
+
+  @@index([name, location])
+  @@map("branches")
+}
+
+model Department {
+  id        String   @id @default(uuid()) @db.Char(36)
+  name      String
+  branchId  String   @db.Char(36)
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  Employee Employee[]
+  Store    Store[]
+
+  @@index([branchId])
+  @@index([name])
+  @@map("departments")
+}
+
+// Permission system optimized
+model Permission {
+  id        String   @id @default(uuid()) @db.Char(36)
+  module    String
+  name      String
+  value     String   @unique
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  Role Role[]
+
+  @@index([module, name])
+  @@map("permissions")
+}
+
+model Role {
+  id          String       @id @default(uuid()) @db.Char(36)
+  name        String       @unique
+  permissions Permission[]
+  updatedAt   DateTime     @updatedAt
+  createdAt   DateTime     @default(now())
+
+  Employee Employee[]
+
+  @@map("roles")
+}
+
+// Employee with optimized indexes for login
+model Employee {
+  id                    String      @id @default(uuid()) @db.Char(36)
+  firstName             String
+  lastName              String
+  gender                Gender
+  email                 String      @unique
+  tel                   String      @unique
+  password              String
+  salary                Decimal     @db.Decimal(10, 2)
+  hasAccess             Boolean     @default(false)
+  hasPrescriptionAccess Boolean     @default(false)
+  isActive              Boolean     @default(true)
+  profileImage          String?
+  roleId                String      @db.Char(36)
+  role                  Role        @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  branchId              String?     @db.Char(36)
+  deptId                String?     @db.Char(36)
+  branch                Branch?     @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  dept                  Department? @relation(fields: [deptId], references: [id], onDelete: Cascade)
+  updatedAt             DateTime    @updatedAt
+  createdAt             DateTime    @default(now())
+
+  // Relations
+  EmailVerification          EmailVerification[]
+  InventoryRecord            InventoryRecord[]
+  Sales                      Sale[]
+  ExhibitionSales            ExhibitionSales[]
+  ProjectSales               ProjectSales[]
+  ExhibitionInventoryRecords ExhibitionInventoryRecord[]
+  ProjectPayments            ProjectPayments[]
+  EmployeeLoginLogs          EmployeeLoginLogs[]
+  branchExpense              branchExpense[]
+  SalePayments               SalePayments[]
+  MassageSales               MassageSales[]
+  MassageServicePayments     MassageServicePayments[]
+  Attendance                 Attendance[]
+  ClientPrescription         ClientPrescription[]
+  DeliveryNote               DeliveryNote[]
+  Supply                     Supply[]
+  SupplyPayments             SupplyPayments[]
+  manufacturings             Manufacturing[]
+
+  @@index([email, isActive])
+  @@index([roleId])
+  @@index([branchId, deptId])
+  @@index([createdAt])
+  @@map("employees")
+}
+
+model EmployeeLoginLogs {
+  id         String   @id @default(uuid()) @db.Char(36)
+  employeeId String   @db.Char(36)
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now())
+
+  @@index([employeeId, createdAt])
+  @@map("employee_login_logs")
+}
+
+model EmailVerification {
+  id        String   @id @default(uuid()) @db.Char(36)
+  userId    String   @db.Char(36)
+  code      String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  employee Employee @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, code])
+  @@index([expiresAt])
+  @@map("email_verifications")
+}
+
+// Items with optimized indexing
+model ItemCategory {
+  id        String   @id @default(uuid()) @db.Char(36)
+  name      String   @unique
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  Item Item[]
+
+  @@map("item_categories")
+}
+
+model Item {
+  id         String       @id @default(uuid()) @db.Char(36)
+  categoryId String       @db.Char(36)
+  category   ItemCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  showInPos  Boolean      @default(false)
+  name       String
+  price      Decimal      @db.Decimal(10, 2)
+  barcode    String?
+  updatedAt  DateTime     @updatedAt
+  createdAt  DateTime     @default(now())
+
+  ProductInventory           ProductInventory[]
+  InventoryRecord            InventoryRecord[]
+  ExhibitionInventory        ExhibitionInventory[]
+  ExhibitionInventoryRecords ExhibitionInventoryRecord[]
+  Supply                     Supply[]
+
+  @@index([categoryId])
+  @@index([name])
+  @@index([barcode])
+  @@index([createdAt])
+  @@map("items")
+}
+
+model Service {
+  id        String   @id @default(uuid()) @db.Char(36)
+  name      String
+  price     Decimal  @db.Decimal(10, 2)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@index([name])
+  @@map("services")
+}
+
+// ProductInventory with composite indexes for store queries
+model ProductInventory {
+  id        String   @id @default(uuid()) @db.Char(36)
+  itemId    String   @db.Char(36)
+  item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  storeId   String   @db.Char(36)
+  qty       Float
+  unitId    String   @db.Char(36)
+  unit      Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@unique([itemId, storeId, unitId])
+  @@index([storeId, itemId])
+  @@index([qty])
+  @@map("product_inventory")
+}
+
+// Inventory records with optimized date queries
+model InventoryRecord {
+  id       String                  @id @default(uuid()) @db.Char(36)
+  category InventoryRecordCategory
+  itemId   String                  @db.Char(36)
+  item     Item                    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  storeId String @db.Char(36)
+  store   Store  @relation("FromStore", fields: [storeId], references: [id], onDelete: Cascade)
+
+  toStoreId String? @db.Char(36)
+  toStore   Store?  @relation("ToStore", fields: [toStoreId], references: [id], onDelete: Cascade)
+
+  deliveryNoteId String?       @db.Char(36)
+  deliveryNote   DeliveryNote? @relation("dn", fields: [deliveryNoteId], references: [id], onDelete: Cascade)
+
+  initiatedQty      Float?
+  qty               Float
+  remainingQuantity Float?
+  unitId            String              @db.Char(36)
+  unit              Unit                @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  source            String
+  description       String?
+  recordedBy        String              @db.Char(36)
+  employee          Employee            @relation(fields: [recordedBy], references: [id], onDelete: Cascade)
+  transferId        String?
+  transferStatus    StockTransferStatus @default(CONFIRMED)
+  isResolved        Boolean?
+  resolveNotes      String?
+  images            Json?
+  extraNote         String?
+  expectedOutput Float?
+  recordedOutput Float?
+  updatedAt         DateTime            @updatedAt
+  createdAt         DateTime            @default(now())
+
+  @@index([storeId, createdAt])
+  @@index([itemId, createdAt])
+  @@index([category, createdAt])
+  @@index([recordedBy, createdAt])
+  @@map("inventory_records")
+}
+
+// SALES - HEAVILY OPTIMIZED FOR POS
+model Sale {
+  id             String         @id @default(uuid()) @db.Char(36)
+  clientId       String?        @db.Char(36)
+  client         Client?        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  items          Json // Array of CartItemDto - consider normalized table for large systems
+  servedBy       String         @db.Char(36)
+  employee       Employee       @relation(fields: [servedBy], references: [id], onDelete: Cascade)
+  storeId        String         @db.Char(36)
+  store          Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  status         SaleStatus
+  total          Decimal        @db.Decimal(10, 2)
+  balance        Decimal        @db.Decimal(10, 2)
+  paymentMethods Json // Array of PaymentMethodDto
+  notes          String?
+  updatedAt      DateTime       @updatedAt
+  createdAt      DateTime       @default(now())
+  SalePayments   SalePayments[]
+
+  // Comprehensive indexing for fast queries
+  @@index([storeId, createdAt])
+  @@index([servedBy, createdAt])
+  @@index([status, createdAt])
+  @@index([clientId, createdAt])
+  @@index([createdAt]) // For date range queries
+  @@index([total])
+  @@map("sales")
+}
+
+model SalePayments {
+  id            String            @id @default(uuid()) @db.Char(36)
+  saleId        String            @db.Char(36)
+  sale          Sale              @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  amount        Decimal           @db.Decimal(10, 2)
+  paymentMethod PaymentMethodType
+  referenceId   String?
+  notes         String?
+  cashierId     String            @db.Char(36)
+  employee      Employee          @relation(fields: [cashierId], references: [id], onDelete: Cascade)
+  updatedAt     DateTime          @updatedAt
+  createdAt     DateTime          @default(now())
+
+  @@index([createdAt])
+  @@map("salesPayments")
+}
+
+// Clientele optimized
+model Client {
+  id        String   @id @default(uuid()) @db.Char(36)
+  firstName String
+  lastName  String
+  contact   String   @unique
+  address   String?
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  Sales              Sale[]
+  ExhibitionSales    ExhibitionSales[]
+  ProjectSales       ProjectSales[]
+  MassageSales       MassageSales[]
+  ClientPrescription ClientPrescription[]
+
+  @@index([firstName, lastName])
+  @@index([contact])
+  @@index([createdAt])
+  @@map("clients")
+}
+
+// Event system optimized
+model Event {
+  id          String      @id @default(uuid()) @db.Char(36)
+  title       String
+  description String?
+  startDate   DateTime
+  endDate     DateTime
+  ticketPrice Decimal     @db.Decimal(10, 2)
+  status      EventStatus @default(OPEN)
+  location    String?
+  updatedAt   DateTime    @updatedAt
+  createdAt   DateTime    @default(now())
+
+  EventParticipant EventParticipant[]
+
+  @@index([startDate, endDate])
+  @@index([status])
+  @@index([title])
+  @@map("events")
+}
+
+model EventParticipant {
+  id            String             @id @default(uuid()) @db.Char(36)
+  firstName     String
+  lastName      String
+  tel           String
+  tel2          String
+  amountPaid    Decimal            @db.Decimal(10, 2)
+  balance       Decimal            @db.Decimal(10, 2)
+  paymentStatus EventPaymentStatus @default(UNPAID)
+  eventId       String             @db.Char(36)
+  event         Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  updatedAt     DateTime           @updatedAt
+  createdAt     DateTime           @default(now())
+
+  @@index([eventId, paymentStatus])
+  @@index([tel])
+  @@index([createdAt])
+  @@map("event_participants")
+}
+
+// Exhibition optimized
+model Exhibition {
+  id          String   @id @default(uuid()) @db.Char(36)
+  name        String
+  location    String
+  description String?
+  startDate   DateTime
+  endDate     DateTime
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  ExhibitionStore    ExhibitionStore[]
+  ExhibitionExpenses ExhibitionExpenses[]
+
+  @@index([startDate, endDate])
+  @@index([name])
+  @@map("exhibitions")
+}
+
+model ExhibitionStore {
+  id           String     @id @default(uuid()) @db.Char(36)
+  name         String
+  exhibitionId String     @db.Char(36)
+  exhibition   Exhibition @relation(fields: [exhibitionId], references: [id], onDelete: Cascade)
+  updatedAt    DateTime   @updatedAt
+  createdAt    DateTime   @default(now())
+
+  ExhibitionInventory        ExhibitionInventory[]
+  ExhibitionInventoryRecords ExhibitionInventoryRecord[]
+  ExhibitionSales            ExhibitionSales[]
+
+  @@unique([exhibitionId, name])
+  @@index([exhibitionId])
+  @@map("exhibition_stores")
+}
+
+model ExhibitionInventory {
+  id        String                  @id @default(uuid()) @db.Char(36)
+  category  InventoryRecordCategory
+  storeId   String                  @db.Char(36)
+  store     ExhibitionStore         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  itemId    String                  @db.Char(36)
+  item      Item                    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  qty       Float
+  unitId    String                  @db.Char(36)
+  unit      Unit                    @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  updatedAt DateTime                @updatedAt
+  createdAt DateTime                @default(now())
+
+  @@unique([storeId, itemId, unitId])
+  @@index([storeId])
+  @@map("exhibition_inventory")
+}
+
+model ExhibitionInventoryRecord {
+  id          String                  @id @default(uuid()) @db.Char(36)
+  storeId     String                  @db.Char(36)
+  store       ExhibitionStore         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  category    InventoryRecordCategory
+  itemId      String                  @db.Char(36)
+  item        Item                    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  qty         Float
+  unitId      String                  @db.Char(36)
+  unit        Unit                    @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  source      String
+  description String?
+  recordedBy  String                  @db.Char(36)
+  employee    Employee                @relation(fields: [recordedBy], references: [id], onDelete: Cascade)
+  updatedAt   DateTime                @updatedAt
+  createdAt   DateTime                @default(now())
+
+  @@index([storeId, createdAt])
+  @@index([recordedBy, createdAt])
+  @@map("exhibition_inventory_records")
+}
+
+model ExhibitionSales {
+  id                String          @id @default(uuid()) @db.Char(36)
+  clientId          String          @db.Char(36)
+  client            Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  items             Json
+  total             Decimal         @db.Decimal(10, 2)
+  status            SaleStatus
+  balance           Decimal         @db.Decimal(10, 2)
+  paymentMethods    Json
+  notes             String?
+  exhibitionStoreId String          @db.Char(36)
+  exhibitionStore   ExhibitionStore @relation(fields: [exhibitionStoreId], references: [id], onDelete: Cascade)
+  servedBy          String          @db.Char(36)
+  employee          Employee        @relation(fields: [servedBy], references: [id], onDelete: Cascade)
+  updatedAt         DateTime        @updatedAt
+  createdAt         DateTime        @default(now())
+
+  @@index([servedBy, createdAt])
+  @@index([clientId])
+  @@map("exhibition_sales")
+}
+
+model ExhibitionExpenses {
+  id           String          @id @default(uuid()) @db.Char(36)
+  category     ExpenseCategory
+  exhibitionId String          @db.Char(36)
+  exhibition   Exhibition      @relation(fields: [exhibitionId], references: [id], onDelete: Cascade)
+  title        String
+  description  String?
+  amount       Float
+  dateIncurred DateTime
+  updatedAt    DateTime        @updatedAt
+  createdAt    DateTime        @default(now())
+}
+
+// Projects optimized
+model Project {
+  id           String         @id @default(uuid()) @db.Char(36)
+  name         String
+  price        Decimal        @db.Decimal(10, 2)
+  barcode      String?
+  updatedAt    DateTime       @updatedAt
+  createdAt    DateTime       @default(now())
+  ProjectSales ProjectSales[]
+
+  @@index([name])
+  @@index([barcode])
+  @@map("projects")
+}
+
+model ProjectSales {
+  id                   String     @id @default(uuid()) @db.Char(36)
+  clientId             String     @db.Char(36)
+  client               Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  projectId            String     @db.Char(36)
+  project              Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  status               SaleStatus
+  saleTotal            Decimal    @db.Decimal(10, 2)
+  downPayment          Decimal    @db.Decimal(10, 2)
+  numberOfInstallments Int
+  installmentAmount    Decimal    @db.Decimal(10, 2)
+  deliveryNoteImage    String?
+  cashierId            String     @db.Char(36)
+  employee             Employee   @relation(fields: [cashierId], references: [id], onDelete: Cascade)
+  updatedAt            DateTime   @updatedAt
+  createdAt            DateTime   @default(now())
+
+  ProjectPayments ProjectPayments[]
+
+  @@index([clientId])
+  @@index([cashierId, createdAt])
+  @@index([createdAt])
+  @@map("project_sales")
+}
+
+model ProjectPayments {
+  id                   String            @id @default(uuid()) @db.Char(36)
+  saleId               String            @db.Char(36)
+  projectSale          ProjectSales      @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  amount               Decimal           @db.Decimal(10, 2)
+  exhibitionId         String            @db.Char(36)
+  paymentMethod        PaymentMethodType
+  referenceId          String?
+  notes                String?
+  receiptImage         String?
+  bankDepositSlipImage String?
+  cashierId            String            @db.Char(36)
+  employee             Employee          @relation(fields: [cashierId], references: [id], onDelete: Cascade)
+  updatedAt            DateTime          @updatedAt
+  createdAt            DateTime          @default(now())
+
+  @@index([saleId, createdAt])
+  @@index([cashierId, createdAt])
+  @@map("project_payments")
+}
+
+// Cheque Management optimized
+model Bank {
+  id            String   @id @default(uuid()) @db.Char(36)
+  name          String
+  accountNumber String?
+  balance       Decimal? @db.Decimal(10, 2)
+  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now())
+
+  Cheque Cheque[]
+
+  @@unique([name])
+  @@index([accountNumber])
+  @@map("banks")
+}
+
+model Cheque {
+  id              String       @id @default(uuid()) @db.Char(36)
+  chequeNumber    String
+  bankId          String       @db.Char(36)
+  bank            Bank         @relation(fields: [bankId], references: [id], onDelete: Cascade)
+  DraweeFirstName String
+  DraweeLastName  String?
+  contact         String?
+  Address         String?
+  reason          String?
+  amount          Decimal      @db.Decimal(10, 2)
+  status          ChequeStatus @default(PENDING)
+  bankingDate     DateTime
+  updatedAt       DateTime     @updatedAt
+  createdAt       DateTime     @default(now())
+
+  @@index([bankId, status])
+  @@index([chequeNumber])
+  @@index([bankingDate])
+  @@index([status, createdAt])
+  @@map("cheques")
+}
+
+model branchExpense {
+  id           String          @id @default(uuid()) @db.Char(36)
+  branchId     String          @db.Char(36)
+  branch       Branch          @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  category     ExpenseCategory
+  title        String
+  description  String?
+  receiptImage String?
+  amount       Float
+  dateIncurred DateTime
+  recordedBy   String          @db.Char(36)
+  employee     Employee        @relation(fields: [recordedBy], references: [id], onDelete: Cascade)
+  updatedAt    DateTime        @updatedAt
+  createdAt    DateTime        @default(now())
+
+  @@index([branchId, dateIncurred])
+  @@map("branch_expenses")
+}
+
+//massage
+model MassageSales {
+  id                     String                   @id @default(uuid()) @db.Char(36)
+  clientId               String                   @db.Char(36)
+  client                 Client                   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  items                  Json
+  total                  Decimal                  @db.Decimal(10, 2)
+  status                 SaleStatus
+  balance                Decimal                  @db.Decimal(10, 2)
+  paymentMethods         Json
+  notes                  String?
+  servedBy               String                   @db.Char(36)
+  employee               Employee                 @relation(fields: [servedBy], references: [id], onDelete: Cascade)
+  updatedAt              DateTime                 @updatedAt
+  createdAt              DateTime                 @default(now())
+  MassageServicePayments MassageServicePayments[]
+
+  @@index([createdAt])
+  @@index([clientId])
+  @@map("massage_sales")
+}
+
+model MassageServicePayments {
+  id            String            @id @default(uuid()) @db.Char(36)
+  saleId        String            @db.Char(36)
+  sale          MassageSales      @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  amount        Decimal           @db.Decimal(10, 2)
+  paymentMethod PaymentMethodType
+  referenceId   String?
+  notes         String?
+  cashierId     String            @db.Char(36)
+  employee      Employee          @relation(fields: [cashierId], references: [id], onDelete: Cascade)
+  updatedAt     DateTime          @updatedAt
+  createdAt     DateTime          @default(now())
+
+  @@index([createdAt])
+  @@map("massageServicePayments")
+}
+
+model Attendance {
+  id          String    @id @default(uuid()) @db.Char(36)
+  date        String
+  employeeId  String    @db.Char(36)
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  timeIn      DateTime
+  timeOut     DateTime?
+  missedHours Float?
+  notes       String?
+  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime  @default(now())
+}
+
+model PayrollPeriods {
+  id          String   @id @default(uuid()) @db.Char(36)
+  periodStart DateTime
+  periodEnd   DateTime
+  payDate     DateTime // <-- add this
+  totalSpent  Decimal
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  payrolls Payroll[] // <-- relation renamed for clarity
+}
+
+model Payroll {
+  id               String         @id @default(uuid()) @db.Char(36)
+  payrollPeriodId  String         @db.Char(36)
+  payrollPeriod    PayrollPeriods @relation(fields: [payrollPeriodId], references: [id], onDelete: Cascade)
+  paymentStructure Json
+  updatedAt        DateTime       @updatedAt
+  createdAt        DateTime       @default(now())
+}
+
+model ClientPrescription {
+  id           String   @id @default(uuid()) @db.Char(36)
+  clientId     String   @db.Char(36)
+  client       Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  images       Json
+  notes        String?
+  prescribedBy String   @db.Char(36)
+  employee     Employee @relation(fields: [prescribedBy], references: [id], onDelete: Cascade)
+  isReviewed   Boolean  @default(false)
+  reviewNotes  String?
+  updatedAt    DateTime @updatedAt
+  createdAt    DateTime @default(now())
+}
+
+model DeliveryNote {
+  id                 String   @id @default(uuid()) @db.Char(36)
+  name               String
+  deliveryNoteNumber String
+  images             Json
+  registeredBy       String   @db.Char(36)
+  employee           Employee @relation(fields: [registeredBy], references: [id], onDelete: Cascade)
+  notes              String?
+  updatedAt          DateTime @updatedAt
+  createdAt          DateTime @default(now())
+
+  InventoryRecord InventoryRecord[] @relation("dn")
+}
+
+model Supplier {
+  id        String   @id @default(uuid()) @db.Char(36)
+  firstName String
+  lastName  String
+  contact   String   @unique
+  address   String?
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  Supply    Supply[]
+
+  @@index([firstName, lastName])
+  @@index([contact])
+  @@index([createdAt])
+}
+
+model Supply {
+  id                 String             @id @default(uuid()) @db.Char(36)
+  itemId             String             @db.Char(36)
+  item               Item               @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  supplierId         String             @db.Char(36)
+  supplier           Supplier           @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  qty                Float
+  unitId             String             @db.Char(36)
+  uom                Unit               @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  value              Decimal            @db.Decimal(10, 2)
+  balance            Decimal            @db.Decimal(10, 2)
+  recievedBy         String             @db.Char(36)
+  employee           Employee           @relation(fields: [recievedBy], references: [id], onDelete: Cascade)
+  paymentStatus      EventPaymentStatus @default(UNPAID)
+  proofImage         String?
+  destinationStoreId String             @db.Char(36)
+  destinationStore   Store              @relation(fields: [destinationStoreId], references: [id], onDelete: Cascade)
+  updatedAt          DateTime           @updatedAt
+  createdAt          DateTime           @default(now())
+  SupplyPayments     SupplyPayments[]
+
+  @@index([supplierId])
+  @@index([createdAt])
+}
+
+model SupplyPayments {
+  id                String             @id @default(uuid()) @db.Char(36)
+  supplyId          String             @db.Char(36)
+  supply            Supply             @relation(fields: [supplyId], references: [id], onDelete: Cascade)
+  bank              String?
+  chequeNumber      String?
+  chequeBankingDate DateTime?
+  paymentType       PaymentType
+  barterItemName    String?
+  amount            Decimal            @db.Decimal(10, 2)
+  paidBy            String             @db.Char(36)
+  employee          Employee           @relation(fields: [paidBy], references: [id], onDelete: Cascade)
+  paymentStatus     EventPaymentStatus
+  proofImage        String?
+  updatedAt         DateTime           @updatedAt
+  createdAt         DateTime           @default(now())
+}
+
+model SeedlingStages {
+  id                    String                 @id @default(uuid()) @db.Char(36)
+  name                  String
+  stageDays             Float
+  updatedAt             DateTime               @updatedAt
+  createdAt             DateTime               @default(now())
+  seedlingBatches       SeedlingBatch[]
+  seedlingBatchTrackers SeedlingBatchTracker[]
+  seedlingDeaths        SeedlingDeath[]
+
+  @@index([name])
+  @@index([createdAt])
+}
+
+model SeedlingBatch {
+  id                      String                 @id @default(uuid()) @db.Char(36)
+  batchNumber             String
+  currentStageId          String                 @db.Char(36)
+  currentStage            SeedlingStages         @relation(fields: [currentStageId], references: [id], onDelete: Cascade)
+  seedlings               Json
+  daysSpentInCurrentStage Float
+  status                  SeedlingGrowthStatus
+  notes                   String?
+  updatedAt               DateTime               @updatedAt
+  createdAt               DateTime               @default(now())
+  seedlingBatchTrackers   SeedlingBatchTracker[]
+  seedlingDeaths          SeedlingDeath[]
+}
+
+model SeedlingBatchTracker {
+  id                          String         @id @default(uuid()) @db.Char(36)
+  batchId                     String         @db.Char(36)
+  batch                       SeedlingBatch  @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  currentStageId              String         @db.Char(36)
+  currentStage                SeedlingStages @relation(fields: [currentStageId], references: [id], onDelete: Cascade)
+  startDate                   DateTime
+  endDate                     DateTime
+  seedlingsLostAtCurrentStage Json?
+  daysToNextStage             Float
+  updatedAt                   DateTime       @updatedAt
+  createdAt                   DateTime       @default(now())
+}
+
+model SeedlingDeath {
+  id        String         @id @default(uuid()) @db.Char(36)
+  batchId   String         @db.Char(36)
+  batch     SeedlingBatch  @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  stageId   String         @db.Char(36)
+  stage     SeedlingStages @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  seedlings Json
+  reason    String?
+  updatedAt DateTime       @updatedAt
+  createdAt DateTime       @default(now())
+}
+
+// Manufacturing model - Product manufacturing records
+model Manufacturing {
+  id              String              @id @default(uuid()) @db.Char(36)
+  storeId         String              @db.Char(36)
+  store           Store               @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  primaryUnitId   String              @db.Char(36) // Unit ID for primary unit (L or KG)
+  primaryUnit     Unit                @relation("PrimaryUnit", fields: [primaryUnitId], references: [id], onDelete: Cascade)
+  unitId          String              @db.Char(36) // Unit ID for packing unit
+  unit            Unit                @relation("PackingUnit", fields: [unitId], references: [id], onDelete: Cascade)
+  totalQuantity   Float               // Total quantity in primary unit (L or KG)
+  estimatedOutput Float               // Estimated number of output units/pieces
+  actualOutput    Float?              // Actual number of output units/pieces (filled after packing)
+  status          ManufacturingStatus @default(PENDING) // Status: PENDING, NORMAL, WASTAGE_DETECTED, GOOD_UTILIZATION
+  items           Json                // Array of manufacturing items: [{ itemId, itemName, quantity }]
+  manufacturedBy  String              @db.Char(36)
+  employee        Employee            @relation(fields: [manufacturedBy], references: [id], onDelete: Cascade)
+  notes           String?
+  updatedAt       DateTime            @updatedAt
+  createdAt       DateTime            @default(now())
+
+  @@index([storeId, createdAt])
+  @@index([manufacturedBy, createdAt])
+  @@index([status, createdAt])
+  @@index([createdAt])
+  @@map("manufacturing")
+}
