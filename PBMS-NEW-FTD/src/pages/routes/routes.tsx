@@ -16,7 +16,8 @@ import {
     FaProjectDiagram,
     FaReceipt,
     FaUserInjured,
-    FaIndustry
+    FaIndustry,
+    FaArchive
   } from 'react-icons/fa';
 import { SystemConfigRoutes } from './systemConfigRoutes';
 import { ExhibitionRoutes } from './exhibitionRoutes';
@@ -33,6 +34,7 @@ import { ProjectsRoutes } from './projectsRoutes';
 import { FarmRoutes } from './farmRoutes';
 import { ExpensesRoutes } from './expensesRoutes';
 import { ManufacturingRoutes } from './manufacturingRoutes';
+import { ArchiveRoutes } from './archiveRoutes';
   
   export const Routes = [
     {
@@ -147,5 +149,10 @@ import { ManufacturingRoutes } from './manufacturingRoutes';
         icon: FaCog,
         routes: SystemConfigRoutes,
         requiredPermission: "create_and_modify_roles",
+      },
+      {
+        name: "Archives (Legacy Data)",
+        icon: FaArchive,
+        routes: ArchiveRoutes,
       },
   ];

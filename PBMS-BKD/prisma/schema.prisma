@@ -111,7 +111,7 @@ enum ManufacturingStatus {
 
 // System config - Optimized indexes
 model Company {
-  id          String   @id @default(uuid()) @db.Char(36)
+  id          Int      @id @default(autoincrement())
   name        String
   email       String
   tel1        String
@@ -133,7 +133,7 @@ model Company {
 }
 
 model PaymentMethod {
-  id        String   @id @default(uuid()) @db.Char(36)
+  id        Int      @id @default(autoincrement())
   name      String
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
@@ -143,10 +143,10 @@ model PaymentMethod {
 
 // Store with optimized relationships
 model Store {
-  id                  String     @id @default(uuid()) @db.Char(36)
+  id                  Int        @id @default(autoincrement())
   name                String
-  branchId            String     @db.Char(36)
-  deptId              String     @db.Char(36)
+  branchId            Int
+  deptId              Int
   branch              Branch     @relation(fields: [branchId], references: [id], onDelete: Cascade)
   dept                Department @relation(fields: [deptId], references: [id], onDelete: Cascade)
   authorizedPersonnel Json? // Consider normalizing if frequently queried
@@ -168,7 +168,7 @@ model Store {
 }
 
 model Unit {
-  id        String   @id @default(uuid()) @db.Char(36)
+  id        Int      @id @default(autoincrement())
   name      String
   value     Float?
   abr       String?
@@ -180,8 +180,8 @@ model Unit {
   ExhibitionInventory       ExhibitionInventory[]
   ExhibitionInventoryRecord ExhibitionInventoryRecord[]
   Supply                    Supply[]
-  primaryUnitManufacturings Manufacturing[] @relation("PrimaryUnit")
-  packingUnitManufacturings Manufacturing[] @relation("PackingUnit")
+  primaryUnitManufacturings Manufacturing[]             @relation("PrimaryUnit")
+  packingUnitManufacturings Manufacturing[]             @relation("PackingUnit")
 
   @@unique([name])
   @@map("units")
@@ -189,7 +189,7 @@ model Unit {
 
 // Branch with composite indexes
 model Branch {
-  id        String   @id @default(uuid()) @db.Char(36)
+  id        Int      @id @default(autoincrement())
   name      String
   location  String
   updatedAt DateTime @updatedAt
@@ -205,9 +205,9 @@ model Branch {
 }
 
 model Department {
-  id        String   @id @default(uuid()) @db.Char(36)
+  id        Int      @id @default(autoincrement())
   name      String
-  branchId  String   @db.Char(36)
+  branchId  Int
   branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
@@ -222,7 +222,7 @@ model Department {
 
 // Permission system optimized
 model Permission {
-  id        String   @id @default(uuid()) @db.Char(36)
+  id        Int      @id @default(autoincrement())
   module    String
   name      String
   value     String   @unique
@@ -236,7 +236,7 @@ model Permission {
 }
 
 model Role {
-  id          String       @id @default(uuid()) @db.Char(36)
+  id          Int          @id @default(autoincrement())
   name        String       @unique
   permissions Permission[]
   updatedAt   DateTime     @updatedAt
@@ -249,7 +249,7 @@ model Role {
 
 // Employee with optimized indexes for login
 model Employee {
-  id                    String      @id @default(uuid()) @db.Char(36)
+  id                    Int         @id @default(autoincrement())
   firstName             String
   lastName              String
   gender                Gender
@@ -261,10 +261,10 @@ model Employee {
   hasPrescriptionAccess Boolean     @default(false)
   isActive              Boolean     @default(true)
   profileImage          String?
-  roleId                String      @db.Char(36)
+  roleId                Int
   role                  Role        @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  branchId              String?     @db.Char(36)
-  deptId                String?     @db.Char(36)
+  branchId              Int?
+  deptId                Int?
   branch                Branch?     @relation(fields: [branchId], references: [id], onDelete: Cascade)
   dept                  Department? @relation(fields: [deptId], references: [id], onDelete: Cascade)
   updatedAt             DateTime    @updatedAt
@@ -298,8 +298,8 @@ model Employee {
 }
 
 model EmployeeLoginLogs {
-  id         String   @id @default(uuid()) @db.Char(36)
-  employeeId String   @db.Char(36)
+  id         Int      @id @default(autoincrement())
+  employeeId Int
   employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   updatedAt  DateTime @updatedAt
   createdAt  DateTime @default(now())
@@ -309,8 +309,8 @@ model EmployeeLoginLogs {
 }
 
 model EmailVerification {
-  id        String   @id @default(uuid()) @db.Char(36)
-  userId    String   @db.Char(36)
+  id        Int      @id @default(autoincrement())
+  userId    Int
   code      String
   createdAt DateTime @default(now())
   expiresAt DateTime
@@ -324,7 +324,7 @@ model EmailVerification {
 
 // Items with optimized indexing
 model ItemCategory {
-  id        String   @id @default(uuid()) @db.Char(36)
+  id        Int      @id @default(autoincrement())
   name      String   @unique
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
@@ -335,8 +335,8 @@ model ItemCategory {
 }
 
 model Item {
-  id         String       @id @default(uuid()) @db.Char(36)
-  categoryId String       @db.Char(36)
+  id         Int          @id @default(autoincrement())
+  categoryId Int
   category   ItemCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   showInPos  Boolean      @default(false)
   name       String
@@ -359,7 +359,7 @@ model Item {
 }
 
 model Service {
-  id        String   @id @default(uuid()) @db.Char(36)
+  id        Int      @id @default(autoincrement())
   name      String
   price     Decimal  @db.Decimal(10, 2)
   updatedAt DateTime @updatedAt
@@ -371,12 +371,12 @@ model Service {
 
 // ProductInventory with composite indexes for store queries
 model ProductInventory {
-  id        String   @id @default(uuid()) @db.Char(36)
-  itemId    String   @db.Char(36)
+  id        Int      @id @default(autoincrement())
+  itemId    Int
   item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  storeId   String   @db.Char(36)
+  storeId   Int
   qty       Float
-  unitId    String   @db.Char(36)
+  unitId    Int
   unit      Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
   store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
   updatedAt DateTime @updatedAt
@@ -390,28 +390,28 @@ model ProductInventory {
 
 // Inventory records with optimized date queries
 model InventoryRecord {
-  id       String                  @id @default(uuid()) @db.Char(36)
+  id       Int                     @id @default(autoincrement())
   category InventoryRecordCategory
-  itemId   String                  @db.Char(36)
+  itemId   Int
   item     Item                    @relation(fields: [itemId], references: [id], onDelete: Cascade)
 
-  storeId String @db.Char(36)
-  store   Store  @relation("FromStore", fields: [storeId], references: [id], onDelete: Cascade)
+  storeId Int
+  store   Store @relation("FromStore", fields: [storeId], references: [id], onDelete: Cascade)
 
-  toStoreId String? @db.Char(36)
-  toStore   Store?  @relation("ToStore", fields: [toStoreId], references: [id], onDelete: Cascade)
+  toStoreId Int?
+  toStore   Store? @relation("ToStore", fields: [toStoreId], references: [id], onDelete: Cascade)
 
-  deliveryNoteId String?       @db.Char(36)
+  deliveryNoteId Int?
   deliveryNote   DeliveryNote? @relation("dn", fields: [deliveryNoteId], references: [id], onDelete: Cascade)
 
   initiatedQty      Float?
   qty               Float
   remainingQuantity Float?
-  unitId            String              @db.Char(36)
+  unitId            Int
   unit              Unit                @relation(fields: [unitId], references: [id], onDelete: Cascade)
   source            String
   description       String?
-  recordedBy        String              @db.Char(36)
+  recordedBy        Int
   employee          Employee            @relation(fields: [recordedBy], references: [id], onDelete: Cascade)
   transferId        String?
   transferStatus    StockTransferStatus @default(CONFIRMED)
@@ -419,8 +419,8 @@ model InventoryRecord {
   resolveNotes      String?
   images            Json?
   extraNote         String?
-  expectedOutput Float?
-  recordedOutput Float?
+  expectedOutput    Float?
+  recordedOutput    Float?
   updatedAt         DateTime            @updatedAt
   createdAt         DateTime            @default(now())
 
@@ -433,13 +433,13 @@ model InventoryRecord {
 
 // SALES - HEAVILY OPTIMIZED FOR POS
 model Sale {
-  id             String         @id @default(uuid()) @db.Char(36)
-  clientId       String?        @db.Char(36)
+  id             Int            @id @default(autoincrement())
+  clientId       Int?
   client         Client?        @relation(fields: [clientId], references: [id], onDelete: Cascade)
   items          Json // Array of CartItemDto - consider normalized table for large systems
-  servedBy       String         @db.Char(36)
+  servedBy       Int
   employee       Employee       @relation(fields: [servedBy], references: [id], onDelete: Cascade)
-  storeId        String         @db.Char(36)
+  storeId        Int
   store          Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
   status         SaleStatus
   total          Decimal        @db.Decimal(10, 2)
@@ -461,14 +461,14 @@ model Sale {
 }
 
 model SalePayments {
-  id            String            @id @default(uuid()) @db.Char(36)
-  saleId        String            @db.Char(36)
+  id            Int               @id @default(autoincrement())
+  saleId        Int
   sale          Sale              @relation(fields: [saleId], references: [id], onDelete: Cascade)
   amount        Decimal           @db.Decimal(10, 2)
   paymentMethod PaymentMethodType
   referenceId   String?
   notes         String?
-  cashierId     String            @db.Char(36)
+  cashierId     Int
   employee      Employee          @relation(fields: [cashierId], references: [id], onDelete: Cascade)
   updatedAt     DateTime          @updatedAt
   createdAt     DateTime          @default(now())
@@ -479,7 +479,7 @@ model SalePayments {
 
 // Clientele optimized
 model Client {
-  id        String   @id @default(uuid()) @db.Char(36)
+  id        Int      @id @default(autoincrement())
   firstName String
   lastName  String
   contact   String   @unique
@@ -501,7 +501,7 @@ model Client {
 
 // Event system optimized
 model Event {
-  id          String      @id @default(uuid()) @db.Char(36)
+  id          Int         @id @default(autoincrement())
   title       String
   description String?
   startDate   DateTime
@@ -521,7 +521,7 @@ model Event {
 }
 
 model EventParticipant {
-  id            String             @id @default(uuid()) @db.Char(36)
+  id            Int                @id @default(autoincrement())
   firstName     String
   lastName      String
   tel           String
@@ -529,7 +529,7 @@ model EventParticipant {
   amountPaid    Decimal            @db.Decimal(10, 2)
   balance       Decimal            @db.Decimal(10, 2)
   paymentStatus EventPaymentStatus @default(UNPAID)
-  eventId       String             @db.Char(36)
+  eventId       Int
   event         Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
   updatedAt     DateTime           @updatedAt
   createdAt     DateTime           @default(now())
@@ -542,7 +542,7 @@ model EventParticipant {
 
 // Exhibition optimized
 model Exhibition {
-  id          String   @id @default(uuid()) @db.Char(36)
+  id          Int      @id @default(autoincrement())
   name        String
   location    String
   description String?
@@ -560,9 +560,9 @@ model Exhibition {
 }
 
 model ExhibitionStore {
-  id           String     @id @default(uuid()) @db.Char(36)
+  id           Int        @id @default(autoincrement())
   name         String
-  exhibitionId String     @db.Char(36)
+  exhibitionId Int
   exhibition   Exhibition @relation(fields: [exhibitionId], references: [id], onDelete: Cascade)
   updatedAt    DateTime   @updatedAt
   createdAt    DateTime   @default(now())
@@ -577,14 +577,14 @@ model ExhibitionStore {
 }
 
 model ExhibitionInventory {
-  id        String                  @id @default(uuid()) @db.Char(36)
+  id        Int                     @id @default(autoincrement())
   category  InventoryRecordCategory
-  storeId   String                  @db.Char(36)
+  storeId   Int
   store     ExhibitionStore         @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  itemId    String                  @db.Char(36)
+  itemId    Int
   item      Item                    @relation(fields: [itemId], references: [id], onDelete: Cascade)
   qty       Float
-  unitId    String                  @db.Char(36)
+  unitId    Int
   unit      Unit                    @relation(fields: [unitId], references: [id], onDelete: Cascade)
   updatedAt DateTime                @updatedAt
   createdAt DateTime                @default(now())
@@ -595,18 +595,18 @@ model ExhibitionInventory {
 }
 
 model ExhibitionInventoryRecord {
-  id          String                  @id @default(uuid()) @db.Char(36)
-  storeId     String                  @db.Char(36)
+  id          Int                     @id @default(autoincrement())
+  storeId     Int
   store       ExhibitionStore         @relation(fields: [storeId], references: [id], onDelete: Cascade)
   category    InventoryRecordCategory
-  itemId      String                  @db.Char(36)
+  itemId      Int
   item        Item                    @relation(fields: [itemId], references: [id], onDelete: Cascade)
   qty         Float
-  unitId      String                  @db.Char(36)
+  unitId      Int
   unit        Unit                    @relation(fields: [unitId], references: [id], onDelete: Cascade)
   source      String
   description String?
-  recordedBy  String                  @db.Char(36)
+  recordedBy  Int
   employee    Employee                @relation(fields: [recordedBy], references: [id], onDelete: Cascade)
   updatedAt   DateTime                @updatedAt
   createdAt   DateTime                @default(now())
@@ -617,8 +617,8 @@ model ExhibitionInventoryRecord {
 }
 
 model ExhibitionSales {
-  id                String          @id @default(uuid()) @db.Char(36)
-  clientId          String          @db.Char(36)
+  id                Int             @id @default(autoincrement())
+  clientId          Int
   client            Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
   items             Json
   total             Decimal         @db.Decimal(10, 2)
@@ -626,9 +626,9 @@ model ExhibitionSales {
   balance           Decimal         @db.Decimal(10, 2)
   paymentMethods    Json
   notes             String?
-  exhibitionStoreId String          @db.Char(36)
+  exhibitionStoreId Int
   exhibitionStore   ExhibitionStore @relation(fields: [exhibitionStoreId], references: [id], onDelete: Cascade)
-  servedBy          String          @db.Char(36)
+  servedBy          Int
   employee          Employee        @relation(fields: [servedBy], references: [id], onDelete: Cascade)
   updatedAt         DateTime        @updatedAt
   createdAt         DateTime        @default(now())
@@ -639,9 +639,9 @@ model ExhibitionSales {
 }
 
 model ExhibitionExpenses {
-  id           String          @id @default(uuid()) @db.Char(36)
+  id           Int             @id @default(autoincrement())
   category     ExpenseCategory
-  exhibitionId String          @db.Char(36)
+  exhibitionId Int
   exhibition   Exhibition      @relation(fields: [exhibitionId], references: [id], onDelete: Cascade)
   title        String
   description  String?
@@ -653,7 +653,7 @@ model ExhibitionExpenses {
 
 // Projects optimized
 model Project {
-  id           String         @id @default(uuid()) @db.Char(36)
+  id           Int            @id @default(autoincrement())
   name         String
   price        Decimal        @db.Decimal(10, 2)
   barcode      String?
@@ -667,10 +667,10 @@ model Project {
 }
 
 model ProjectSales {
-  id                   String     @id @default(uuid()) @db.Char(36)
-  clientId             String     @db.Char(36)
+  id                   Int        @id @default(autoincrement())
+  clientId             Int
   client               Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  projectId            String     @db.Char(36)
+  projectId            Int
   project              Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
   status               SaleStatus
   saleTotal            Decimal    @db.Decimal(10, 2)
@@ -678,7 +678,7 @@ model ProjectSales {
   numberOfInstallments Int
   installmentAmount    Decimal    @db.Decimal(10, 2)
   deliveryNoteImage    String?
-  cashierId            String     @db.Char(36)
+  cashierId            Int
   employee             Employee   @relation(fields: [cashierId], references: [id], onDelete: Cascade)
   updatedAt            DateTime   @updatedAt
   createdAt            DateTime   @default(now())
@@ -692,17 +692,17 @@ model ProjectSales {
 }
 
 model ProjectPayments {
-  id                   String            @id @default(uuid()) @db.Char(36)
-  saleId               String            @db.Char(36)
+  id                   Int               @id @default(autoincrement())
+  saleId               Int
   projectSale          ProjectSales      @relation(fields: [saleId], references: [id], onDelete: Cascade)
   amount               Decimal           @db.Decimal(10, 2)
-  exhibitionId         String            @db.Char(36)
+  exhibitionId         Int
   paymentMethod        PaymentMethodType
   referenceId          String?
   notes                String?
   receiptImage         String?
   bankDepositSlipImage String?
-  cashierId            String            @db.Char(36)
+  cashierId            Int
   employee             Employee          @relation(fields: [cashierId], references: [id], onDelete: Cascade)
   updatedAt            DateTime          @updatedAt
   createdAt            DateTime          @default(now())
@@ -714,7 +714,7 @@ model ProjectPayments {
 
 // Cheque Management optimized
 model Bank {
-  id            String   @id @default(uuid()) @db.Char(36)
+  id            Int      @id @default(autoincrement())
   name          String
   accountNumber String?
   balance       Decimal? @db.Decimal(10, 2)
@@ -729,9 +729,9 @@ model Bank {
 }
 
 model Cheque {
-  id              String       @id @default(uuid()) @db.Char(36)
+  id              Int          @id @default(autoincrement())
   chequeNumber    String
-  bankId          String       @db.Char(36)
+  bankId          Int
   bank            Bank         @relation(fields: [bankId], references: [id], onDelete: Cascade)
   DraweeFirstName String
   DraweeLastName  String?
@@ -752,8 +752,8 @@ model Cheque {
 }
 
 model branchExpense {
-  id           String          @id @default(uuid()) @db.Char(36)
-  branchId     String          @db.Char(36)
+  id           Int             @id @default(autoincrement())
+  branchId     Int
   branch       Branch          @relation(fields: [branchId], references: [id], onDelete: Cascade)
   category     ExpenseCategory
   title        String
@@ -761,7 +761,7 @@ model branchExpense {
   receiptImage String?
   amount       Float
   dateIncurred DateTime
-  recordedBy   String          @db.Char(36)
+  recordedBy   Int
   employee     Employee        @relation(fields: [recordedBy], references: [id], onDelete: Cascade)
   updatedAt    DateTime        @updatedAt
   createdAt    DateTime        @default(now())
@@ -772,8 +772,8 @@ model branchExpense {
 
 //massage
 model MassageSales {
-  id                     String                   @id @default(uuid()) @db.Char(36)
-  clientId               String                   @db.Char(36)
+  id                     Int                      @id @default(autoincrement())
+  clientId               Int
   client                 Client                   @relation(fields: [clientId], references: [id], onDelete: Cascade)
   items                  Json
   total                  Decimal                  @db.Decimal(10, 2)
@@ -781,7 +781,7 @@ model MassageSales {
   balance                Decimal                  @db.Decimal(10, 2)
   paymentMethods         Json
   notes                  String?
-  servedBy               String                   @db.Char(36)
+  servedBy               Int
   employee               Employee                 @relation(fields: [servedBy], references: [id], onDelete: Cascade)
   updatedAt              DateTime                 @updatedAt
   createdAt              DateTime                 @default(now())
@@ -793,14 +793,14 @@ model MassageSales {
 }
 
 model MassageServicePayments {
-  id            String            @id @default(uuid()) @db.Char(36)
-  saleId        String            @db.Char(36)
+  id            Int               @id @default(autoincrement())
+  saleId        Int
   sale          MassageSales      @relation(fields: [saleId], references: [id], onDelete: Cascade)
   amount        Decimal           @db.Decimal(10, 2)
   paymentMethod PaymentMethodType
   referenceId   String?
   notes         String?
-  cashierId     String            @db.Char(36)
+  cashierId     Int
   employee      Employee          @relation(fields: [cashierId], references: [id], onDelete: Cascade)
   updatedAt     DateTime          @updatedAt
   createdAt     DateTime          @default(now())
@@ -810,9 +810,9 @@ model MassageServicePayments {
 }
 
 model Attendance {
-  id          String    @id @default(uuid()) @db.Char(36)
+  id          Int       @id @default(autoincrement())
   date        String
-  employeeId  String    @db.Char(36)
+  employeeId  Int
   employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   timeIn      DateTime
   timeOut     DateTime?
@@ -823,7 +823,7 @@ model Attendance {
 }
 
 model PayrollPeriods {
-  id          String   @id @default(uuid()) @db.Char(36)
+  id          Int      @id @default(autoincrement())
   periodStart DateTime
   periodEnd   DateTime
   payDate     DateTime // <-- add this
@@ -835,8 +835,8 @@ model PayrollPeriods {
 }
 
 model Payroll {
-  id               String         @id @default(uuid()) @db.Char(36)
-  payrollPeriodId  String         @db.Char(36)
+  id               Int            @id @default(autoincrement())
+  payrollPeriodId  Int
   payrollPeriod    PayrollPeriods @relation(fields: [payrollPeriodId], references: [id], onDelete: Cascade)
   paymentStructure Json
   updatedAt        DateTime       @updatedAt
@@ -844,12 +844,12 @@ model Payroll {
 }
 
 model ClientPrescription {
-  id           String   @id @default(uuid()) @db.Char(36)
-  clientId     String   @db.Char(36)
+  id           Int      @id @default(autoincrement())
+  clientId     Int
   client       Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
   images       Json
   notes        String?
-  prescribedBy String   @db.Char(36)
+  prescribedBy Int
   employee     Employee @relation(fields: [prescribedBy], references: [id], onDelete: Cascade)
   isReviewed   Boolean  @default(false)
   reviewNotes  String?
@@ -858,11 +858,11 @@ model ClientPrescription {
 }
 
 model DeliveryNote {
-  id                 String   @id @default(uuid()) @db.Char(36)
+  id                 Int      @id @default(autoincrement())
   name               String
   deliveryNoteNumber String
   images             Json
-  registeredBy       String   @db.Char(36)
+  registeredBy       Int
   employee           Employee @relation(fields: [registeredBy], references: [id], onDelete: Cascade)
   notes              String?
   updatedAt          DateTime @updatedAt
@@ -872,7 +872,7 @@ model DeliveryNote {
 }
 
 model Supplier {
-  id        String   @id @default(uuid()) @db.Char(36)
+  id        Int      @id @default(autoincrement())
   firstName String
   lastName  String
   contact   String   @unique
@@ -887,21 +887,21 @@ model Supplier {
 }
 
 model Supply {
-  id                 String             @id @default(uuid()) @db.Char(36)
-  itemId             String             @db.Char(36)
+  id                 Int                @id @default(autoincrement())
+  itemId             Int
   item               Item               @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  supplierId         String             @db.Char(36)
+  supplierId         Int
   supplier           Supplier           @relation(fields: [supplierId], references: [id], onDelete: Cascade)
   qty                Float
-  unitId             String             @db.Char(36)
+  unitId             Int
   uom                Unit               @relation(fields: [unitId], references: [id], onDelete: Cascade)
   value              Decimal            @db.Decimal(10, 2)
   balance            Decimal            @db.Decimal(10, 2)
-  recievedBy         String             @db.Char(36)
+  recievedBy         Int
   employee           Employee           @relation(fields: [recievedBy], references: [id], onDelete: Cascade)
   paymentStatus      EventPaymentStatus @default(UNPAID)
   proofImage         String?
-  destinationStoreId String             @db.Char(36)
+  destinationStoreId Int
   destinationStore   Store              @relation(fields: [destinationStoreId], references: [id], onDelete: Cascade)
   updatedAt          DateTime           @updatedAt
   createdAt          DateTime           @default(now())
@@ -912,8 +912,8 @@ model Supply {
 }
 
 model SupplyPayments {
-  id                String             @id @default(uuid()) @db.Char(36)
-  supplyId          String             @db.Char(36)
+  id                Int                @id @default(autoincrement())
+  supplyId          Int
   supply            Supply             @relation(fields: [supplyId], references: [id], onDelete: Cascade)
   bank              String?
   chequeNumber      String?
@@ -921,7 +921,7 @@ model SupplyPayments {
   paymentType       PaymentType
   barterItemName    String?
   amount            Decimal            @db.Decimal(10, 2)
-  paidBy            String             @db.Char(36)
+  paidBy            Int
   employee          Employee           @relation(fields: [paidBy], references: [id], onDelete: Cascade)
   paymentStatus     EventPaymentStatus
   proofImage        String?
@@ -930,7 +930,7 @@ model SupplyPayments {
 }
 
 model SeedlingStages {
-  id                    String                 @id @default(uuid()) @db.Char(36)
+  id                    Int                    @id @default(autoincrement())
   name                  String
   stageDays             Float
   updatedAt             DateTime               @updatedAt
@@ -944,9 +944,9 @@ model SeedlingStages {
 }
 
 model SeedlingBatch {
-  id                      String                 @id @default(uuid()) @db.Char(36)
+  id                      Int                    @id @default(autoincrement())
   batchNumber             String
-  currentStageId          String                 @db.Char(36)
+  currentStageId          Int
   currentStage            SeedlingStages         @relation(fields: [currentStageId], references: [id], onDelete: Cascade)
   seedlings               Json
   daysSpentInCurrentStage Float
@@ -959,10 +959,10 @@ model SeedlingBatch {
 }
 
 model SeedlingBatchTracker {
-  id                          String         @id @default(uuid()) @db.Char(36)
-  batchId                     String         @db.Char(36)
+  id                          Int            @id @default(autoincrement())
+  batchId                     Int
   batch                       SeedlingBatch  @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  currentStageId              String         @db.Char(36)
+  currentStageId              Int
   currentStage                SeedlingStages @relation(fields: [currentStageId], references: [id], onDelete: Cascade)
   startDate                   DateTime
   endDate                     DateTime
@@ -973,10 +973,10 @@ model SeedlingBatchTracker {
 }
 
 model SeedlingDeath {
-  id        String         @id @default(uuid()) @db.Char(36)
-  batchId   String         @db.Char(36)
+  id        Int            @id @default(autoincrement())
+  batchId   Int
   batch     SeedlingBatch  @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  stageId   String         @db.Char(36)
+  stageId   Int
   stage     SeedlingStages @relation(fields: [stageId], references: [id], onDelete: Cascade)
   seedlings Json
   reason    String?
@@ -986,19 +986,19 @@ model SeedlingDeath {
 
 // Manufacturing model - Product manufacturing records
 model Manufacturing {
-  id              String              @id @default(uuid()) @db.Char(36)
-  storeId         String              @db.Char(36)
+  id              Int                 @id @default(autoincrement())
+  storeId         Int
   store           Store               @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  primaryUnitId   String              @db.Char(36) // Unit ID for primary unit (L or KG)
+  primaryUnitId   Int // Unit ID for primary unit (L or KG)
   primaryUnit     Unit                @relation("PrimaryUnit", fields: [primaryUnitId], references: [id], onDelete: Cascade)
-  unitId          String              @db.Char(36) // Unit ID for packing unit
+  unitId          Int // Unit ID for packing unit
   unit            Unit                @relation("PackingUnit", fields: [unitId], references: [id], onDelete: Cascade)
-  totalQuantity   Float               // Total quantity in primary unit (L or KG)
-  estimatedOutput Float               // Estimated number of output units/pieces
-  actualOutput    Float?              // Actual number of output units/pieces (filled after packing)
+  totalQuantity   Float // Total quantity in primary unit (L or KG)
+  estimatedOutput Float // Estimated number of output units/pieces
+  actualOutput    Float? // Actual number of output units/pieces (filled after packing)
   status          ManufacturingStatus @default(PENDING) // Status: PENDING, NORMAL, WASTAGE_DETECTED, GOOD_UTILIZATION
-  items           Json                // Array of manufacturing items: [{ itemId, itemName, quantity }]
-  manufacturedBy  String              @db.Char(36)
+  items           Json // Array of manufacturing items: [{ itemId, itemName, quantity }]
+  manufacturedBy  Int
   employee        Employee            @relation(fields: [manufacturedBy], references: [id], onDelete: Cascade)
   notes           String?
   updatedAt       DateTime            @updatedAt

@@ -1,10 +1,11 @@
 import axios, { type AxiosRequestConfig, type AxiosResponse } from "axios"
 import { toast } from "sonner";
 
-export const baseURL = "http://localhost:3005"
-export const imageURL = "http://localhost:3005/storage"
-// export const baseURL = "https://deinapi.smartclinic360.com"
-// export const imageURL = "https://deinapi.smartclinic360.com/storage"
+// export const baseURL = "http://localhost:3005"
+// export const imageURL = "http://localhost:3005/storage"
+export const baseURL = "https://pbmsapi.megaerpug.com"
+export const imageURL = "https://pbmsapi.megaerpug.com/storage"
+export const legacyBaseURL = "http://localhost:3008"
 export const system = 'PBMS'
 
 let isRefreshing = false;
@@ -110,6 +111,49 @@ export const apiRequest = async <T>(
     // Handle non-Axios related errors (network errors, etc.)
     toast.error("Network error. Please check your connection.");
     console.log(error)
+    throw new Error("Network error occurred");
+  }
+};
+
+// Legacy API request function for accessing old system data
+export const legacyApiRequest = async <T>(
+  endpoint: string,
+  method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE" = "GET",
+  data?: any
+): Promise<T> => {
+  const url = `${legacyBaseURL}${endpoint}`;
+
+  const config: AxiosRequestConfig = {
+    url,
+    method,
+    headers: {
+      "Content-Type": "application/json",
+    },
+    ...(data && { data }),
+  };
+
+  try {
+    const response: AxiosResponse<T> = await axios.request(config);
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const responseData = error.response?.data as any;
+
+      // Handle legacy API errors with toast notifications
+      if (responseData?.message) {
+        toast.error(`Legacy API Error: ${responseData.message}`);
+      } else if (error.response?.status === 404) {
+        toast.error("Legacy API endpoint not found. Please check if the legacy API is running.");
+      } else if (error.response?.status >= 500) {
+        toast.error("Legacy API server error. The legacy system may be unavailable.");
+      } else {
+        toast.error("Failed to connect to legacy API. Please check your network connection.");
+      }
+
+      throw error;
+    }
+
+    toast.error("Network error connecting to legacy API.");
     throw new Error("Network error occurred");
   }
 };
