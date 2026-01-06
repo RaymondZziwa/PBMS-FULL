@@ -32,7 +32,7 @@ export class ClientService {
     };
   }
 
-  async findOne(id: string) {
+  async findOne(id: number) {
     const client = await this.prisma.client.findUnique({ where: { id } });
     if (!client) throw new NotFoundException(`Client with id ${id} not found`);
     return {
@@ -42,7 +42,7 @@ export class ClientService {
     };
   }
 
-  async update(id: string, dto: UpdateClientDto) {
+  async update(id: number, dto: UpdateClientDto) {
     await this.findOne(id); // ensures it exists
     const client = await this.prisma.client.update({
       where: { id },
@@ -56,7 +56,7 @@ export class ClientService {
     };
   }
 
-  async remove(id: string) {
+  async remove(id: number) {
     await this.findOne(id);
     await this.prisma.client.delete({ where: { id } });
 
@@ -67,7 +67,7 @@ export class ClientService {
     };
   }
 
-  async getClientPurchases(id: string) {
+  async getClientPurchases(id: number) {
     await this.findOne(id);
     const posPurchases = await this.prisma.sale.findMany({
       where: {
@@ -136,9 +136,9 @@ export class ClientService {
   }
 
   async uploadPrescriptionImages(
-    clientId: string,
+    clientId: number,
     files: Express.Multer.File[],
-    dto: { notes: string; prescribedBy: string },
+    dto: { notes: string; prescribedBy: number },
   ) {
     if (!files || files.length === 0) {
       throw new NotFoundException('No files uploaded');
@@ -176,7 +176,7 @@ export class ClientService {
     };
   }
 
-  async getPrescriptions(clientId: string) {
+  async getPrescriptions(clientId: number) {
     const client = await this.prisma.client.findUnique({
       where: { id: clientId },
     });
@@ -202,7 +202,7 @@ export class ClientService {
     };
   }
 
-  async prescriptionHistory(id: string, startDate?: string, endDate?: string) {
+  async prescriptionHistory(id: number, startDate?: string, endDate?: string) {
     const employee = await this.prisma.employee.findUnique({ where: { id } });
 
     if (!employee) {
@@ -275,7 +275,7 @@ export class ClientService {
     };
   }
 
-  async reviewPescription(id: string, dto: reviewPrescriptionDto) {
+  async reviewPescription(id: number, dto: reviewPrescriptionDto) {
     const prescription = await this.prisma.clientPrescription.findUnique({
       where: { id },
     });

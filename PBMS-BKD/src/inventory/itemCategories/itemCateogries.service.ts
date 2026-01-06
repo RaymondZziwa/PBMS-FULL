@@ -24,7 +24,7 @@ export class ItemCategoryService {
     };
   }
 
-  async findOne(id: string): Promise<GenericResponse> {
+  async findOne(id: number): Promise<GenericResponse> {
     const itemCategory = await this.prismaService.itemCategory.findUnique({
       where: { id },
     });
@@ -35,7 +35,7 @@ export class ItemCategoryService {
     };
   }
 
-  async update(id: string, data: { name?: string }): Promise<GenericResponse> {
+  async update(id: number, data: { name?: string }): Promise<GenericResponse> {
     const itemCategory = await this.prismaService.itemCategory.update({
       where: { id },
       data,
@@ -47,7 +47,7 @@ export class ItemCategoryService {
     };
   }
 
-  async remove(id: string): Promise<GenericResponse> {
+  async remove(id: number): Promise<GenericResponse> {
     const itemCategory = await this.prismaService.itemCategory.delete({
       where: { id },
     });

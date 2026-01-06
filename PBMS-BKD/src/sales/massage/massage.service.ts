@@ -110,7 +110,7 @@ export class MassageSalesService {
     };
   }
 
-  async findOne(id: string) {
+  async findOne(id: number) {
     const sale = await this.prisma.massageSales.findUnique({
       where: { id },
       include: {
@@ -130,7 +130,7 @@ export class MassageSalesService {
     };
   }
 
-  async update(id: string, updateSaleDto: UpdateSaleDto) {
+  async update(id: number, updateSaleDto: UpdateSaleDto) {
     // Check if sale exists
     const existingSale = await this.prisma.massageSales.findUnique({
       where: { id },
@@ -208,7 +208,7 @@ export class MassageSalesService {
             saleId: dto.saleId,
             amount: method.amount,
             paymentMethod: method.type,
-            referenceId: dto.referenceId || '',
+            referenceId: dto.referenceId ? String(dto.referenceId) : null,
             notes: dto.notes,
             cashierId: dto.servedBy,
           },
@@ -223,7 +223,7 @@ export class MassageSalesService {
     };
   }
 
-  async remove(id: string) {
+  async remove(id: number) {
     const existing = await this.prisma.massageSales.findUnique({
       where: { id },
     });

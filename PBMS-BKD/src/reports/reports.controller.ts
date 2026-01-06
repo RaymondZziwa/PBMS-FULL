@@ -13,12 +13,12 @@ export class ReportsController {
 
   @Get('/stock-level-analysis/:id')
   async getStockLevelAnalysis(@Param('id') id: string) {
-    return await this.reportService.stockLevelAnalysis(id);
+    return await this.reportService.stockLevelAnalysis(Number(id));
   }
 
   @Get('/stock-level-analysis/print/:id')
   async printStockLevelAnalysis(@Param('id') id: string) {
-    return await this.reportService.exportStockLevelAnalysisPDF(id);
+    return await this.reportService.exportStockLevelAnalysisPDF(Number(id));
   }
 
   @Get('/stock-level-movement/:id')
@@ -31,11 +31,11 @@ export class ReportsController {
     @Query('movementType') movementType?: string,
   ) {
     return await this.reportService.stockMovementAnalysis(
-      id,
+      Number(id),
       startDate,
       endDate,
-      itemId,
-      categoryId,
+      itemId ? Number(itemId) : undefined,
+      categoryId ? Number(categoryId) : undefined,
       movementType,
     );
   }
@@ -51,7 +51,7 @@ export class ReportsController {
   ) {
     const exportResult =
       await this.reportService.exportStockMovementAnalysisPDF(
-        id,
+        Number(id),
         startDate,
         endDate,
         itemId,
@@ -79,12 +79,12 @@ export class ReportsController {
 
   @Get('/exhibition-sales-summary')
   async getExhibitionSalesSummary(@Query('expoId') expoId?: string) {
-    return await this.reportService.exhibitionSalesSummary(expoId);
+    return await this.reportService.exhibitionSalesSummary(expoId ? Number(expoId) : undefined);
   }
 
   @Get('/exhibition-expenses-summary')
   async getExhibitionExpensesSummary(@Query('expoId') expoId?: string) {
-    return await this.reportService.exhibitionExpensesSummary(expoId);
+    return await this.reportService.exhibitionExpensesSummary(expoId ? Number(expoId) : undefined);
   }
 
   @Get('/exhibition/print/:reportType')
@@ -108,8 +108,7 @@ export class ReportsController {
 
     // Build filters object
     const filters: {
-      exhibitionIds?: string[];
-      expoId?: string;
+      exhibitionIds?: string[];  expoId?: number;
     } = {};
 
     if (exhibitionIds) {
@@ -117,7 +116,7 @@ export class ReportsController {
     }
 
     if (expoId) {
-      filters.expoId = expoId;
+      filters.expoId = Number(expoId);
     }
 
     // Generate PDF
@@ -145,9 +144,9 @@ export class ReportsController {
 
   @Get('/exhibition/sales-summary/print')
   async printExhibitionSalesSummary(@Query('expoId') expoId?: string) {
-    const filters: { expoId?: string } = {};
+    const filters: { expoId?: number } = {};
     if (expoId) {
-      filters.expoId = expoId;
+      filters.expoId = Number(expoId);
     }
 
     return await this.reportService.exportExhibitionReportToPDF(
@@ -158,9 +157,9 @@ export class ReportsController {
 
   @Get('/exhibition/expenses-summary/print')
   async printExhibitionExpensesSummary(@Query('expoId') expoId?: string) {
-    const filters: { expoId?: string } = {};
+    const filters: { expoId?: number } = {};
     if (expoId) {
-      filters.expoId = expoId;
+      filters.expoId = Number(expoId);
     }
 
     return await this.reportService.exportExhibitionReportToPDF(
@@ -254,8 +253,8 @@ export class ReportsController {
     @Query('endDate') endDate?: string,
   ) {
     return await this.reportService.productPerformance(
-      itemId,
-      storeId,
+      Number(itemId),
+      storeId ? Number(storeId) : undefined,
       startDate,
       endDate,
     );
@@ -271,7 +270,7 @@ export class ReportsController {
     @Query('date') date?: string,
   ) {
     return await this.reportService.exportSalesReportToPDF('daily-sales', {
-      storeId,
+      storeId: storeId ? Number(storeId) : undefined,
       date,
     });
   }
@@ -284,7 +283,7 @@ export class ReportsController {
     @Query('endDate') endDate?: string,
   ) {
     return await this.reportService.exportSalesReportToPDF('period-sales', {
-      storeId,
+      storeId: storeId ? Number(storeId) : undefined,
       startDate,
       endDate,
     });
@@ -310,7 +309,7 @@ export class ReportsController {
     @Query('endDate') endDate?: string,
   ) {
     return await this.reportService.exportSalesReportToPDF('massage-services', {
-      serviceId,
+      serviceId: serviceId ? Number(serviceId) : undefined,
       startDate,
       endDate,
     });
@@ -319,34 +318,34 @@ export class ReportsController {
   // Export Product Performance
   @Get('export/product-performance')
   async exportProductPerformance(
-    @Query('itemId') itemId: string,
+    @Query('itemId') itemId: number,
     @Query('storeId') storeId?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
     return await this.reportService.exportSalesReportToPDF(
       'product-performance',
-      { itemId, storeId, startDate, endDate },
+      { itemId, storeId: storeId ? Number(storeId) : undefined, startDate, endDate },
     );
   }
 
   // Store-specific reports
   @Get('store/:storeId/daily-summary')
   async getStoreDailySalesSummary(
-    @Param('storeId') storeId: string,
+    @Param('storeId') storeId: number,
     @Query('date') date?: string,
   ) {
-    return await this.reportService.dailySalesSummary(storeId, date);
+    return await this.reportService.dailySalesSummary(storeId.toString(), date);
   }
 
   @Get('store/:storeId/period-summary')
   async getStorePeriodSalesSummary(
-    @Param('storeId') storeId: string,
+    @Param('storeId') storeId: number,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
     return await this.reportService.periodSalesSummary(
-      storeId,
+      storeId.toString(),
       startDate,
       endDate,
     );
@@ -354,7 +353,7 @@ export class ReportsController {
 
   @Get('store/:storeId/export/daily-summary')
   async exportStoreDailySalesSummary(
-    @Param('storeId') storeId: string,
+    @Param('storeId') storeId: number,
     @Query('date') date?: string,
   ) {
     return await this.reportService.exportSalesReportToPDF('daily-sales', {
@@ -365,7 +364,7 @@ export class ReportsController {
 
   @Get('store/:storeId/export/period-summary')
   async exportStorePeriodSalesSummary(
-    @Param('storeId') storeId: string,
+    @Param('storeId') storeId: number,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
@@ -378,7 +377,7 @@ export class ReportsController {
 
   @Get('massage-service/:serviceId/export/sales')
   async exportMassageServiceSales(
-    @Param('serviceId') serviceId: string,
+    @Param('serviceId') serviceId: number,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {

@@ -30,21 +30,21 @@ export class ManufacturingController {
 
   @Get('fetch/:id')
   findOne(@Param('id') id: string) {
-    return this.manufacturingService.findOne(id);
+    return this.manufacturingService.findOne(Number(id));
   }
 
   @Patch('modify/:id')
   update(@Param('id') id: string, @Body() dto: UpdateManufacturingDto) {
-    return this.manufacturingService.update(id, dto);
+    return this.manufacturingService.update(Number(id), dto);
   }
 
   @Patch('complete/:id')
   complete(@Param('id') id: string, @Body() dto: CompleteManufacturingDto) {
-    return this.manufacturingService.completeManufacturing(id, dto);
+    return this.manufacturingService.completeManufacturing(Number(id), dto);
   }
 
   @Delete('delete/:id')
   remove(@Param('id') id: string) {
-    return this.manufacturingService.remove(id);
+    return this.manufacturingService.remove(Number(id));
   }
 }

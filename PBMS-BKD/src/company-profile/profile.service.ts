@@ -11,7 +11,7 @@ export class CompanyService {
   }
 
   async update(
-    id: string,
+    id: number,
     data: {
       name?: string;
       email?: string;

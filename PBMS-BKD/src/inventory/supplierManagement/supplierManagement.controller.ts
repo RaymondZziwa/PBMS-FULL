@@ -43,7 +43,7 @@ export class SupplierController {
   @Get('get-supplier/:id')
   @HttpCode(HttpStatus.OK)
   async findOne(@Param('id') id: string) {
-    return await this.supplierService.findOne(id);
+    return await this.supplierService.findOne(Number(id));
   }
 
   @Put('update/:id')
@@ -52,13 +52,13 @@ export class SupplierController {
     @Param('id') id: string,
     @Body() updateSupplierDto: UpdateSupplierDto,
   ) {
-    return await this.supplierService.update(id, updateSupplierDto);
+    return await this.supplierService.update(Number(id), updateSupplierDto);
   }
 
   @Delete('delete/:id')
   @HttpCode(HttpStatus.OK)
   async remove(@Param('id') id: string) {
-    return await this.supplierService.remove(id);
+    return await this.supplierService.remove(Number(id));
   }
 
   // ✅ FIXED SUPPLY CREATION WITH FILE UPLOAD
@@ -82,16 +82,16 @@ export class SupplierController {
     }),
   )
   async saveSupply(
-    @Param('id') supplierId: string,
+    @Param('id') supplierId: number,
     @UploadedFile() proofImage: Express.Multer.File,
     @Body()
     body: {
-      itemId: string;
+      itemId: number;
       qty: number;
       value: number;
-      unitId: string;
-      recievedBy: string;
-      destinationStoreId: string;
+      unitId: number;
+      recievedBy: number;
+      destinationStoreId: number;
     },
   ) {
     return await this.supplierService.createSupply(proofImage, {
@@ -116,26 +116,26 @@ export class SupplierController {
     }),
   )
   async modifySupply(
-    @Param('supplyId', ParseUUIDPipe) id: string,
+    @Param('supplyId', ParseUUIDPipe) id: number,
     @UploadedFile() file: Express.Multer.File,
     @Body()
     body: {
-      itemId: string;
+      itemId: number;
       qty: number;
       value: number;
-      unitId: string;
-      recievedBy: string;
-      destinationStoreId: string;
+      unitId: number;
+      recievedBy: number;
+      destinationStoreId: number;
     },
   ) {
     // Prepare update payload
     const updateData: {
-      itemId: string;
+      itemId: number;
       qty: number;
       value: number;
-      unitId: string;
-      recievedBy: string;
-      destinationStoreId: string;
+      unitId: number;
+      recievedBy: number;
+      destinationStoreId: number;
     } = {
       itemId: body.itemId,
       qty: Number(body.qty),
@@ -151,7 +151,7 @@ export class SupplierController {
 
   @Delete('supplies/delete/:supplyId')
   @HttpCode(HttpStatus.OK)
-  async deleteSupply(@Param('supplyId') id: string) {
+  async deleteSupply(@Param('supplyId') id: number) {
     return await this.supplierService.deleteSupply(id);
   }
 
@@ -187,7 +187,7 @@ export class SupplierController {
   @Put('payments/:paymentId')
   @HttpCode(HttpStatus.OK)
   async modifyPayment(
-    @Param('paymentId') id: string,
+    @Param('paymentId') id: number,
     @Body() updatePaymentDto: Prisma.SupplyPaymentsUpdateInput,
   ) {
     return await this.supplierService.modifyPayment(id, updatePaymentDto);
@@ -195,8 +195,8 @@ export class SupplierController {
 
   @Delete('payments/delete/:paymentId')
   @HttpCode(HttpStatus.OK)
-  async deletePayment(@Param('paymentId') id: string) {
-    return await this.supplierService.deletePayment(id);
+  async deletePayment(@Param('paymentId') id: number) {
+    return await this.supplierService.deletePayment(Number(id));
   }
 
   @Get('report')

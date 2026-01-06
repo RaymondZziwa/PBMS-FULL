@@ -34,7 +34,7 @@ export interface SummaryCard {
 }
 
 export interface CompanyInfo {
-  id: string;
+  id: number;
   name: string;
   email: string;
   tel1: string;

@@ -6,7 +6,7 @@ export class CreateAttendanceDto {
   date: string;
 
   @IsUUID()
-  employeeId: string;
+  employeeId: number;
 
   @IsDateString()
   timeIn: string;
@@ -31,22 +31,22 @@ export class UpdateAttendanceDto {
 }
 
 export class AttendanceResponseDto {
-  id: string;
+  id: number;
   date: string;
-  employeeId: string;
+  employeeId: number;
   timeIn: Date;
   timeOut?: Date;
   createdAt: Date;
   updatedAt: Date;
   employee?: {
-    id: string;
+    id: number;
     firstName: string;
     lastName: string;
   };
 }
 
 export interface IPayrollEmployee {
-  id: string;
+  id: number;
   firstName: string;
   lastName: string;
   branch: string;

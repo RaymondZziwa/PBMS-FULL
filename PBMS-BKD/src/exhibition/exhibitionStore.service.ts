@@ -31,11 +31,11 @@ export class ExhibitionStoreService {
     });
   }
 
-  async findByExhibition(exhibitionId: string) {
+  async findByExhibition(exhibitionId: number) {
     return this.prisma.exhibitionStore.findMany({ where: { exhibitionId } });
   }
 
-  async findOne(id: string) {
+  async findOne(id: number) {
     const store = await this.prisma.exhibitionStore.findUnique({
       where: { id },
     });
@@ -43,7 +43,7 @@ export class ExhibitionStoreService {
     return store;
   }
 
-  async update(id: string, dto: UpdateExhibitionStoreDto) {
+  async update(id: number, dto: UpdateExhibitionStoreDto) {
     await this.findOne(id);
     return this.prisma.exhibitionStore.update({
       where: { id },
@@ -51,7 +51,7 @@ export class ExhibitionStoreService {
     });
   }
 
-  async remove(id: string) {
+  async remove(id: number) {
     await this.findOne(id);
     return this.prisma.exhibitionStore.delete({ where: { id } });
   }

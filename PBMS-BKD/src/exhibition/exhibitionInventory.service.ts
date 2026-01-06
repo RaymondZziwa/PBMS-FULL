@@ -134,7 +134,7 @@ export class ExhibitionStockMovementService {
     }
   }
 
-  async findAllWithStoreQuantity(storeId: string): Promise<GenericResponse> {
+  async findAllWithStoreQuantity(storeId: number): Promise<GenericResponse> {
     const store = await this.prisma.exhibitionStore.findUnique({
       where: { id: storeId },
     });

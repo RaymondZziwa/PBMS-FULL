@@ -18,7 +18,7 @@ import { RefreshAuthGuard } from 'src/guards/refreshTokenGuard.guard';
 
 // Define the user type that matches what your guards return
 interface AuthUser {
-  id: string;
+  id: number;
   // Add other properties that your JWT payload contains
   email?: string;
   firstName?: string;

@@ -122,7 +122,7 @@ export class SalesService {
     });
   }
 
-  async findCreditSales(id: string) {
+  async findCreditSales(id: number) {
     const sales = await this.prisma.sale.findMany({
       where: {
         balance: {
@@ -147,7 +147,7 @@ export class SalesService {
     };
   }
 
-  async findOne(id: string) {
+  async findOne(id: number) {
     const sale = await this.prisma.sale.findUnique({
       where: { id },
       include: {
@@ -164,7 +164,7 @@ export class SalesService {
     return sale;
   }
 
-  async update(id: string, updateSaleDto: UpdateSaleDto) {
+  async update(id: number, updateSaleDto: UpdateSaleDto) {
     // 1️⃣ Check if sale exists
     const existingSale = await this.prisma.sale.findUnique({
       where: { id },
@@ -233,7 +233,7 @@ export class SalesService {
             saleId: dto.saleId,
             amount: method.amount, // individual amount per method
             paymentMethod: method.type, // individual payment type
-            referenceId: dto.referenceId,
+            referenceId: dto.referenceId ? String(dto.referenceId) : null,
             notes: dto.notes,
             cashierId: dto.servedBy,
           },
@@ -247,7 +247,7 @@ export class SalesService {
     };
   }
 
-  async remove(id: string) {
+  async remove(id: number) {
     const existing = await this.prisma.sale.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException(`Sale with ID ${id} not found`);
 

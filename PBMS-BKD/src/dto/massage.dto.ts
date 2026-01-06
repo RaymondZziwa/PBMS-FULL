@@ -23,16 +23,15 @@ export enum PaymentMethodType {
 
 export interface PaymentMethod {
   method: PaymentMethodType;
-  amount: number;
-  referenceId?: string;
+  amount: number;  referenceId?: number;
 }
 
 export class CreateMassageSaleDto {
   @IsUUID()
-  clientId: string;
+  clientId: number;
 
   @IsUUID()
-  serviceId: string;
+  serviceId: number;
 
   @IsNumber()
   total: number;
@@ -50,13 +49,13 @@ export class CreateMassageSaleDto {
   @IsString()
   notes?: string;
 
-  @IsUUID()
-  servedBy: string;
+  @IsNumber()
+  servedBy: number;
 }
 
 export class CreateMassagePaymentDto {
   @IsUUID()
-  saleId: string;
+  saleId: number;
 
   @IsNumber()
   amount: number;
@@ -65,15 +64,14 @@ export class CreateMassagePaymentDto {
   paymentMethod: PaymentMethodType;
 
   @IsOptional()
-  @IsString()
-  referenceId?: string;
+  @IsString()  referenceId?: number;
 
   @IsOptional()
   @IsString()
   notes?: string;
 
   @IsUUID()
-  cashierId: string;
+  cashierId: number;
 }
 
 export class UpdateMassageSaleDto {
@@ -91,9 +89,9 @@ export class UpdateMassageSaleDto {
 }
 
 export class MassageSaleResponseDto {
-  id: string;
-  clientId: string;
-  serviceId: string;
+  id: number;
+  clientId: number;
+  serviceId: number;
   total: number;
   status: SaleStatus;
   balance: number;
@@ -109,13 +107,12 @@ export class MassageSaleResponseDto {
 }
 
 export class MassagePaymentResponseDto {
-  id: string;
-  saleId: string;
+  id: number;
+  saleId: number;
   amount: number;
-  paymentMethod: PaymentMethodType;
-  referenceId?: string;
+  paymentMethod: PaymentMethodType;  referenceId?: number;
   notes?: string;
-  cashierId: string;
+  cashierId: number;
   createdAt: Date;
   updatedAt: Date;
   sale?: any;

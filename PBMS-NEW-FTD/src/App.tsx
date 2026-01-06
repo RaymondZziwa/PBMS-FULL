@@ -54,6 +54,8 @@ import ClientPrescriptionsManagement from './pages/prescriptionDB';
 import SeedlingStagesManagement from './pages/farm/stages';
 import SeedlingBatchesManagement from './pages/farm/batches';
 import ManufacturingManagement from './pages/manufacturing';
+import ArchiveSalesRecords from './pages/archives/sales';
+import ArchiveExpenseRecords from './pages/archives/expenses';
 
 // Protected Route Component
 interface ProtectedRouteProps {
@@ -556,6 +558,24 @@ function App() {
         element={
           <ProtectedRoute>
             <EmployeeProfile />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Archives */}
+      <Route
+        path="/archives/sales"
+        element={
+          <ProtectedRoute>
+            <ArchiveSalesRecords />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/archives/expenses"
+        element={
+          <ProtectedRoute>
+            <ArchiveExpenseRecords />
           </ProtectedRoute>
         }
       />

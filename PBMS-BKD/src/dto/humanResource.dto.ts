@@ -15,7 +15,7 @@ export class CreateDepartmentDto {
 
   @IsNotEmpty()
   @IsUUID()
-  branchId: string;
+  branchId: number;
 }
 
 export class CreateEmployeeDto {
@@ -63,14 +63,12 @@ export class CreateEmployeeDto {
 
   @IsNotEmpty()
   @IsUUID()
-  roleId: string;
+  roleId: number;
 
-  @IsUUID()
-  branchId?: string;
+  @IsUUID()  branchId?: number;
 
   @IsOptional()
-  @IsUUID()
-  deptId?: string;
+  @IsUUID()  deptId?: number;
 }
 
 export class employeeProfileUpdateDto {

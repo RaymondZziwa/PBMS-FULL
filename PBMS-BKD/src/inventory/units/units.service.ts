@@ -24,7 +24,7 @@ export class MeasurementUnitService {
     };
   }
 
-  async findOne(id: string): Promise<GenericResponse> {
+  async findOne(id: number): Promise<GenericResponse> {
     const unit = await this.prismaService.unit.findUnique({
       where: { id },
     });
@@ -36,7 +36,7 @@ export class MeasurementUnitService {
   }
 
   async update(
-    id: string,
+    id: number,
     data: { name?: string; abr?: string },
   ): Promise<GenericResponse> {
     const unit = await this.prismaService.unit.update({
@@ -50,7 +50,7 @@ export class MeasurementUnitService {
     };
   }
 
-  async remove(id: string): Promise<GenericResponse> {
+  async remove(id: number): Promise<GenericResponse> {
     const unit = await this.prismaService.unit.delete({
       where: { id },
     });

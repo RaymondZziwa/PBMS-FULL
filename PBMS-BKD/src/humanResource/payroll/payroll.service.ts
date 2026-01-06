@@ -182,7 +182,7 @@ export class PayrollService {
     };
   }
 
-  async getAttendanceById(id: string) {
+  async getAttendanceById(id: number) {
     const attendance = await this.prisma.attendance.findUnique({
       where: { id },
       include: {
@@ -207,7 +207,7 @@ export class PayrollService {
     };
   }
 
-  async getAttendancesByEmployee(employeeId: string) {
+  async getAttendancesByEmployee(employeeId: number) {
     // Check if employee exists
     const employee = await this.prisma.employee.findUnique({
       where: { id: employeeId },
@@ -241,7 +241,7 @@ export class PayrollService {
   }
 
   async updateAttendance(
-    id: string,
+    id: number,
     updateAttendanceDto: UpdateAttendanceDto,
   ) {
     const company = await this.prisma.company.findFirst();
@@ -294,7 +294,7 @@ export class PayrollService {
     };
   }
 
-  async deleteAttendance(id: string) {
+  async deleteAttendance(id: number) {
     const attendance = await this.prisma.attendance.findUnique({
       where: { id },
     });
@@ -427,7 +427,7 @@ export class PayrollService {
   }
 
   // Get a single Payroll Period by ID
-  async getPayrollPeriod(id: string) {
+  async getPayrollPeriod(id: number) {
     const payrollPeriod = await this.prisma.payrollPeriods.findUnique({
       where: { id },
       include: { payrolls: true }, // include Payrolls
@@ -452,7 +452,7 @@ export class PayrollService {
   }
 
   // Update a Payroll Period
-  async updatePayrollPeriod(id: string, dto: Partial<CreatePayrollPeriodDto>) {
+  async updatePayrollPeriod(id: number, dto: Partial<CreatePayrollPeriodDto>) {
     const payrollPeriod = await this.prisma.payrollPeriods.update({
       where: { id },
       data: {
@@ -471,7 +471,7 @@ export class PayrollService {
 
   // Add or update Payroll records inside a PayrollPeriod
   async upsertPayrolls(
-    payrollPeriodId: string,
+    payrollPeriodId: number,
     payrolls: PaymentStructureDto[],
   ) {
     const upserted = await Promise.all(
@@ -491,7 +491,7 @@ export class PayrollService {
   }
 
   // Delete a payroll period by ID
-  async deletePayrollPeriod(id: string) {
+  async deletePayrollPeriod(id: number) {
     await this.getPayrollPeriod(id); // Check if exists
     return this.prisma.payrollPeriods.delete({ where: { id } });
   }

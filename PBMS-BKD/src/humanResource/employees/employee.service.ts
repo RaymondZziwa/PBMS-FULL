@@ -76,7 +76,7 @@ export class EmployeeService {
     };
   }
 
-  async findOne(id: string) {
+  async findOne(id: number) {
     const employee = await this.prisma.employee.findUnique({
       where: { id },
       include: {
@@ -92,7 +92,7 @@ export class EmployeeService {
     return employee;
   }
 
-  async update(id: string, dto: UpdateEmployeeDto) {
+  async update(id: number, dto: UpdateEmployeeDto) {
     await this.findOne(id);
 
     await this.prisma.employee.update({
@@ -107,7 +107,7 @@ export class EmployeeService {
     };
   }
 
-  async remove(id: string) {
+  async remove(id: number) {
     await this.findOne(id);
     await this.prisma.employee.delete({
       where: { id },
@@ -119,7 +119,7 @@ export class EmployeeService {
     };
   }
 
-  async updateProfileImage(employeeId: string, file: Express.Multer.File) {
+  async updateProfileImage(employeeId: number, file: Express.Multer.File) {
     if (!file) {
       throw new NotFoundException('No file uploaded');
     }
@@ -160,11 +160,11 @@ export class EmployeeService {
     };
   }
 
-  async exportEmployeeData(id: string) {
+  async exportEmployeeData(id: number) {
     await this.findOne(id);
   }
 
-  async employeeProfileUpdate(id: string, dto: employeeProfileUpdateDto) {
+  async employeeProfileUpdate(id: number, dto: employeeProfileUpdateDto) {
     const employee = await this.findOne(id);
 
     if (!employee) {
@@ -194,13 +194,13 @@ export class EmployeeService {
   }
 
   async saveEmployeeSystemSettings(
-    id: string,
+    id: number,
     dto: saveEmployeeSystemSettingsDto,
   ) {
     await this.findOne(id);
   }
 
-  async disableAccount(id: string) {
+  async disableAccount(id: number) {
     await this.findOne(id);
     await this.prisma.employee.update({
       where: { id },

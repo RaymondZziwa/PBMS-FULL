@@ -31,7 +31,7 @@ export class PaymentMethodDto {
 export class ItemCategoryDto {
   @IsString()
   @IsNotEmpty()
-  id: string;
+  id: number;
 
   @IsString()
   name: string;
@@ -40,11 +40,11 @@ export class ItemCategoryDto {
 export class SaleItemDto {
   @IsString()
   @IsNotEmpty()
-  id: string;
+  id: number;
 
   @IsString()
   @IsNotEmpty()
-  categoryId: string;
+  categoryId: number;
 
   @IsString()
   name: string;
@@ -93,15 +93,15 @@ export class CreateSaleDto {
 
   @IsString()
   @IsNotEmpty()
-  storeId: string;
+  storeId: number;
 
   @IsString()
   @IsNotEmpty()
-  customerId: string;
+  customerId: number;
 
-  @IsString()
+  @IsNumber()
   @IsNotEmpty()
-  servedBy: string;
+  servedBy: number;
 }
 
 export class ExhibitionCreateSaleDto {
@@ -128,34 +128,32 @@ export class ExhibitionCreateSaleDto {
 
   @IsString()
   @IsNotEmpty()
-  storeId: string;
+  storeId: number;
 
   @IsString()
-  exhibitionId: string;
-
-  @IsString()
-  @IsNotEmpty()
-  customerId: string;
+  exhibitionId: number;
 
   @IsString()
   @IsNotEmpty()
-  servedBy: string;
+  customerId: number;
+
+  @IsNumber()
+  @IsNotEmpty()
+  servedBy: number;
 }
 
 export class CollectCreditPaymentDto {
   @IsString()
   @IsNotEmpty()
-  saleId: string;
+  saleId: number;
 
   @IsArray()
   @ValidateNested({ each: true })
   paymentMethods: { type: PaymentMethodType; amount: number }[];
 
-  @IsString()
+  @IsNumber()
   @IsNotEmpty()
-  servedBy: string;
-
-  referenceId?: string;
+  servedBy: number;  referenceId?: number;
 
   @IsOptional()
   @IsString()

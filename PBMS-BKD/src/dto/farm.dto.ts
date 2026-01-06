@@ -70,7 +70,7 @@ export class CreateSeedlingBatchDto {
 
   @IsString()
   @IsNotEmpty()
-  currentStageId: string;
+  currentStageId: number;
 
   @IsObject()
   @IsNotEmpty()
@@ -122,8 +122,7 @@ export class QuerySeedlingBatchDto {
   batchNumber?: string;
 
   @IsOptional()
-  @IsString()
-  currentStageId?: string;
+  @IsString()  currentStageId?: number;
 
   @IsOptional()
   @IsEnum(SeedlingGrowthStatus)
@@ -149,11 +148,11 @@ export class QuerySeedlingBatchDto {
 export class CreateSeedlingDeathDto {
   @IsUUID()
   @IsNotEmpty()
-  batchId: string;
+  batchId: number;
 
   @IsUUID()
   @IsNotEmpty()
-  stageId: string;
+  stageId: number;
 
   @IsNotEmpty()
   seedlings: any;

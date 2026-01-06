@@ -32,31 +32,31 @@ export class ProjectPaymentsController {
   }
 
   @Get('sale/:saleId')
-  async getPaymentsBySale(@Param('saleId', ParseUUIDPipe) saleId: string) {
+  async getPaymentsBySale(@Param('saleId', ParseUUIDPipe) saleId: number) {
     return this.projectPaymentsService.getPaymentsBySale(saleId);
   }
 
   @Get(':id')
-  async getPayment(@Param('id', ParseUUIDPipe) id: string) {
-    return this.projectPaymentsService.getPayment(id);
+  async getPayment(@Param('id', ParseUUIDPipe) id: number) {
+    return this.projectPaymentsService.getPayment(Number(id));
   }
 
   @Put('modify/:id')
   @UsePipes(new ValidationPipe({ transform: true }))
   async modifyPayment(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseUUIDPipe) id: number,
     @Body() updatePaymentDto: UpdatePaymentDto,
   ) {
     return this.projectPaymentsService.modifyPayment(id, updatePaymentDto);
   }
 
   @Delete('delete/:id')
-  async deletePayment(@Param('id', ParseUUIDPipe) id: string) {
-    return this.projectPaymentsService.deletePayment(id);
+  async deletePayment(@Param('id', ParseUUIDPipe) id: number) {
+    return this.projectPaymentsService.deletePayment(Number(id));
   }
 
   @Get('summary/sale/:saleId')
-  async getPaymentSummary(@Param('saleId', ParseUUIDPipe) saleId: string) {
+  async getPaymentSummary(@Param('saleId', ParseUUIDPipe) saleId: number) {
     return this.projectPaymentsService.getPaymentSummary(saleId);
   }
 
@@ -87,7 +87,7 @@ export class ProjectPaymentsController {
     @UploadedFile() file: Express.Multer.File,
   ) {
     return await this.projectPaymentsService.uploadProjectPaymentReceipt(
-      id,
+      Number(id),
       file,
     );
   }
@@ -119,7 +119,7 @@ export class ProjectPaymentsController {
     @UploadedFile() file: Express.Multer.File,
   ) {
     return await this.projectPaymentsService.uploadProjectPaymentBankDepositSlip(
-      id,
+      Number(id),
       file,
     );
   }

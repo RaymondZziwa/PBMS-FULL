@@ -37,7 +37,7 @@ export class FarmController {
 
   @Get('seedling-stage/fetch/:id')
   findOneSeedlingStage(@Param('id') id: string) {
-    return this.farmService.findOneSeedlingStage(id);
+    return this.farmService.findOneSeedlingStage(Number(id));
   }
 
   @Patch('seedling-stage/modify/:id')
@@ -45,12 +45,12 @@ export class FarmController {
     @Param('id') id: string,
     @Body() data: UpdateSeedlingStageDto,
   ) {
-    return this.farmService.updateSeedlingStage(id, data);
+    return this.farmService.updateSeedlingStage(Number(id), data);
   }
 
   @Delete('seedling-stage/delete/:id')
   removeSeedlingStage(@Param('id') id: string) {
-    return this.farmService.removeSeedlingStage(id);
+    return this.farmService.removeSeedlingStage(Number(id));
   }
 
   // ==================== SeedlingBatch Endpoints ====================
@@ -67,7 +67,7 @@ export class FarmController {
 
   @Get('seedling-batch/fetch/:id')
   findOneSeedlingBatch(@Param('id') id: string) {
-    return this.farmService.findOneSeedlingBatch(id);
+    return this.farmService.findOneSeedlingBatch(Number(id));
   }
 
   @Patch('seedling-batch/modify/:id')
@@ -75,7 +75,7 @@ export class FarmController {
     @Param('id') id: string,
     @Body() data: UpdateSeedlingBatchDto,
   ) {
-    return this.farmService.updateSeedlingBatch(id, data);
+    return this.farmService.updateSeedlingBatch(Number(id), data);
   }
 
   @Patch('seedling-batch/update-status/:id')
@@ -83,11 +83,11 @@ export class FarmController {
     @Param('id') id: string,
     @Body() data: UpdateSeedlingBatchStatusDto,
   ) {
-    return this.farmService.updateSeedlingBatchStatus(id, data);
+    return this.farmService.updateSeedlingBatchStatus(Number(id), data);
   }
 
   @Delete('seedling-batch/delete/:id')
   removeSeedlingBatch(@Param('id') id: string) {
-    return this.farmService.removeSeedlingBatch(id);
+    return this.farmService.removeSeedlingBatch(Number(id));
   }
 }

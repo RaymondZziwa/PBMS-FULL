@@ -27,7 +27,7 @@ export class MservicesService {
     };
   }
 
-  async findOne(id: string): Promise<GenericResponse> {
+  async findOne(id: number): Promise<GenericResponse> {
     const service = await this.prismaService.service.findUnique({
       where: { id },
     });
@@ -39,7 +39,7 @@ export class MservicesService {
   }
 
   async update(
-    id: string,
+    id: number,
     data: { name?: string; price?: number },
   ): Promise<GenericResponse> {
     const item = await this.prismaService.service.update({
@@ -53,7 +53,7 @@ export class MservicesService {
     };
   }
 
-  async remove(id: string): Promise<GenericResponse> {
+  async remove(id: number): Promise<GenericResponse> {
     const item = await this.prismaService.service.delete({
       where: { id },
     });

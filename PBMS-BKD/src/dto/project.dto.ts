@@ -19,19 +19,18 @@ export class ProjectPaymentDto {
   amount: number;
 
   @IsString()
-  @IsOptional()
-  exhibitionId?: string;
+  @IsOptional()  exhibitionId?: number;
 
   @IsString()
-  cashierId: string;
+  cashierId: number;
 }
 
 export class CreateProjectSaleDto {
   @IsString()
-  clientId: string;
+  clientId: number;
 
   @IsString()
-  projectId: string;
+  projectId: number;
 
   @IsNumber()
   @Min(0)
@@ -41,7 +40,7 @@ export class CreateProjectSaleDto {
   @Min(0)
   downPayment: number;
 
-  exhibitionId: string;
+  exhibitionId: number;
 
   @IsInt()
   @Min(1)
@@ -52,7 +51,7 @@ export class CreateProjectSaleDto {
   installmentAmount: number;
 
   @IsString()
-  cashierId: string;
+  cashierId: number;
 
   @IsArray()
   @ValidateNested({ each: true })
@@ -63,7 +62,7 @@ export class CreateProjectSaleDto {
 
 export class AddPaymentDto {
   @IsString()
-  saleId: string;
+  saleId: number;
 
   @IsNumber()
   @Min(0)
@@ -71,10 +70,10 @@ export class AddPaymentDto {
 
   @IsString()
   @IsOptional()
-  exhibitionId: string;
+  exhibitionId: number;
 
   @IsString()
-  cashierId: string;
+  cashierId: number;
 
   paymentMethod: PaymentMethodType;
 }
@@ -90,6 +89,7 @@ export class UpdatePaymentDto {
   paymentMethod?: PaymentMethodType;
 
   @IsOptional()
+  @IsOptional()
   @IsString()
   referenceId?: string;
 
@@ -98,8 +98,7 @@ export class UpdatePaymentDto {
   notes?: string;
 
   @IsOptional()
-  @IsString()
-  cashierId?: string;
+  @IsString()  cashierId?: number;
 }
 
 export enum PaymentMethodType {
@@ -112,7 +111,7 @@ export enum PaymentMethodType {
 
 export class CreatePaymentDto {
   @IsString()
-  saleId: string;
+  saleId: number;
 
   @IsNumber()
   amount: number;
@@ -125,29 +124,29 @@ export class CreatePaymentDto {
   notes?: string;
 
   @IsString()
-  exhibitionId: string;
+  exhibitionId: number;
 
   @IsString()
-  cashierId: string;
+  cashierId: number;
 }
 
 export class PaymentResponseDto {
-  id: string;
-  saleId: string;
+  id: number;
+  saleId: number;
   amount: number;
   paymentMethod: PaymentMethodType;
   referenceNumber: string | null;
   notes: string | null;
   paymentDate: Date;
-  exhibitionId: string;
-  cashierId: string;
+  exhibitionId: number;
+  cashierId: number;
   status: string;
   createdAt: Date;
   updatedAt: Date;
 
   // Relations
   projectSale?: {
-    id: string;
+    id: number;
     saleTotal: number;
     client?: {
       firstName: string;

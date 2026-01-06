@@ -20,7 +20,7 @@ export class ExhibitionStockMovementController {
 
   @Get('fetch-exhibitionstore-inventory/:id')
   findAllStoreInventory(@Param('id') id: string) {
-    return this.expoStockMovementService.findAllWithStoreQuantity(id);
+    return this.expoStockMovementService.findAllWithStoreQuantity(Number(id));
   }
 
   @Get('fetch-all-stores')

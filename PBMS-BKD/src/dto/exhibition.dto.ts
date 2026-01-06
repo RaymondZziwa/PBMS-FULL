@@ -12,7 +12,7 @@ import { PartialType } from '@nestjs/mapped-types';
 import { ExpenseCategory, InventoryRecordCategory } from '@prisma/client';
 
 interface CartItem {
-  id: string;
+  id: number;
   name: string;
   quantity: number;
   unitCost: number;
@@ -29,30 +29,30 @@ export class CreateExhibitionDto {
 
 export class CreateExhibitionStoreDto {
   @IsString() @IsNotEmpty() name: string;
-  @IsString() @IsNotEmpty() exhibitionId: string;
+  @IsNumber() @IsNotEmpty() exhibitionId: number;
 }
 
 export class InventoryOperationDto {
-  @IsString() @IsNotEmpty() storeId: string;
-  @IsString() @IsNotEmpty() itemId: string;
+  @IsNumber() @IsNotEmpty() storeId: number;
+  @IsNumber() @IsNotEmpty() itemId: number;
   @IsNotEmpty() quantity: string; // we keep string to allow Decimal values; Prisma Decimal will accept string
   @IsString() @IsOptional() reason?: string;
-  @IsString() @IsNotEmpty() employeeId: string;
+  @IsNumber() @IsNotEmpty() employeeId: number;
   @IsString() @IsOptional() category?: string; // e.g., 'RESTOCK', 'DEPLETION', 'ADJUSTMENT'
 }
 
 export class CreateExhibitionSaleDto {
-  @IsString()
+  @IsNumber()
   @IsNotEmpty()
-  clientId: string;
+  clientId: number;
 
-  @IsString()
+  @IsNumber()
   @IsNotEmpty()
-  cashierId: string;
+  cashierId: number;
 
-  @IsString()
+  @IsNumber()
   @IsNotEmpty()
-  exhibitionId: string;
+  exhibitionId: number;
 
   @IsArray()
   @ValidateNested({ each: true })
@@ -62,21 +62,19 @@ export class CreateExhibitionSaleDto {
   saleTotal: string;
 
   @IsOptional()
-  @IsString()
-  storeId?: string;
+  @IsNumber()  storeId?: number;
 }
 
-export class FetchExhibitionSalesDto {
-  exhibitionId?: string;
+export class FetchExhibitionSalesDto {  exhibitionId?: number;
 }
 
 export class CreateExhibitionExpenseDto {
   @IsNotEmpty()
   category: ExpenseCategory;
 
-  @IsString()
+  @IsNumber()
   @IsNotEmpty()
-  exhibitionId: string;
+  exhibitionId: number;
 
   @IsString()
   @IsNotEmpty()
@@ -116,17 +114,17 @@ export class UpdateExhibitionExpenseDto {
 }
 
 export class CreateExpoStockMovementDto {
-  @IsString()
+  @IsNumber()
   @IsNotEmpty()
-  itemId: string;
+  itemId: number;
 
-  @IsString()
+  @IsNumber()
   @IsNotEmpty()
-  storeId: string;
+  storeId: number;
 
-  @IsString()
+  @IsNumber()
   @IsNotEmpty()
-  unitId: string;
+  unitId: number;
 
   @IsString()
   source: string;
@@ -137,9 +135,9 @@ export class CreateExpoStockMovementDto {
   @IsEnum(InventoryRecordCategory)
   category: InventoryRecordCategory;
 
-  @IsString()
+  @IsNumber()
   @IsNotEmpty()
-  employeeId: string;
+  employeeId: number;
 
   @IsOptional()
   @IsString()

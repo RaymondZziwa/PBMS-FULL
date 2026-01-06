@@ -36,22 +36,22 @@ export class ClientController {
 
   @Get('fetch/:id')
   findOne(@Param('id') id: string) {
-    return this.clientService.findOne(id);
+    return this.clientService.findOne(Number(id));
   }
 
   @Get('fetch-purchases/:id')
   findClientPurchases(@Param('id') id: string) {
-    return this.clientService.getClientPurchases(id);
+    return this.clientService.getClientPurchases(Number(id));
   }
 
   @Put('modify/:id')
   update(@Param('id') id: string, @Body() dto: UpdateClientDto) {
-    return this.clientService.update(id, dto);
+    return this.clientService.update(Number(id), dto);
   }
 
   @Delete('delete/:id')
   remove(@Param('id') id: string) {
-    return this.clientService.remove(id);
+    return this.clientService.remove(Number(id));
   }
 
   @Post('upload-prescription/:id')
@@ -79,14 +79,14 @@ export class ClientController {
   async uploadClientPrescriptions(
     @Param('id') id: string,
     @UploadedFiles() files: Express.Multer.File[],
-    @Body() body: { notes: string; prescribedBy: string },
+    @Body() body: { notes: string; prescribedBy: number },
   ) {
-    return await this.clientService.uploadPrescriptionImages(id, files, body);
+    return await this.clientService.uploadPrescriptionImages(Number(id), files, body);
   }
 
   @Get('fetch-prescriptions/:id')
   findClientPrescriptions(@Param('id') id: string) {
-    return this.clientService.getPrescriptions(id);
+    return this.clientService.getPrescriptions(Number(id));
   }
 
   @Get('fetch-prescription-history/:id')
@@ -95,7 +95,7 @@ export class ClientController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    return this.clientService.prescriptionHistory(id, startDate, endDate);
+    return this.clientService.prescriptionHistory(Number(id), startDate, endDate);
   }
 
   @Put('review-prescription/:id')
@@ -104,7 +104,7 @@ export class ClientController {
     @Body() dto: reviewPrescriptionDto,
   ) {
     console.log(id, dto);
-    return this.clientService.reviewPescription(id, dto);
+    return this.clientService.reviewPescription(Number(id), dto);
   }
 
   @Get('fetch-all-prescriptions')

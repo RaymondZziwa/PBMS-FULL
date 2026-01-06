@@ -51,7 +51,7 @@ export class RoleService {
     };
   }
 
-  // async findOne(id: string): Promise<GenericResponse> {
+  // async findOne(id: number): Promise<GenericResponse> {
   //   const role = await this.prisma.role.findUnique({ where: { id } });
   //   return {
   //     status: 200,
@@ -60,7 +60,7 @@ export class RoleService {
   //   };
   // }
 
-  async update(id: string, data: UpdateRoleDto): Promise<GenericResponse> {
+  async update(id: number, data: UpdateRoleDto): Promise<GenericResponse> {
     await this.prisma.role.update({
       where: { id },
       data: {
@@ -78,7 +78,7 @@ export class RoleService {
     };
   }
 
-  async remove(id: string): Promise<GenericResponse> {
+  async remove(id: number): Promise<GenericResponse> {
     await this.prisma.role.delete({ where: { id } });
     return {
       status: 200,

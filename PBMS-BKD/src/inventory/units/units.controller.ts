@@ -25,16 +25,16 @@ export class MeasurementUnitController {
 
   @Get('fetch/:id')
   findOne(@Param('id') id: string) {
-    return this.measurementService.findOne(id);
+    return this.measurementService.findOne(Number(id));
   }
 
   @Patch('modify/:id')
   update(@Param('id') id: string, @Body() data: { name?: string }) {
-    return this.measurementService.update(id, data);
+    return this.measurementService.update(Number(id), data);
   }
 
   @Delete('delete/:id')
   remove(@Param('id') id: string) {
-    return this.measurementService.remove(id);
+    return this.measurementService.remove(Number(id));
   }
 }

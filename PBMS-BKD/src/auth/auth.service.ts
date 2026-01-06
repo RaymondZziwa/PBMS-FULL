@@ -98,23 +98,23 @@ export class AuthService {
         createdAt: user.createdAt,
         role: user.role
           ? {
-              id: user.role.id,
+              id: Number(user.role.id),
               name: user.role.name,
               permissions: user.role.permissions,
             }
-          : { id: '', name: '', permissions: [] },
+          : null,
         branch: user.branch
           ? {
-              id: user.branch.id,
+              id: Number(user.branch.id),
               name: user.branch.name,
             }
-          : { id: '', name: '' },
+          : null,
         dept: user.dept
           ? {
-              id: user.dept.id,
+              id: Number(user.dept.id),
               name: user.dept.name,
             }
-          : { id: '', name: '' },
+          : null,
         token: { accessToken, refreshToken },
       };
     } catch (error: unknown) {
@@ -222,23 +222,23 @@ export class AuthService {
         createdAt: user.createdAt,
         role: user.role
           ? {
-              id: user.role.id,
+              id: Number(user.role.id),
               name: user.role.name,
               permissions: user.role.permissions,
             }
-          : { id: '', name: '', permissions: [] },
+          : null,
         branch: user.branch
           ? {
-              id: user.branch.id,
+              id: Number(user.branch.id),
               name: user.branch.name,
             }
-          : { id: '', name: '' },
+          : null,
         dept: user.dept
           ? {
-              id: user.dept.id,
+              id: Number(user.dept.id),
               name: user.dept.name,
             }
-          : { id: '', name: '' },
+          : null,
         token: { accessToken, refreshToken },
       };
     } catch (error: unknown) {
@@ -266,18 +266,13 @@ export class AuthService {
   }
 
   async refreshTokens(
-    refreshToken: string,
+    userId: number,
     res?: any,
   ): Promise<IRefreshTokenResponse> {
     try {
-      // Verify the refresh token
-      const payload = await this.jwtService.verifyAsync(refreshToken, {
-        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-      });
-
-      // Optional: Check if user still exists and is active
+      // Check if user still exists and is active
       const user = await this.prismaService.employee.findUnique({
-        where: { id: payload.sub },
+        where: { id: userId },
         select: {
           id: true,
           email: true,
@@ -340,7 +335,7 @@ export class AuthService {
   }
 
   // Optional: Method to get current user from token
-  async getCurrentUser(userId: string) {
+  async getCurrentUser(userId: number) {
     const user = await this.prismaService.employee.findUnique({
       where: { id: userId, hasAccess: true, isActive: true },
       select: {
@@ -390,7 +385,7 @@ export class AuthService {
     return user;
   }
 
-  async validateUser(userId: string) {
+  async validateUser(userId: number) {
     try {
       const user = await this.prismaService.employee.findUnique({
         where: { id: userId, isActive: true },
@@ -440,9 +435,9 @@ export class AuthService {
         branchId: user.branchId,
         deptId: user.deptId,
         roleId: user.roleId,
-        branch: user.branch || { id: '', name: '' },
-        dept: user.dept || { id: '', name: '' },
-        role: user.role || { id: '', name: '', permissions: [] },
+        branch: user.branch || null,
+        dept: user.dept || null,
+        role: user.role || null,
       };
     } catch (error) {
       return null;

@@ -1,12 +1,12 @@
 export interface IPermission {
-  id: string;
+  id: number;
   name: string;
   value: string;
   module: string;
 }
 
 export interface IUserAuth {
-  id: string;
+  id: number;
   firstName: string;
   lastName: string;
   gender: string;
@@ -21,15 +21,15 @@ export interface IUserAuth {
   updatedAt: Date;
   createdAt: Date;
   branch: {
-    id: string;
+    id: number;
     name: string;
   } | null;
   dept: {
-    id: string;
+    id: number;
     name: string;
   } | null;
   role: {
-    id: string;
+    id: number;
     name: string;
     permissions: IPermission[];
   } | null;

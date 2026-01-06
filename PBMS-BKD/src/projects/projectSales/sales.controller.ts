@@ -60,18 +60,18 @@ export class ProjectSalesController {
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.projectSalesService.findOne(id);
+  findOne(@Param('id', ParseUUIDPipe) id: number) {
+    return this.projectSalesService.findOne(Number(id));
   }
 
   @Get(':id/payment-schedule')
-  getPaymentSchedule(@Param('id', ParseUUIDPipe) id: string) {
-    return this.projectSalesService.getPaymentSchedule(id);
+  getPaymentSchedule(@Param('id', ParseUUIDPipe) id: number) {
+    return this.projectSalesService.getPaymentSchedule(Number(id));
   }
 
   @Post(':id/payments')
   addPayment(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseUUIDPipe) id: number,
     @Body() addPaymentDto: AddPaymentDto,
   ) {
     return this.projectSalesService.addPayment(id, addPaymentDto);
@@ -79,15 +79,15 @@ export class ProjectSalesController {
 
   @Patch('modify/:id')
   update(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseUUIDPipe) id: number,
     @Body() updateProjectSaleDto: UpdateProjectSaleDto,
   ) {
-    return this.projectSalesService.update(id, updateProjectSaleDto);
+    return this.projectSalesService.update(Number(id), updateProjectSaleDto);
   }
 
   @Delete('delete/:id')
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.projectSalesService.remove(id);
+  remove(@Param('id', ParseUUIDPipe) id: number) {
+    return this.projectSalesService.remove(Number(id));
   }
 
   @Post('upload-delivery-note/:id')
@@ -117,7 +117,7 @@ export class ProjectSalesController {
     @UploadedFile() file: Express.Multer.File,
   ) {
     return await this.projectSalesService.uploadProjectSaleDeliveryNote(
-      id,
+      Number(id),
       file,
     );
   }

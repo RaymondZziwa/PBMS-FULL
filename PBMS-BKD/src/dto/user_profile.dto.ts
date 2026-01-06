@@ -12,7 +12,7 @@ import { PartialType } from '@nestjs/mapped-types';
 
 export class CreateProfileDto {
   @IsUUID()
-  userId: string;
+  userId: number;
 
   @IsOptional()
   @IsString()
@@ -81,7 +81,7 @@ export class CreateProfileDto {
 
 export class updatePwdDto {
   @IsUUID()
-  userId: string;
+  userId: number;
   @IsString()
   @IsNotEmpty()
   password: string;

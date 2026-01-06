@@ -25,7 +25,7 @@ export class ServicesController {
 
   @Get('fetch/:id')
   findOne(@Param('id') id: string) {
-    return this.mServicesService.findOne(id);
+    return this.mServicesService.findOne(Number(id));
   }
 
   @Patch('modify/:id')
@@ -33,11 +33,11 @@ export class ServicesController {
     @Param('id') id: string,
     @Body() data: { name?: string; price?: number },
   ) {
-    return this.mServicesService.update(id, data);
+    return this.mServicesService.update(Number(id), data);
   }
 
   @Delete('delete/:id')
   remove(@Param('id') id: string) {
-    return this.mServicesService.remove(id);
+    return this.mServicesService.remove(Number(id));
   }
 }

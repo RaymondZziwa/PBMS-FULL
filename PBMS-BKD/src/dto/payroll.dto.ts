@@ -5,7 +5,7 @@ export class CreatePayrollPeriodDto {
   payDate: Date;
   totalSpent: number;
   fineSettings: FineSettingsDto;
-  companyId: string;
+  companyId: number;
   dateRange: DateRangeDto;
   paymentStructure: PaymentStructureDto[];
   metadata: PayrollMetadataDto;
@@ -22,7 +22,7 @@ export class DateRangeDto {
 }
 
 export class PaymentStructureDto {
-  employeeId: string;
+  employeeId: number;
   name: string;
   branch: string;
   department: string;

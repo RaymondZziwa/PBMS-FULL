@@ -13,7 +13,7 @@ export class BranchExpenseService {
     return this.prisma.branchExpense.create({ data: dto });
   }
 
-  async findAll(id: string) {
+  async findAll(id: number) {
     const expenses = await this.prisma.branchExpense.findMany({
       where: { branchId: id },
       include: { branch: true, employee: true },
@@ -27,7 +27,7 @@ export class BranchExpenseService {
     };
   }
 
-  async findOne(id: string) {
+  async findOne(id: number) {
     const expense = await this.prisma.branchExpense.findUnique({
       where: { id },
       include: { branch: true, employee: true },
@@ -36,7 +36,7 @@ export class BranchExpenseService {
     return expense;
   }
 
-  async update(id: string, dto: UpdateBranchExpenseDto) {
+  async update(id: number, dto: UpdateBranchExpenseDto) {
     await this.findOne(id); // check existence
     return this.prisma.branchExpense.update({
       where: { id },
@@ -44,7 +44,7 @@ export class BranchExpenseService {
     });
   }
 
-  async remove(id: string) {
+  async remove(id: number) {
     await this.findOne(id); // check existence
     await this.prisma.branchExpense.delete({ where: { id } });
     return {

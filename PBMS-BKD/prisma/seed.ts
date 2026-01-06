@@ -52,7 +52,9 @@ async function seedRoles() {
       data: {
         name: role.name,
         permissions: {
-          connect: role.permissions.map((permId: string) => ({ id: permId })),
+          connect: role.permissions.map((permValue: string) => ({
+            value: permValue,
+          })),
         },
       },
     });

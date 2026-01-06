@@ -46,7 +46,7 @@ export class StockMovementService {
     if (!store) throw new NotFoundException('Store not found');
 
     const authorized = (store.authorizedPersonnel as string[]) || [];
-    if (!authorized.includes(employeeId)) {
+    if (!authorized.includes(employeeId.toString())) {
       throw new ForbiddenException(
         'You are not authorized to perform operations in this store',
       );
@@ -299,7 +299,7 @@ export class StockMovementService {
     }
   }
 
-  async resolveStockMvtConflict(recordId: string, notes: string) {
+  async resolveStockMvtConflict(recordId: number, notes: string) {
     try {
       const record = await this.prisma.inventoryRecord.findUnique({
         where: {

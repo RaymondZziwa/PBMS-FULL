@@ -107,7 +107,7 @@ export class ProjectPaymentsService {
     }
   }
 
-  async modifyPayment(id: string, updatePaymentDto: UpdatePaymentDto) {
+  async modifyPayment(id: number, updatePaymentDto: UpdatePaymentDto) {
     try {
       // Check if payment exists
       const existingPayment = await this.prisma.projectPayments.findUnique({
@@ -226,7 +226,7 @@ export class ProjectPaymentsService {
     }
   }
 
-  async deletePayment(id: string) {
+  async deletePayment(id: number) {
     try {
       // Check if payment exists
       const payment = await this.prisma.projectPayments.findUnique({
@@ -279,7 +279,7 @@ export class ProjectPaymentsService {
     }
   }
 
-  async getPayment(id: string) {
+  async getPayment(id: number) {
     try {
       const payment = await this.prisma.projectPayments.findUnique({
         where: { id },
@@ -328,7 +328,7 @@ export class ProjectPaymentsService {
     }
   }
 
-  async getPaymentsBySale(saleId: string) {
+  async getPaymentsBySale(saleId: number) {
     try {
       const payments = await this.prisma.projectPayments.findMany({
         where: { saleId },
@@ -364,7 +364,7 @@ export class ProjectPaymentsService {
     }
   }
 
-  async getPaymentSummary(saleId: string) {
+  async getPaymentSummary(saleId: number) {
     try {
       const [payments, totalPaid, sale] = await Promise.all([
         this.prisma.projectPayments.findMany({
@@ -438,7 +438,7 @@ export class ProjectPaymentsService {
   }
 
   private async updateSaleStatus(
-    saleId: string,
+    saleId: number,
     totalPaid: Prisma.Decimal,
     saleTotal: Prisma.Decimal,
     prisma: any = this.prisma,
@@ -463,7 +463,7 @@ export class ProjectPaymentsService {
   }
 
   async uploadProjectPaymentBankDepositSlip(
-    paymentId: string,
+    paymentId: number,
     file: Express.Multer.File,
   ) {
     if (!file) {
@@ -506,7 +506,7 @@ export class ProjectPaymentsService {
   }
 
   async uploadProjectPaymentReceipt(
-    paymentId: string,
+    paymentId: number,
     file: Express.Multer.File,
   ) {
     if (!file) {

@@ -52,7 +52,7 @@ export class EventsService {
     };
   }
 
-  async findOne(id: string) {
+  async findOne(id: number) {
     const event = await this.prisma.event.findUnique({
       where: { id },
       include: {
@@ -73,7 +73,7 @@ export class EventsService {
     };
   }
 
-  async update(id: string, data: UpdateEventDto) {
+  async update(id: number, data: UpdateEventDto) {
     try {
       if (data.startDate) {
         data.startDate = new Date(data.startDate);
@@ -97,7 +97,7 @@ export class EventsService {
     }
   }
 
-  async remove(id: string) {
+  async remove(id: number) {
     try {
       await this.prisma.event.delete({
         where: { id },
@@ -117,7 +117,7 @@ export class EventsService {
   }
 
   // Participant Management
-  async addParticipant(eventId: string, data: CreateEventParticipantDto) {
+  async addParticipant(eventId: number, data: CreateEventParticipantDto) {
     // Check if event exists
     const event = await this.prisma.event.findUnique({
       where: { id: eventId },
@@ -156,7 +156,7 @@ export class EventsService {
     };
   }
 
-  async getEventParticipants(eventId: string) {
+  async getEventParticipants(eventId: number) {
     // Check if event exists
     const event = await this.prisma.event.findUnique({
       where: { id: eventId },
@@ -179,7 +179,7 @@ export class EventsService {
     });
   }
 
-  async getParticipant(participantId: string) {
+  async getParticipant(participantId: number) {
     const participant = await this.prisma.eventParticipant.findUnique({
       where: { id: participantId },
       include: {
@@ -204,7 +204,7 @@ export class EventsService {
   }
 
   async updateParticipant(
-    participantId: string,
+    participantId: number,
     updateParticipantDto: UpdateParticipantDto,
   ) {
     try {
@@ -261,7 +261,7 @@ export class EventsService {
     }
   }
 
-  async removeParticipant(participantId: string, eventId: string) {
+  async removeParticipant(participantId: number, eventId: number) {
     const result = await this.prisma.eventParticipant.deleteMany({
       where: {
         id: participantId,

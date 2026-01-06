@@ -37,17 +37,17 @@ export class EmployeeController {
 
   @Get('fetch/:id')
   findOne(@Param('id') id: string) {
-    return this.employeeService.findOne(id);
+    return this.employeeService.findOne(Number(id));
   }
 
   @Patch('modify/:id')
   update(@Param('id') id: string, @Body() dto: UpdateEmployeeDto) {
-    return this.employeeService.update(id, dto);
+    return this.employeeService.update(Number(id), dto);
   }
 
   @Delete('delete/:id')
   remove(@Param('id') id: string) {
-    return this.employeeService.remove(id);
+    return this.employeeService.remove(Number(id));
   }
 
   @Put('update-profile/:id')
@@ -55,7 +55,7 @@ export class EmployeeController {
     @Param('id') id: string,
     @Body() dto: employeeProfileUpdateDto,
   ) {
-    return this.employeeService.employeeProfileUpdate(id, dto);
+    return this.employeeService.employeeProfileUpdate(Number(id), dto);
   }
 
   /**
@@ -87,12 +87,12 @@ export class EmployeeController {
     @Param('id') id: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    return await this.employeeService.updateProfileImage(id, file);
+    return await this.employeeService.updateProfileImage(Number(id), file);
   }
 
   @Get('export-profile')
   exportProfile(@Param('id') id: string) {
-    return this.employeeService.exportEmployeeData(id);
+    return this.employeeService.exportEmployeeData(Number(id));
   }
 
   @Post('save-settings/:id')
@@ -100,11 +100,11 @@ export class EmployeeController {
     @Param('id') id: string,
     @Body() dto: saveEmployeeSystemSettingsDto,
   ) {
-    return this.employeeService.saveEmployeeSystemSettings(id, dto);
+    return this.employeeService.saveEmployeeSystemSettings(Number(id), dto);
   }
 
   @Put('disable/:id')
   disableEmployeeAccount(@Param('id') id: string) {
-    return this.employeeService.disableAccount(id);
+    return this.employeeService.disableAccount(Number(id));
   }
 }

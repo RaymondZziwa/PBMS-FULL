@@ -1,23 +1,23 @@
 // dto/create-stock-movement.dto.ts
-import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString, IsNumber } from 'class-validator';
 import { InventoryRecordCategory } from '@prisma/client';
 
 export class CreateStockMovementDto {
-  @IsString()
+  @IsNumber()
   @IsNotEmpty()
-  itemId: string;
+  itemId: number;
 
-  @IsString()
+  @IsNumber()
   @IsNotEmpty()
-  storeId: string;
+  storeId: number;
 
-  @IsString()
+  @IsNumber()
   @IsOptional()
-  toStoreId: string;
+  toStoreId: number;
 
-  @IsString()
+  @IsNumber()
   @IsNotEmpty()
-  unitId: string;
+  unitId: number;
 
   @IsString()
   source: string;
@@ -28,13 +28,13 @@ export class CreateStockMovementDto {
   @IsEnum(InventoryRecordCategory)
   category: InventoryRecordCategory;
 
-  @IsString()
+  @IsNumber()
   @IsNotEmpty()
-  employeeId: string; // ✅ who made the transaction
+  employeeId: number; // ✅ who made the transaction
 
-  @IsString()
+  @IsNumber()
   @IsNotEmpty()
-  deliveryNoteId: string;
+  deliveryNoteId: number;
 
   @IsOptional()
   @IsString()
@@ -42,13 +42,13 @@ export class CreateStockMovementDto {
 }
 
 export class ConfirmStockMovementDto {
-  transferId: string;
+  transferId: number;
   confirmedQty: number;
   notes: string;
 }
 
 export class RejectStockMovementDto {
-  transferId: string;
+  transferId: number;
   reason: string;
 }
 
@@ -62,8 +62,8 @@ export class CreateDeliveryNoteDto {
   deliveryNoteNumber: string;
 
   @IsOptional()
-  @IsString()
-  registeredBy: string;
+  @IsNumber()
+  registeredBy: number;
 
   @IsOptional()
   @IsString()

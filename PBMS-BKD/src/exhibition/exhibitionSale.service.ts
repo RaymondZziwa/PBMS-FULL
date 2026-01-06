@@ -66,7 +66,7 @@ export class ExhibitionSalesService {
       const sale = await tx.exhibitionSales.create({
         data: {
           client: { connect: { id: customerId } },
-          employee: { connect: { id: servedBy } },
+          employee: { connect: { id: Number(servedBy) } },
           exhibitionStore: { connect: { id: storeId } },
           status,
           total,
@@ -102,7 +102,7 @@ export class ExhibitionSalesService {
     });
   }
 
-  async findOne(id: string) {
+  async findOne(id: number) {
     const sale = await this.prisma.exhibitionSales.findUnique({
       where: { id },
       include: {
@@ -119,7 +119,7 @@ export class ExhibitionSalesService {
     return sale;
   }
 
-  async update(id: string, updateSaleDto: UpdateExhibitionSaleDto) {
+  async update(id: number, updateSaleDto: UpdateExhibitionSaleDto) {
     // 1️⃣ Check if sale exists
     const existingSale = await this.prisma.sale.findUnique({
       where: { id },
@@ -137,10 +137,14 @@ export class ExhibitionSalesService {
       throw new Error(`Invalid sale status: ${updateSaleDto.status}`);
     }
 
-    // 3️⃣ Update the sale
+    // 3️⃣ Update the sale - filter out undefined values
+    const updateData = Object.fromEntries(
+      Object.entries(updateSaleDto).filter(([_, value]) => value !== undefined)
+    );
+
     const updatedSale = await this.prisma.exhibitionSales.update({
       where: { id },
-      data: updateSaleDto,
+      data: updateData,
       include: {
         client: true,
         exhibitionStore: true,
@@ -155,7 +159,7 @@ export class ExhibitionSalesService {
     };
   }
 
-  async remove(id: string) {
+  async remove(id: number) {
     const existing = await this.prisma.exhibitionSales.findUnique({
       where: { id },
     });

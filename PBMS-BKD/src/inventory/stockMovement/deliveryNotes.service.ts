@@ -53,7 +53,7 @@ export class DeliveryNoteService {
     }
   }
 
-  async deleteDeliveryNotes(id: string) {
+  async deleteDeliveryNotes(id: number) {
     try {
       const dns = await this.prisma.deliveryNote.delete({
         where: {

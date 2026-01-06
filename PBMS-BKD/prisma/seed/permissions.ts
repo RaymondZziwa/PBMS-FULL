@@ -6,6 +6,12 @@ export const permissions = [
     module: 'Reports',
   },
 
+  {
+    name: 'Access Prescription Database Module',
+    value: 'prescription_database_module',
+    module: 'PBPD',
+  },
+
   // Human Resource
   {
     name: 'Access Human Resource Module',

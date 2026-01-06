@@ -31,16 +31,16 @@ export class ExhibitionExpensesController {
 
   @Get('fetch/:id')
   findOne(@Param('id') id: string) {
-    return this.exhibitionExpensesService.findOne(id);
+    return this.exhibitionExpensesService.findOne(Number(id));
   }
 
   @Put('modify/:id')
   update(@Param('id') id: string, @Body() dto: UpdateExhibitionExpenseDto) {
-    return this.exhibitionExpensesService.update(id, dto);
+    return this.exhibitionExpensesService.update(Number(id), dto);
   }
 
   @Delete('delete/:id')
   remove(@Param('id') id: string) {
-    return this.exhibitionExpensesService.remove(id);
+    return this.exhibitionExpensesService.remove(Number(id));
   }
 }

@@ -26,16 +26,16 @@ export class ExhibitionSalesController {
 
   @Get('fetch/:id')
   async findOne(@Param('id') id: string) {
-    return this.salesService.findOne(id);
+    return this.salesService.findOne(Number(id));
   }
 
   @Put('modify/:id')
   async update(@Param('id') id: string, @Body() updateSaleDto: UpdateSaleDto) {
-    return this.salesService.update(id, updateSaleDto);
+    return this.salesService.update(Number(id), updateSaleDto);
   }
 
   @Delete('delete/:id')
   async remove(@Param('id') id: string) {
-    return this.salesService.remove(id);
+    return this.salesService.remove(Number(id));
   }
 }

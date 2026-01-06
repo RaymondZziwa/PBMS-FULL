@@ -29,16 +29,16 @@ export class DepartmentController {
 
   @Get('fetch/:id')
   findOne(@Param('id') id: string) {
-    return this.departmentService.findOne(id);
+    return this.departmentService.findOne(Number(id));
   }
 
   @Patch('modify/:id')
   update(@Param('id') id: string, @Body() dto: UpdateDepartmentDto) {
-    return this.departmentService.update(id, dto);
+    return this.departmentService.update(Number(id), dto);
   }
 
   @Delete('delete/:id')
   remove(@Param('id') id: string) {
-    return this.departmentService.remove(id);
+    return this.departmentService.remove(Number(id));
   }
 }

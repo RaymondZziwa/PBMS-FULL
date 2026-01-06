@@ -30,7 +30,7 @@ export class PayrollController {
 
   @Put('modify-attendance/:id')
   modifyAttendance(@Param('id') id: string, @Body() dto: UpdateAttendanceDto) {
-    return this.payrollService.updateAttendance(id, dto);
+    return this.payrollService.updateAttendance(Number(id), dto);
   }
 
   @Get('attendance/daily-sheet')
@@ -40,7 +40,7 @@ export class PayrollController {
 
   @Get('summary')
   async getAttendanceSummaryByPeriod(
-    @Query('companyId') companyId: string,
+    @Query('companyId') companyId: number,
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
   ) {
@@ -78,7 +78,7 @@ export class PayrollController {
   /** GET a single payroll period by ID */
   @Get('period/:id')
   async getPayrollPeriod(@Param('id') id: string) {
-    const payrollPeriod = await this.payrollService.getPayrollPeriod(id);
+    const payrollPeriod = await this.payrollService.getPayrollPeriod(Number(id));
     if (!payrollPeriod) throw new NotFoundException('Payroll period not found');
     return payrollPeriod;
   }
@@ -89,13 +89,13 @@ export class PayrollController {
     @Param('id') id: string,
     @Body() dto: CreatePayrollPeriodDto,
   ) {
-    return this.payrollService.updatePayrollPeriod(id, dto);
+    return this.payrollService.updatePayrollPeriod(Number(id), dto);
   }
 
   /** UPSERT payrolls for a payroll period */
   @Put('period/:id/payrolls')
   async upsertPayrolls(
-    @Param('id') payrollPeriodId: string,
+    @Param('id') payrollPeriodId: number,
     @Body() payrolls: PaymentStructureDto[],
   ) {
     return this.payrollService.upsertPayrolls(payrollPeriodId, payrolls);

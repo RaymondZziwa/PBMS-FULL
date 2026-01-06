@@ -13,8 +13,8 @@ export class CreateChequeDto {
   chequeNumber: string;
 
   @IsNotEmpty()
-  @IsString()
-  bankId: string;
+  @IsNumber()
+  bankId: number;
 
   @IsNotEmpty()
   @IsString()

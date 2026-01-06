@@ -7,8 +7,8 @@ export class StoreService {
   constructor(private readonly prismaService: PrismaService) {}
 
   async create(data: {
-    branchId: string;
-    deptId: string;
+    branchId: number;
+    deptId: number;
     name: string;
     authorizedPersonnel: string[];
   }): Promise<GenericResponse> {
@@ -34,7 +34,7 @@ export class StoreService {
     };
   }
 
-  async findOne(id: string): Promise<GenericResponse> {
+  async findOne(id: number): Promise<GenericResponse> {
     const store = await this.prismaService.store.findUnique({
       where: { id },
     });
@@ -46,10 +46,8 @@ export class StoreService {
   }
 
   async update(
-    id: string,
-    data: {
-      branchId?: string;
-      deptId?: string;
+    id: number,
+    data: {  branchId?: number;  deptId?: number;
       name?: string;
       authorizedPersonnel: string[];
     },
@@ -65,7 +63,7 @@ export class StoreService {
     };
   }
 
-  async remove(id: string): Promise<GenericResponse> {
+  async remove(id: number): Promise<GenericResponse> {
     const store = await this.prismaService.store.delete({
       where: { id },
     });

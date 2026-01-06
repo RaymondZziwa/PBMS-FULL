@@ -13,7 +13,7 @@ import {
 export class ManufacturingItemDto {
   @IsUUID()
   @IsNotEmpty()
-  itemId: string;
+  itemId: number;
 
   @IsString()
   @IsNotEmpty()
@@ -27,15 +27,15 @@ export class ManufacturingItemDto {
 export class CreateManufacturingDto {
   @IsUUID()
   @IsNotEmpty()
-  storeId: string;
+  storeId: number;
 
-  @IsUUID()
+  @IsNumber()
   @IsNotEmpty()
-  primaryUnitId: string; // Unit ID for primary unit (L or KG)
+  primaryUnitId: number; // Unit ID for primary unit (L or KG)
 
-  @IsUUID()
+  @IsNumber()
   @IsNotEmpty()
-  unitId: string; // Unit ID for packing unit
+  unitId: number; // Unit ID for packing unit
 
   @IsNumber()
   @IsNotEmpty()
@@ -50,9 +50,9 @@ export class CreateManufacturingDto {
   @IsNotEmpty()
   items: ManufacturingItemDto[]; // Array of manufacturing items
 
-  @IsUUID()
+  @IsNumber()
   @IsNotEmpty()
-  manufacturedBy: string; // Employee ID
+  manufacturedBy: number; // Employee ID
 
   @IsOptional()
   @IsString()

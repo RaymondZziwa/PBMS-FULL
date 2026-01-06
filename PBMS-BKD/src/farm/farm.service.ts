@@ -66,7 +66,7 @@ export class FarmService {
     };
   }
 
-  async findOneSeedlingStage(id: string): Promise<GenericResponse> {
+  async findOneSeedlingStage(id: number): Promise<GenericResponse> {
     const stage = await this.prismaService.seedlingStages.findUnique({
       where: { id },
       include: {
@@ -90,7 +90,7 @@ export class FarmService {
   }
 
   async updateSeedlingStage(
-    id: string,
+    id: number,
     data: UpdateSeedlingStageDto,
   ): Promise<GenericResponse> {
     const stage = await this.prismaService.seedlingStages.update({
@@ -105,7 +105,7 @@ export class FarmService {
     };
   }
 
-  async removeSeedlingStage(id: string): Promise<GenericResponse> {
+  async removeSeedlingStage(id: number): Promise<GenericResponse> {
     await this.prismaService.seedlingStages.delete({
       where: { id },
     });
@@ -211,7 +211,7 @@ export class FarmService {
     };
   }
 
-  async findOneSeedlingBatch(id: string): Promise<GenericResponse> {
+  async findOneSeedlingBatch(id: number): Promise<GenericResponse> {
     const batch = await this.prismaService.seedlingBatch.findUnique({
       where: { id },
       include: {
@@ -245,7 +245,7 @@ export class FarmService {
   }
 
   async updateSeedlingBatch(
-    id: string,
+    id: number,
     data: UpdateSeedlingBatchDto,
   ): Promise<GenericResponse> {
     // If currentStageId is being updated, verify it exists
@@ -276,7 +276,7 @@ export class FarmService {
   }
 
   async updateSeedlingBatchStatus(
-    id: string,
+    id: number,
     data: UpdateSeedlingBatchStatusDto,
   ): Promise<GenericResponse> {
     const batch = await this.prismaService.seedlingBatch.findUnique({
@@ -314,7 +314,7 @@ export class FarmService {
     };
   }
 
-  async removeSeedlingBatch(id: string): Promise<GenericResponse> {
+  async removeSeedlingBatch(id: number): Promise<GenericResponse> {
     await this.prismaService.seedlingBatch.delete({
       where: { id },
     });

@@ -17,8 +17,8 @@ export class StoresController {
   create(
     @Body()
     data: {
-      branchId: string;
-      deptId: string;
+      branchId: number;
+      deptId: number;
       name: string;
       authorizedPersonnel: string[];
     },
@@ -33,7 +33,7 @@ export class StoresController {
 
   @Get('fetch/:id')
   findOne(@Param('id') id: string) {
-    return this.storeService.findOne(id);
+    return this.storeService.findOne(Number(id));
   }
 
   @Patch('modify/:id')
@@ -41,17 +41,17 @@ export class StoresController {
     @Param('id') id: string,
     @Body()
     data: {
-      branchId: string;
-      deptId: string;
+      branchId: number;
+      deptId: number;
       name: string;
       authorizedPersonnel: string[];
     },
   ) {
-    return this.storeService.update(id, data);
+    return this.storeService.update(Number(id), data);
   }
 
   @Delete('delete/:id')
   remove(@Param('id') id: string) {
-    return this.storeService.remove(id);
+    return this.storeService.remove(Number(id));
   }
 }

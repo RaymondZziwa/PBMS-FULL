@@ -27,7 +27,7 @@ export class ProjectsService {
     };
   }
 
-  async findOne(id: string): Promise<GenericResponse> {
+  async findOne(id: number): Promise<GenericResponse> {
     const project = await this.prismaService.project.findUnique({
       where: { id },
     });
@@ -38,7 +38,7 @@ export class ProjectsService {
     };
   }
 
-  async update(id: string, data: { name?: string }): Promise<GenericResponse> {
+  async update(id: number, data: { name?: string }): Promise<GenericResponse> {
     const project = await this.prismaService.project.update({
       where: { id },
       data,
@@ -50,7 +50,7 @@ export class ProjectsService {
     };
   }
 
-  async remove(id: string): Promise<GenericResponse> {
+  async remove(id: number): Promise<GenericResponse> {
     const project = await this.prismaService.project.delete({
       where: { id },
     });

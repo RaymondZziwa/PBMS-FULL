@@ -66,7 +66,7 @@ export class ProjectSalesService {
             saleId: projectSale.id,
             amount: saleData.downPayment,
             paymentMethod: 'CASH',
-            exhibitionId: createProjectSaleDto.exhibitionId || '',
+            exhibitionId: createProjectSaleDto.exhibitionId || 0,
             cashierId: cashierId,
           },
         });
@@ -249,7 +249,7 @@ export class ProjectSalesService {
     }
   }
 
-  async findOne(id: string) {
+  async findOne(id: number) {
     try {
       const sale = await this.prisma.projectSales.findUnique({
         where: { id },
@@ -322,7 +322,7 @@ export class ProjectSalesService {
     }
   }
 
-  async update(id: string, updateProjectSaleDto: UpdateProjectSaleDto) {
+  async update(id: number, updateProjectSaleDto: UpdateProjectSaleDto) {
     try {
       const sale = await this.findOne(id);
 
@@ -365,7 +365,7 @@ export class ProjectSalesService {
     }
   }
 
-  async remove(id: string) {
+  async remove(id: number) {
     try {
       const sale = await this.findOne(id);
 
@@ -391,7 +391,7 @@ export class ProjectSalesService {
     }
   }
 
-  async addPayment(saleId: string, addPaymentDto: AddPaymentDto) {
+  async addPayment(saleId: number, addPaymentDto: AddPaymentDto) {
     try {
       const saleResponse = await this.findOne(saleId);
       const sale = saleResponse.data;
@@ -439,7 +439,7 @@ export class ProjectSalesService {
     }
   }
 
-  async getPaymentSchedule(saleId: string) {
+  async getPaymentSchedule(saleId: number) {
     try {
       const saleResponse = await this.findOne(saleId);
       const sale = saleResponse.data;
@@ -553,9 +553,9 @@ export class ProjectSalesService {
 
   // Helper Methods
   private async validateReferences(
-    clientId: string,
-    projectId: string,
-    cashierId: string,
+    clientId: number,
+    projectId: number,
+    cashierId: number,
   ) {
     await Promise.all([
       this.validateClient(clientId),
@@ -564,21 +564,21 @@ export class ProjectSalesService {
     ]);
   }
 
-  private async validateClient(clientId: string) {
+  private async validateClient(clientId: number) {
     const client = await this.prisma.client.findUnique({
       where: { id: clientId },
     });
     if (!client) throw new BadRequestException('Client not found');
   }
 
-  private async validateProject(projectId: string) {
+  private async validateProject(projectId: number) {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
     });
     if (!project) throw new BadRequestException('Project not found');
   }
 
-  private async validateEmployee(employeeId: string) {
+  private async validateEmployee(employeeId: number) {
     const employee = await this.prisma.employee.findUnique({
       where: { id: employeeId },
     });
@@ -628,7 +628,7 @@ export class ProjectSalesService {
   }
 
   private async calculateTotalPaid(
-    saleId: string,
+    saleId: number,
     prisma: any = this.prisma,
   ): Promise<Prisma.Decimal> {
     const result = await prisma.projectPayments.aggregate({
@@ -639,7 +639,7 @@ export class ProjectSalesService {
   }
 
   private async updateSaleStatus(
-    saleId: string,
+    saleId: number,
     totalPaid: Prisma.Decimal,
     saleTotal: number,
     prisma: any = this.prisma,
@@ -723,7 +723,7 @@ export class ProjectSalesService {
   }
 
   async uploadProjectSaleDeliveryNote(
-    saleId: string,
+    saleId: number,
     file: Express.Multer.File,
   ) {
     if (!file) {

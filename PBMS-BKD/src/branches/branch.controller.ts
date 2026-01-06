@@ -25,7 +25,7 @@ export class BranchController {
 
   @Get('fetch/:id')
   findOne(@Param('id') id: string) {
-    return this.branchService.findOne(id);
+    return this.branchService.findOne(Number(id));
   }
 
   @Patch('modify/:id')
@@ -33,11 +33,11 @@ export class BranchController {
     @Param('id') id: string,
     @Body() data: { name?: string; location?: string },
   ) {
-    return this.branchService.update(id, data);
+    return this.branchService.update(Number(id), data);
   }
 
   @Delete('delete/:id')
   remove(@Param('id') id: string) {
-    return this.branchService.remove(id);
+    return this.branchService.remove(Number(id));
   }
 }

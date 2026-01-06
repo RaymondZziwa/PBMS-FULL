@@ -24,7 +24,7 @@ export class ChequeService {
     });
   }
 
-  async findOne(id: string) {
+  async findOne(id: number) {
     const cheque = await this.prisma.cheque.findUnique({
       where: { id },
       include: { bank: true },
@@ -33,7 +33,7 @@ export class ChequeService {
     return cheque;
   }
 
-  async update(id: string, data: UpdateChequeDto) {
+  async update(id: number, data: UpdateChequeDto) {
     const { bankId, ...rest } = data;
 
     return this.prisma.cheque.update({
@@ -49,7 +49,7 @@ export class ChequeService {
     });
   }
 
-  async remove(id: string) {
+  async remove(id: number) {
     await this.findOne(id);
     return this.prisma.cheque.delete({ where: { id } });
   }

@@ -28,22 +28,22 @@ export class ExhibitionStoreController {
   }
 
   @Get('by-exhibition/:exhibitionId')
-  findByExhibition(@Param('exhibitionId') exhibitionId: string) {
+  findByExhibition(@Param('exhibitionId') exhibitionId: number) {
     return this.svc.findByExhibition(exhibitionId);
   }
 
   @Get(':id') findOne(@Param('id') id: string) {
-    return this.svc.findOne(id);
+    return this.svc.findOne(Number(id));
   }
 
   @Put('modify/:id') update(
     @Param('id') id: string,
     @Body() dto: UpdateExhibitionStoreDto,
   ) {
-    return this.svc.update(id, dto);
+    return this.svc.update(Number(id), dto);
   }
 
   @Delete('delete/:id') remove(@Param('id') id: string) {
-    return this.svc.remove(id);
+    return this.svc.remove(Number(id));
   }
 }

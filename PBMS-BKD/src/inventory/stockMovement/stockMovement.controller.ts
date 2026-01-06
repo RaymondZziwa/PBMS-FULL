@@ -104,12 +104,12 @@ export class StockMovementController {
     @Param('id') id: string,
     @Body() dto: { notes: string },
   ) {
-    return this.stockMovementService.resolveStockMvtConflict(id, dto.notes);
+    return this.stockMovementService.resolveStockMvtConflict(Number(id), dto.notes);
   }
 
   @Post('delete-dn/:id')
   async deleteDn(@Param('id') id: string) {
-    return this.DeliveryNoteService.deleteDeliveryNotes(id);
+    return this.DeliveryNoteService.deleteDeliveryNotes(Number(id));
   }
 
   @Get('fetch-all-dns')

@@ -9,9 +9,9 @@ import {
 import { ExpenseCategory } from '@prisma/client';
 
 export class CreateBranchExpenseDto {
-  @IsString()
+  @IsNumber()
   @IsNotEmpty()
-  branchId: string;
+  branchId: number;
 
   @IsEnum(ExpenseCategory)
   category: ExpenseCategory;
@@ -30,9 +30,9 @@ export class CreateBranchExpenseDto {
   @IsDateString()
   dateIncurred: string; // ISO string
 
-  @IsString()
+  @IsNumber()
   @IsNotEmpty()
-  recordedBy: string; // Employee ID
+  recordedBy: number; // Employee ID
 }
 
 export class UpdateBranchExpenseDto {

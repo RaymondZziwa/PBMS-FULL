@@ -56,23 +56,23 @@ export class ExhibitionService {
     };
   }
 
-  async findOne(id: string) {
+  async findOne(id: number) {
     const e = await this.prismaService.exhibition.findUnique({ where: { id } });
     if (!e) throw new NotFoundException(`Exhibition ${id} not found`);
     return e;
   }
 
-  async update(id: string, dto: UpdateExhibitionDto): Promise<GenericResponse> {
+  async update(id: number, dto: UpdateExhibitionDto): Promise<GenericResponse> {
     await this.findOne(id);
     const data: {
-      id: string;
+      id: number;
       name: string;
       location: string;
       description: string | null;
       startDate: Date;
       endDate: Date;
     } = {
-      id: '',
+      id: id,
       name: '',
       location: '',
       description: null,
@@ -102,7 +102,7 @@ export class ExhibitionService {
     }
   }
 
-  async remove(id: string): Promise<GenericResponse> {
+  async remove(id: number): Promise<GenericResponse> {
     await this.findOne(id);
 
     try {

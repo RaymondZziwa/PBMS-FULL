@@ -27,7 +27,7 @@ export class BranchService {
     };
   }
 
-  async findOne(id: string): Promise<GenericResponse> {
+  async findOne(id: number): Promise<GenericResponse> {
     const branch = await this.prismaService.branch.findUnique({
       where: { id },
     });
@@ -39,7 +39,7 @@ export class BranchService {
   }
 
   async update(
-    id: string,
+    id: number,
     data: { name?: string; location?: string },
   ): Promise<GenericResponse> {
     const branch = await this.prismaService.branch.update({
@@ -53,7 +53,7 @@ export class BranchService {
     };
   }
 
-  async remove(id: string): Promise<GenericResponse> {
+  async remove(id: number): Promise<GenericResponse> {
     const branch = await this.prismaService.branch.delete({ where: { id } });
     return {
       status: 200,

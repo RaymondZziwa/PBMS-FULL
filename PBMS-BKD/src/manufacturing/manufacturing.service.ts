@@ -30,7 +30,7 @@ export class ManufacturingService {
 
       // 2. Check if employee is authorized to operate on this store
       const authorizedPersonnel = (store.authorizedPersonnel as string[]) || [];
-      if (!authorizedPersonnel.includes(dto.manufacturedBy)) {
+      if (!authorizedPersonnel.includes(dto.manufacturedBy.toString())) {
         throw new ForbiddenException(
           'You are not authorized to perform operations in this store',
         );
@@ -253,7 +253,7 @@ export class ManufacturingService {
     };
   }
 
-  async findOne(id: string): Promise<GenericResponse> {
+  async findOne(id: number): Promise<GenericResponse> {
     const manufacturing = await this.prismaService.manufacturing.findUnique({
       where: { id },
       include: {
@@ -288,7 +288,7 @@ export class ManufacturingService {
   }
 
   async update(
-    id: string,
+    id: number,
     dto: UpdateManufacturingDto,
   ): Promise<GenericResponse> {
     // Check if manufacturing record exists
@@ -377,7 +377,7 @@ export class ManufacturingService {
   }
 
   async completeManufacturing(
-    id: string,
+    id: number,
     dto: CompleteManufacturingDto,
   ): Promise<GenericResponse> {
     // Check if manufacturing record exists
@@ -444,7 +444,7 @@ export class ManufacturingService {
     };
   }
 
-  async remove(id: string): Promise<GenericResponse> {
+  async remove(id: number): Promise<GenericResponse> {
     // Check if manufacturing record exists
     const existing = await this.prismaService.manufacturing.findUnique({
       where: { id },

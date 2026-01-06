@@ -89,7 +89,7 @@ export class SupplierService {
     };
   }
 
-  async findOne(id: string) {
+  async findOne(id: number) {
     const supplier = await this.prisma.supplier.findUnique({ where: { id } });
     if (!supplier)
       throw new NotFoundException(`Supplier with id ${id} not found`);
@@ -100,7 +100,7 @@ export class SupplierService {
     };
   }
 
-  async update(id: string, dto: UpdateSupplierDto) {
+  async update(id: number, dto: UpdateSupplierDto) {
     await this.findOne(id); // ensures it exists
     const supplier = await this.prisma.supplier.update({
       where: { id },
@@ -114,7 +114,7 @@ export class SupplierService {
     };
   }
 
-  async remove(id: string) {
+  async remove(id: number) {
     await this.findOne(id);
     await this.prisma.supplier.delete({ where: { id } });
 
@@ -125,7 +125,7 @@ export class SupplierService {
     };
   }
 
-  async getSupplierSupplies(id: string) {
+  async getSupplierSupplies(id: number) {
     await this.findOne(id);
     const supplies = await this.prisma.supply.findMany({
       where: {
@@ -155,13 +155,13 @@ export class SupplierService {
   async createSupply(
     file: Express.Multer.File | null,
     dto: {
-      supplierId: string;
-      itemId: string;
+      supplierId: number;
+      itemId: number;
       qty: number;
       value: number;
-      unitId: string;
-      recievedBy: string;
-      destinationStoreId: string;
+      unitId: number;
+      recievedBy: number;
+      destinationStoreId: number;
     },
   ) {
     const {
@@ -183,7 +183,7 @@ export class SupplierService {
       );
 
     const authorized = (store.authorizedPersonnel as string[]) || [];
-    if (!authorized.includes(recievedBy)) {
+    if (!authorized.includes(recievedBy.toString())) {
       throw new ForbiddenException(
         'You are not authorized to perform operations in this store',
       );
@@ -260,7 +260,7 @@ export class SupplierService {
     };
   }
 
-  async modifySupply(id: string, dto: Prisma.SupplyUpdateInput) {
+  async modifySupply(id: number, dto: Prisma.SupplyUpdateInput) {
     const existing = await this.prisma.supply.findUnique({ where: { id } });
     if (!existing)
       throw new NotFoundException(`Supply with id ${id} not found`);
@@ -278,7 +278,7 @@ export class SupplierService {
     };
   }
 
-  async deleteSupply(id: string) {
+  async deleteSupply(id: number) {
     const existing = await this.prisma.supply.findUnique({ where: { id } });
     if (!existing)
       throw new NotFoundException(`Supply with id ${id} not found`);
@@ -355,7 +355,7 @@ export class SupplierService {
     };
   }
 
-  async modifyPayment(id: string, dto: Prisma.SupplyPaymentsUpdateInput) {
+  async modifyPayment(id: number, dto: Prisma.SupplyPaymentsUpdateInput) {
     const existing = await this.prisma.supplyPayments.findUnique({
       where: { id },
     });
@@ -375,7 +375,7 @@ export class SupplierService {
     };
   }
 
-  async deletePayment(id: string) {
+  async deletePayment(id: number) {
     // 1️⃣ Find existing payment
     const existing = await this.prisma.supplyPayments.findUnique({
       where: { id },
@@ -545,7 +545,7 @@ export class SupplierService {
     };
   }
 
-  async exportSupplierPayment(id: string) {
+  async exportSupplierPayment(id: number) {
     const payments = await this.prisma.supplyPayments.findMany({
       where: { supply: { supplierId: id } },
       include: { employee: true, supply: true },

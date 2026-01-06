@@ -15,13 +15,13 @@ export class BankService {
     return this.prisma.bank.findMany();
   }
 
-  async findOne(id: string) {
+  async findOne(id: number) {
     const bank = await this.prisma.bank.findUnique({ where: { id } });
     if (!bank) throw new NotFoundException(`Bank with id ${id} not found`);
     return bank;
   }
 
-  async update(id: string, data: UpdateBankDto) {
+  async update(id: number, data: UpdateBankDto) {
     await this.findOne(id); // ensure exists
     return this.prisma.bank.update({
       where: { id },
@@ -29,7 +29,7 @@ export class BankService {
     });
   }
 
-  async remove(id: string) {
+  async remove(id: number) {
     await this.findOne(id); // ensure exists
     return this.prisma.bank.delete({ where: { id } });
   }

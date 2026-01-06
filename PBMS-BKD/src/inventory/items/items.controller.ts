@@ -17,7 +17,7 @@ export class ItemController {
   create(
     @Body()
     data: {
-      categoryId: string;
+      categoryId: number;
       name: string;
       price: number;
       showInPos: boolean;
@@ -33,24 +33,24 @@ export class ItemController {
 
   @Get('fetch-store-inventory/:id')
   findAllStoreInventory(@Param('id') id: string) {
-    return this.itemCategoryService.findAllWithStoreQuantity(id);
+    return this.itemCategoryService.findAllWithStoreQuantity(Number(id));
   }
 
   @Get('fetch/:id')
   findOne(@Param('id') id: string) {
-    return this.itemCategoryService.findOne(id);
+    return this.itemCategoryService.findOne(Number(id));
   }
 
   @Patch('modify/:id')
   update(
     @Param('id') id: string,
-    @Body() data: { categoryId?: string; name?: string; price?: number },
+    @Body() data: {  categoryId?: number; name?: string; price?: number },
   ) {
-    return this.itemCategoryService.update(id, data);
+    return this.itemCategoryService.update(Number(id), data);
   }
 
   @Delete('delete/:id')
   remove(@Param('id') id: string) {
-    return this.itemCategoryService.remove(id);
+    return this.itemCategoryService.remove(Number(id));
   }
 }

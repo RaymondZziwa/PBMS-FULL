@@ -12,22 +12,19 @@ import {
   ReportSection,
 } from 'src/utils/pdfGenerator/generator.service';
 
-interface MovementWhereInput {
-  storeId?: string;
+interface MovementWhereInput {  storeId?: number;
   category?: 'RESTOCK' | 'DEPLETION' | 'ADJUSTMENT';
   createdAt?: {
     gte?: Date;
     lte?: Date;
-  };
-  itemId?: string;
-  item?: {
-    categoryId?: string;
+  };  itemId?: number;
+  item?: {  categoryId?: number;
   };
 }
 
 // Define interface for product sales
 interface ProductSale {
-  saleId: string;
+  saleId: number;
   date: Date;
   store: string;
   quantity: number;
@@ -45,7 +42,7 @@ export class ReportService {
   ) {}
 
   //inventory reports
-  async stockLevelAnalysis(storeId?: string) {
+  async stockLevelAnalysis(storeId?: number) {
     const inventory = await this.prisma.productInventory.findMany({
       where: storeId ? { storeId } : {},
       select: {
@@ -88,7 +85,7 @@ export class ReportService {
     };
   }
 
-  async exportStockLevelAnalysisPDF(storeId: string) {
+  async exportStockLevelAnalysisPDF(storeId: number) {
     const reportData = await this.stockLevelAnalysis(storeId);
     const companyInfo = await this.companyService.getProfile();
     const store = await this.prisma.store.findUnique({
@@ -217,11 +214,11 @@ export class ReportService {
   }
 
   async stockMovementAnalysis(
-    storeId?: string,
+    storeId?: number,
     startDate?: string,
     endDate?: string,
-    itemId?: string,
-    categoryId?: string,
+    itemId?: number,
+    categoryId?: number,
     movementType?: string,
   ) {
     const where: MovementWhereInput = {};
@@ -330,7 +327,7 @@ export class ReportService {
   }
 
   async exportStockMovementAnalysisPDF(
-    storeId: string,
+    storeId: number,
     startDate?: string,
     endDate?: string,
     itemId?: string,
@@ -342,8 +339,8 @@ export class ReportService {
       storeId,
       startDate,
       endDate,
-      itemId,
-      categoryId,
+      itemId ? Number(itemId) : undefined,
+      categoryId ? Number(categoryId) : undefined,
       movementType,
     );
 
@@ -387,11 +384,11 @@ export class ReportService {
         movementLabels[movementType] || movementType;
     }
     if (itemId) {
-      const item = movements.find((m) => m.itemId === itemId)?.item;
+      const item = movements.find((m) => m.itemId === Number(itemId))?.item;
       filterDescriptions['Item'] = item?.name || 'Selected Item';
     }
     if (categoryId) {
-      const category = movements.find((m) => m.item.categoryId === categoryId)
+      const category = movements.find((m) => m.item.categoryId === Number(categoryId))
         ?.item.category;
       filterDescriptions['Category'] = category?.name || 'Selected Category';
     }
@@ -1024,8 +1021,8 @@ export class ReportService {
 
   // Product Performance
   async productPerformance(
-    itemId: string,
-    storeId?: string,
+    itemId: number,
+    storeId?: number,
     startDate?: string,
     endDate?: string,
   ) {
@@ -1073,7 +1070,7 @@ export class ReportService {
     };
 
     const salesWithProduct: {
-      saleId: string;
+      saleId: number;
       date: Date;
       store: string;
       quantity: number;
@@ -1096,7 +1093,7 @@ export class ReportService {
         productData.totalUnitsSold += productInSale.quantity;
         productData.totalRevenue += productInSale.total;
         productData.salesCount += 1;
-        productData.stores.add(sale.storeId);
+        productData.stores.add(sale.storeId.toString());
 
         salesWithProduct.push({
           saleId: sale.id,
@@ -1150,13 +1147,10 @@ export class ReportService {
       | 'store-comparison'
       | 'massage-services'
       | 'product-performance',
-    filters: {
-      storeId?: string;
+    filters: {  storeId?: number;
       date?: string;
       startDate?: string;
-      endDate?: string;
-      serviceId?: string;
-      itemId?: string;
+      endDate?: string;  serviceId?: number;  itemId?: number;
     },
   ) {
     let reportData: any;
@@ -1167,7 +1161,7 @@ export class ReportService {
     switch (reportType) {
       case 'daily-sales':
         reportData = await this.dailySalesSummary(
-          filters.storeId,
+          filters.storeId?.toString(),
           filters.date,
         );
         title = 'Daily Sales Summary Report';
@@ -1178,7 +1172,7 @@ export class ReportService {
 
       case 'period-sales':
         reportData = await this.periodSalesSummary(
-          filters.storeId,
+          filters.storeId?.toString(),
           filters.startDate,
           filters.endDate,
         );
@@ -1197,7 +1191,7 @@ export class ReportService {
 
       case 'massage-services':
         reportData = await this.massageServiceSales(
-          filters.serviceId,
+          filters.serviceId?.toString(),
           filters.startDate,
           filters.endDate,
         );
@@ -1722,7 +1716,7 @@ export class ReportService {
       // TODO: Implement expense by category
       const where: Prisma.branchExpenseWhereInput = {};
 
-      if (branchId) where.branchId = branchId;
+      if (branchId) where.branchId = Number(branchId);
       if (category) where.category = category as ExpenseCategory; // ExpenseCategory enum
       if (startDate || endDate) {
         where.dateIncurred = {};
@@ -1789,7 +1783,7 @@ export class ReportService {
     // 2️⃣ Fetch branch info
     let branch: any = null;
     if (branchId) {
-      branch = await this.prisma.branch.findUnique({ where: { id: branchId } });
+      branch = await this.prisma.branch.findUnique({ where: { id: Number(branchId) } });
       if (!branch)
         throw new NotFoundException(`Branch with ID ${branchId} not found`);
     }
@@ -1900,9 +1894,9 @@ export class ReportService {
   // Exhibition reports - Simplified sales and revenue comparison
   async exhibitionRevenueComparison(exhibitionIds?: string[]) {
     interface ExhibitionStore {
-      id: string;
+      id: number;
       name: string;
-      exhibitionId: string;
+      exhibitionId: number;
     }
 
     let whereCondition = {};
@@ -1914,7 +1908,7 @@ export class ReportService {
       exhibitionStores = await this.prisma.exhibitionStore.findMany({
         where: {
           exhibitionId: {
-            in: exhibitionIds,
+            in: exhibitionIds.map(id => Number(id)),
           },
         },
         select: {
@@ -2002,14 +1996,14 @@ export class ReportService {
 
         acc[exhibitionId].totalRevenue += Number(sale.total);
         acc[exhibitionId].salesCount += 1;
-        acc[exhibitionId].storeIds.add(sale.exhibitionStoreId);
+        acc[exhibitionId].storeIds.add(sale.exhibitionStoreId.toString());
 
         return acc;
       },
       {} as Record<
         string,
         {
-          id: string;
+          id: number;
           name: string;
           totalRevenue: number;
           salesCount: number;
@@ -2054,7 +2048,7 @@ export class ReportService {
     };
   }
 
-  async exhibitionSalesSummary(expoId?: string) {
+  async exhibitionSalesSummary(expoId?: number) {
     // Build where condition
     const store = await this.prisma.exhibitionStore.findMany({
       where: { exhibitionId: expoId },
@@ -2107,7 +2101,7 @@ export class ReportService {
     };
   }
 
-  async exhibitionExpensesSummary(expoId?: string) {
+  async exhibitionExpensesSummary(expoId?: number) {
     const expoExpenses = await this.prisma.exhibitionExpenses.findMany({
       where: expoId ? { exhibitionId: expoId } : {},
       include: {
@@ -2161,8 +2155,7 @@ export class ReportService {
   async exportExhibitionReportToPDF(
     reportType: 'revenue-comparison' | 'sales-summary' | 'expenses-summary',
     filters: {
-      exhibitionIds?: string[];
-      expoId?: string;
+      exhibitionIds?: string[];  expoId?: number;
     },
   ) {
     let reportData: any;

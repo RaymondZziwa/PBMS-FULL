@@ -32,7 +32,7 @@ export class EventsController {
 
   @Get(':id')
   async findOneEvent(@Param('id') id: string) {
-    return this.eventsService.findOne(id);
+    return this.eventsService.findOne(Number(id));
   }
 
   @Patch('modify/:id')
@@ -40,12 +40,12 @@ export class EventsController {
     @Param('id') id: string,
     @Body() updateEventDto: UpdateEventDto,
   ) {
-    return this.eventsService.update(id, updateEventDto);
+    return this.eventsService.update(Number(id), updateEventDto);
   }
 
   @Delete('delete/:id')
   async removeEvent(@Param('id') id: string) {
-    return this.eventsService.remove(id);
+    return this.eventsService.remove(Number(id));
   }
 
   @Get('upcoming/all')
@@ -56,25 +56,25 @@ export class EventsController {
   // ========== Participant Management ==========
   @Post(':eventId/participants')
   async addParticipant(
-    @Param('eventId') eventId: string,
+    @Param('eventId') eventId: number,
     @Body() data: CreateEventParticipantDto,
   ) {
     return this.eventsService.addParticipant(eventId, data);
   }
 
   @Get(':eventId/participants')
-  async getEventParticipants(@Param('eventId') eventId: string) {
+  async getEventParticipants(@Param('eventId') eventId: number) {
     return this.eventsService.getEventParticipants(eventId);
   }
 
   @Get('participants/:participantId')
-  async getParticipant(@Param('participantId') participantId: string) {
+  async getParticipant(@Param('participantId') participantId: number) {
     return this.eventsService.getParticipant(participantId);
   }
 
   @Patch('participants/modify/:participantId')
   async updateParticipant(
-    @Param('participantId') participantId: string,
+    @Param('participantId') participantId: number,
     @Body() updateParticipantDto: UpdateParticipantDto,
   ) {
     return this.eventsService.updateParticipant(
@@ -85,8 +85,8 @@ export class EventsController {
 
   @Delete(':eventId/participants/:participantId')
   async removeParticipant(
-    @Param('participantId') participantId: string,
-    @Param('eventId') eventId: string,
+    @Param('participantId') participantId: number,
+    @Param('eventId') eventId: number,
   ) {
     return this.eventsService.removeParticipant(participantId, eventId);
   }

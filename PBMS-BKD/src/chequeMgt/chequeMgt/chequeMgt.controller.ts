@@ -26,16 +26,16 @@ export class ChequeController {
 
   @Get('fetch/:id')
   findOne(@Param('id') id: string) {
-    return this.chequeService.findOne(id);
+    return this.chequeService.findOne(Number(id));
   }
 
   @Patch('modify/:id')
   update(@Param('id') id: string, @Body() dto: UpdateChequeDto) {
-    return this.chequeService.update(id, dto);
+    return this.chequeService.update(Number(id), dto);
   }
 
   @Delete('delete/:id')
   remove(@Param('id') id: string) {
-    return this.chequeService.remove(id);
+    return this.chequeService.remove(Number(id));
   }
 }

@@ -335,15 +335,15 @@ model ItemCategory {
 }
 
 model Item {
-  id         Int          @id @default(autoincrement())
-  categoryId Int
-  category   ItemCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  showInPos  Boolean      @default(false)
+  id         Int           @id @default(autoincrement())
+  categoryId Int?
+  category   ItemCategory? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  showInPos  Boolean       @default(false)
   name       String
-  price      Decimal      @db.Decimal(10, 2)
+  price      Decimal       @db.Decimal(10, 2)
   barcode    String?
-  updatedAt  DateTime     @updatedAt
-  createdAt  DateTime     @default(now())
+  updatedAt  DateTime      @updatedAt
+  createdAt  DateTime      @default(now())
 
   ProductInventory           ProductInventory[]
   InventoryRecord            InventoryRecord[]

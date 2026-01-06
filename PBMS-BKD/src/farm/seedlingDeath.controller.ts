@@ -29,16 +29,16 @@ export class SeedlingDeathController {
 
   @Get('find/:id')
   findOne(@Param('id') id: string) {
-    return this.service.findOne(id);
+    return this.service.findOne(Number(id));
   }
 
   @Patch('modify/:id')
   update(@Param('id') id: string, @Body() dto: UpdateSeedlingDeathDto) {
-    return this.service.update(id, dto);
+    return this.service.update(Number(id), dto);
   }
 
   @Delete('delete/:id')
   remove(@Param('id') id: string) {
-    return this.service.remove(id);
+    return this.service.remove(Number(id));
   }
 }

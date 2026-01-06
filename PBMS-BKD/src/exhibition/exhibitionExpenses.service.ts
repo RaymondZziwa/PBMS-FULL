@@ -44,7 +44,7 @@ export class ExhibitionExpensesService {
     };
   }
 
-  async findOne(id: string) {
+  async findOne(id: number) {
     const expense = await this.prisma.exhibitionExpenses.findUnique({
       where: { id },
       include: { exhibition: true },
@@ -57,7 +57,7 @@ export class ExhibitionExpensesService {
     };
   }
 
-  async update(id: string, data: UpdateExhibitionExpenseDto) {
+  async update(id: number, data: UpdateExhibitionExpenseDto) {
     await this.findOne(id);
 
     // Prepare update data, handling date conversion if dateIncurred is provided
@@ -78,7 +78,7 @@ export class ExhibitionExpensesService {
       message: 'Exhibition expense updated successfully',
     };
   }
-  async remove(id: string) {
+  async remove(id: number) {
     await this.findOne(id); // ensure it exists
     await this.prisma.exhibitionExpenses.delete({ where: { id } });
     return {

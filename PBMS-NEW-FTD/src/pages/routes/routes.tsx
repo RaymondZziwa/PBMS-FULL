@@ -136,6 +136,11 @@ import { ArchiveRoutes } from './archiveRoutes';
       routes: ExhibitionRoutes,
       requiredPermission: "access_exhibition_module"
     },
+    {
+      name: "Archives (Legacy Data)",
+      icon: FaArchive,
+      routes: ArchiveRoutes,
+    },
    
     // {
     //   name: "Event Ticket",
@@ -149,10 +154,5 @@ import { ArchiveRoutes } from './archiveRoutes';
         icon: FaCog,
         routes: SystemConfigRoutes,
         requiredPermission: "create_and_modify_roles",
-      },
-      {
-        name: "Archives (Legacy Data)",
-        icon: FaArchive,
-        routes: ArchiveRoutes,
       },
   ];

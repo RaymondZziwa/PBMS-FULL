@@ -29,7 +29,7 @@ export class CreateSupplierDto {
 
 export class SupplierPaymentDto {
   @IsString()
-  supplyId: string;
+  supplyId: number;
 
   @IsEnum(PaymentType)
   paymentType: PaymentType;

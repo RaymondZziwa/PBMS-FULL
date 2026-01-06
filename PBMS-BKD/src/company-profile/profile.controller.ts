@@ -68,6 +68,6 @@ export class CompanyController {
       }
     });
 
-    return this.companyService.update(id, payload);
+    return this.companyService.update(Number(id), payload);
   }
 }

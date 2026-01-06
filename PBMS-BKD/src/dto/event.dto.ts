@@ -62,7 +62,7 @@ export class CreateEventParticipantDto {
 
   @IsString()
   @IsNotEmpty()
-  eventId: string;
+  eventId: number;
 }
 
 export class UpdateParticipantDto extends PartialType(
@@ -70,6 +70,6 @@ export class UpdateParticipantDto extends PartialType(
 ) {}
 
 export class UpdatePaymentStatusDto {
-  participantId: string;
-  eventId: string;
+  participantId: number;
+  eventId: number;
 }

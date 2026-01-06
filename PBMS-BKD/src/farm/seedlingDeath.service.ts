@@ -67,7 +67,7 @@ export class SeedlingDeathService {
     });
   }
 
-  async findOne(id: string) {
+  async findOne(id: number) {
     const record = await this.prisma.seedlingDeath.findUnique({
       where: { id },
       include: { batch: true, stage: true },
@@ -78,7 +78,7 @@ export class SeedlingDeathService {
     return record;
   }
 
-  async update(id: string, dto: UpdateSeedlingDeathDto) {
+  async update(id: number, dto: UpdateSeedlingDeathDto) {
     // ensure record exists
     await this.findOne(id);
 
@@ -88,7 +88,7 @@ export class SeedlingDeathService {
     });
   }
 
-  async remove(id: string) {
+  async remove(id: number) {
     // ensure record exists
     await this.findOne(id);
 

@@ -15,15 +15,14 @@ export enum StockLevel {
 
 export class StockReportFilterDto {
   @IsString()
-  storeId: string;
+  storeId: number;
 
   @IsOptional()
   @IsEnum(StockLevel)
   stockLevel?: StockLevel;
 
   @IsOptional()
-  @IsString()
-  categoryId?: string;
+  @IsString()  categoryId?: number;
 
   @IsOptional()
   @IsDateString()
@@ -39,7 +38,7 @@ export class StockReportFilterDto {
 }
 
 export class StockLevelAnalysis {
-  itemId: string;
+  itemId: number;
   itemName: string;
   categoryName: string;
   currentStock: number;
@@ -52,7 +51,7 @@ export class StockLevelAnalysis {
 }
 
 export class StoreStockReport {
-  storeId: string;
+  storeId: number;
   storeName: string;
   generatedAt: Date;
   totalItems: number;

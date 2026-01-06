@@ -25,16 +25,16 @@ export class ItemCategoryController {
 
   @Get('fetch/:id')
   findOne(@Param('id') id: string) {
-    return this.itemCategoryService.findOne(id);
+    return this.itemCategoryService.findOne(Number(id));
   }
 
   @Patch('modify/:id')
   update(@Param('id') id: string, @Body() data: { name?: string }) {
-    return this.itemCategoryService.update(id, data);
+    return this.itemCategoryService.update(Number(id), data);
   }
 
   @Delete('delete/:id')
   remove(@Param('id') id: string) {
-    return this.itemCategoryService.remove(id);
+    return this.itemCategoryService.remove(Number(id));
   }
 }
