@@ -246,7 +246,7 @@ const ProductPerformanceReport: React.FC = () => {
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <div className="font-medium text-gray-900">{product.name}</div>
-                        <div className="text-sm text-gray-500">{product.category.name}</div>
+                        <div className="text-sm text-gray-500">{product.category?.name || '-'}</div>
                       </div>
                       <div className="text-right">
                         <div className="text-sm font-medium text-gray-900">
@@ -284,7 +284,7 @@ const ProductPerformanceReport: React.FC = () => {
                     {getSelectedProduct()?.name}
                   </div>
                   <div className="text-sm text-teal-700">
-                    {getSelectedProduct()?.category.name}
+                    {getSelectedProduct()?.category?.name || '-'}
                   </div>
                 </div>
                 <button

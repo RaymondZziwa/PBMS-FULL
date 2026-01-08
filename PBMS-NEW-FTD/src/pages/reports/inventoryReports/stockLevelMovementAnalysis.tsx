@@ -156,7 +156,7 @@ const StockMovementAnalysisReport: React.FC = () => {
       if (filters.categoryId) params.append('categoryId', filters.categoryId);
 
       const queryString = params.toString();
-      const url = `http://localhost:3005/api/reports/stock-level-movement/${storeId}${queryString ? `?${queryString}` : ''}`;
+      const url = `${baseURL}/api/reports/stock-level-movement/${storeId}${queryString ? `?${queryString}` : ''}`;
       
       const response = await fetch(url);
       if (!response.ok) throw new Error('Failed to fetch report data');
@@ -559,7 +559,7 @@ const StockMovementAnalysisReport: React.FC = () => {
                                 {movement.item.name}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {movement.item.category.name}
+                                {movement.item.category?.name || '-'}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getMovementColor(movement.category)}`}>

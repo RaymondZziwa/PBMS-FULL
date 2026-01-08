@@ -29,8 +29,9 @@ export class ManufacturingService {
       }
 
       // 2. Check if employee is authorized to operate on this store
-      const authorizedPersonnel = (store.authorizedPersonnel as string[]) || [];
-      if (!authorizedPersonnel.includes(dto.manufacturedBy.toString())) {
+      const authorizedPersonnel = (store.authorizedPersonnel as any[]) || [];
+      const authorizedNumbers = authorizedPersonnel.map(id => Number(id));
+      if (!authorizedNumbers.includes(dto.manufacturedBy)) {
         throw new ForbiddenException(
           'You are not authorized to perform operations in this store',
         );

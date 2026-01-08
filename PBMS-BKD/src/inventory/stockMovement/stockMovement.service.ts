@@ -45,8 +45,8 @@ export class StockMovementService {
     });
     if (!store) throw new NotFoundException('Store not found');
 
-    const authorized = (store.authorizedPersonnel as string[]) || [];
-    if (!authorized.includes(Number(employeeId).toString())) {
+    const authorized = (store.authorizedPersonnel as any[]) || [];
+    if (!authorized.includes(Number(employeeId))) {
       throw new ForbiddenException(
         'You are not authorized to perform operations in this store',
       );
@@ -54,7 +54,11 @@ export class StockMovementService {
 
     // 2. Handle inventory logic and calculate remaining quantity
     let productInventory = await this.prisma.productInventory.findFirst({
-      where: { itemId: Number(itemId), storeId: Number(storeId), unitId: Number(unitId) },
+      where: {
+        itemId: Number(itemId),
+        storeId: Number(storeId),
+        unitId: Number(unitId),
+      },
     });
 
     let remainingQuantity = 0;
@@ -63,7 +67,12 @@ export class StockMovementService {
       case InventoryRecordCategory.RESTOCK:
         if (!productInventory) {
           productInventory = await this.prisma.productInventory.create({
-            data: { itemId: Number(itemId), storeId: Number(storeId), unitId: Number(unitId), qty },
+            data: {
+              itemId: Number(itemId),
+              storeId: Number(storeId),
+              unitId: Number(unitId),
+              qty,
+            },
           });
           remainingQuantity = qty;
         } else {
@@ -94,7 +103,12 @@ export class StockMovementService {
       case InventoryRecordCategory.ADJUSTMENT:
         if (!productInventory) {
           productInventory = await this.prisma.productInventory.create({
-            data: { itemId: Number(itemId), storeId: Number(storeId), unitId: Number(unitId), qty },
+            data: {
+              itemId: Number(itemId),
+              storeId: Number(storeId),
+              unitId: Number(unitId),
+              qty,
+            },
           });
           remainingQuantity = qty;
         } else {

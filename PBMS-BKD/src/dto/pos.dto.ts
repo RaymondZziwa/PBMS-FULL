@@ -29,7 +29,7 @@ export class PaymentMethodDto {
 }
 
 export class ItemCategoryDto {
-  @IsString()
+  @IsNumber()
   @IsNotEmpty()
   id: number;
 
@@ -38,11 +38,11 @@ export class ItemCategoryDto {
 }
 
 export class SaleItemDto {
-  @IsString()
+  @IsNumber()
   @IsNotEmpty()
   id: number;
 
-  @IsString()
+  @IsNumber()
   @IsNotEmpty()
   categoryId: number;
 
@@ -91,11 +91,11 @@ export class CreateSaleDto {
   @ValidateNested({ each: true })
   items: any[];
 
-  @IsString()
+  @IsNumber()
   @IsNotEmpty()
   storeId: number;
 
-  @IsString()
+  @IsNumber()
   @IsNotEmpty()
   customerId: number;
 
@@ -143,7 +143,7 @@ export class ExhibitionCreateSaleDto {
 }
 
 export class CollectCreditPaymentDto {
-  @IsString()
+  @IsNumber()
   @IsNotEmpty()
   saleId: number;
 

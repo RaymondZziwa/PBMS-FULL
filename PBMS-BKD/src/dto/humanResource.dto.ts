@@ -4,6 +4,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsNumber,
   IsUUID,
 } from 'class-validator';
 import { PartialType } from '@nestjs/mapped-types';
@@ -14,7 +15,7 @@ export class CreateDepartmentDto {
   name: string;
 
   @IsNotEmpty()
-  @IsUUID()
+  @IsNumber()
   branchId: number;
 }
 
@@ -62,13 +63,13 @@ export class CreateEmployeeDto {
   profileImage?: string;
 
   @IsNotEmpty()
-  @IsUUID()
+  @IsNumber()
   roleId: number;
 
-  @IsUUID()  branchId?: number;
+  @IsNumber()  branchId?: number;
 
   @IsOptional()
-  @IsUUID()  deptId?: number;
+  @IsNumber()  deptId?: number;
 }
 
 export class employeeProfileUpdateDto {

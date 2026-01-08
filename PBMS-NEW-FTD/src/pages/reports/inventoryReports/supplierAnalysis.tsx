@@ -98,11 +98,35 @@ const SuppliersReport: React.FC = () => {
       setLoading(true);
       const response = await fetch(`${baseURL}/api/suppliers/report`);
       if (!response.ok) throw new Error('Failed to fetch suppliers report');
-      
+
       const data = await response.json();
-      setReportData(data.data);
+
+      // Handle empty data response
+      if (!data.data || (Array.isArray(data.data) && data.data.length === 0)) {
+        setReportData({
+          suppliers: [],
+          summary: {
+            totalSuppliers: 0,
+            overallTotalSupplied: 0,
+            overallTotalPaid: 0,
+            overallBalance: 0,
+          },
+        });
+      } else {
+        setReportData(data.data);
+      }
     } catch (error) {
       console.error('Error fetching suppliers report:', error);
+      // Set empty data on error
+      setReportData({
+        suppliers: [],
+        summary: {
+          totalSuppliers: 0,
+          overallTotalSupplied: 0,
+          overallTotalPaid: 0,
+          overallBalance: 0,
+        },
+      });
     } finally {
       setLoading(false);
     }

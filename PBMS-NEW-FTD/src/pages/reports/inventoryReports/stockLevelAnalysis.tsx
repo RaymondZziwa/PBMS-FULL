@@ -270,7 +270,7 @@ const handleExportPDF = async () => {
                                     {stockItem.item.name}
                                   </td>
                                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    {stockItem.item.category.name}
+                                    {stockItem.item.category?.name || '-'}
                                   </td>
                                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                     <span className="font-semibold">{stockItem.qty}</span>

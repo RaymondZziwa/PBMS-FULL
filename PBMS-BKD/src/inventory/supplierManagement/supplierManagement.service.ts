@@ -182,8 +182,9 @@ export class SupplierService {
         `Store with id ${destinationStoreId} not found`,
       );
 
-    const authorized = (store.authorizedPersonnel as string[]) || [];
-    if (!authorized.includes(recievedBy.toString())) {
+    const authorized = (store.authorizedPersonnel as any[]) || [];
+    const authorizedNumbers = authorized.map(id => Number(id));
+    if (!authorizedNumbers.includes(recievedBy)) {
       throw new ForbiddenException(
         'You are not authorized to perform operations in this store',
       );
@@ -458,7 +459,15 @@ export class SupplierService {
     // 2️⃣ If no suppliers exist
     if (!suppliers || suppliers.length === 0) {
       return {
-        data: [],
+        data: {
+          suppliers: [],
+          summary: {
+            totalSuppliers: 0,
+            overallTotalSupplied: 0,
+            overallTotalPaid: 0,
+            overallBalance: 0,
+          },
+        },
         message: 'No suppliers found in the system',
         status: 200,
       };

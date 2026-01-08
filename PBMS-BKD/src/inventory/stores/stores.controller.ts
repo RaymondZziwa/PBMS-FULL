@@ -20,10 +20,15 @@ export class StoresController {
       branchId: number;
       deptId: number;
       name: string;
-      authorizedPersonnel: string[];
+      authorizedPersonnel: number[];
     },
   ) {
-    return this.storeService.create(data);
+    return this.storeService.create({
+      ...data,
+      branchId: Number(data.branchId),
+      deptId: Number(data.deptId),
+      authorizedPersonnel: data.authorizedPersonnel.map(id => Number(id)),
+    });
   }
 
   @Get('fetch-all')
@@ -44,10 +49,15 @@ export class StoresController {
       branchId: number;
       deptId: number;
       name: string;
-      authorizedPersonnel: string[];
+      authorizedPersonnel: number[];
     },
   ) {
-    return this.storeService.update(Number(id), data);
+    return this.storeService.update(Number(id), {
+      ...data,
+      branchId: data.branchId ? Number(data.branchId) : undefined,
+      deptId: data.deptId ? Number(data.deptId) : undefined,
+      authorizedPersonnel: data.authorizedPersonnel.map(id => Number(id)),
+    });
   }
 
   @Delete('delete/:id')

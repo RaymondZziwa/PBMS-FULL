@@ -11,8 +11,8 @@ export class CreateClientDto {
   lastName: string;
 
   @IsString()
-  @IsNotEmpty()
-  phone: string;
+  @IsOptional()
+  phone?: string;
 
   @IsString()
   @IsOptional()

@@ -482,7 +482,7 @@ model Client {
   id        Int      @id @default(autoincrement())
   firstName String
   lastName  String
-  phone   String   @unique
+  phone   String?   @unique
   address   String?
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())

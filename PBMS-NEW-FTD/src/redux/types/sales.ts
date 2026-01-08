@@ -11,7 +11,7 @@ export interface ISale {
     id: string;
     firstName: string;
     lastName: string;
-    phone: string;
+    phone?: string;
   };
   items: IItem[];
   servedBy: string;
@@ -40,7 +40,7 @@ export interface IClient {
     id: string;
     firstName: string;
     lastName: string;
-    phone: string;
+    phone?: string;
     address?: string;
     updatedAt: Date;
     createdAt: Date;

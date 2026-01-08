@@ -10,7 +10,7 @@ export class StoreService {
     branchId: number;
     deptId: number;
     name: string;
-    authorizedPersonnel: string[];
+    authorizedPersonnel: number[];
   }): Promise<GenericResponse> {
     const store = await this.prismaService.store.create({ data });
     return {
@@ -53,7 +53,7 @@ export class StoreService {
     id: number,
     data: {  branchId?: number;  deptId?: number;
       name?: string;
-      authorizedPersonnel: string[];
+      authorizedPersonnel: number[];
     },
   ): Promise<GenericResponse> {
     const store = await this.prismaService.store.update({
