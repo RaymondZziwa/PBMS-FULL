@@ -11,14 +11,14 @@ import useServices from '../../../hooks/inventory/useServices';
 import Cart from './cart';
 
 interface POSStore {
-  storeId: string;
+  storeId: number;
   storeName: string;
   timestamp: number;
 }
 
 const ServicePointOfSale: React.FC = () => {
-  const store = JSON.parse(localStorage.getItem('posStore') || '{}');
-  const {data: allItems, refresh: getStockLevels} = useStoreInventory(store.storeId);
+  const [selectedStore, setSelectedStore] = useState<number | null>(null);
+  const {data: allItems, refresh: getStockLevels} = useStoreInventory(selectedStore?.toString() || '');
   const [cart, setCart] = useState<ICartItem[]>([]);
   const [showCheckout, setShowCheckout] = useState(false);
   const [filterCategory, setFilterCategory] = useState<string>('all');
@@ -141,7 +141,9 @@ const ServicePointOfSale: React.FC = () => {
         onCompleteSale={() => {
           setCart([]);
           setShowCheckout(false);
-          getStockLevels(store.storeId);
+          if (selectedStore) {
+            getStockLevels(selectedStore.toString());
+          }
         }}
       />
     </div>

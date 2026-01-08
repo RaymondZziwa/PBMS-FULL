@@ -82,7 +82,7 @@ export class ProjectSalesService {
               id: true,
               firstName: true,
               lastName: true,
-              contact: true,
+              phone: true,
             },
           },
           project: {
@@ -178,7 +178,7 @@ export class ProjectSalesService {
                 id: true,
                 firstName: true,
                 lastName: true,
-                contact: true,
+                phone: true,
               },
             },
             project: {
@@ -259,7 +259,7 @@ export class ProjectSalesService {
               id: true,
               firstName: true,
               lastName: true,
-              contact: true,
+              phone: true,
               address: true,
             },
           },

@@ -561,7 +561,7 @@ export class ReportService {
     };
 
     if (storeId) {
-      whereCondition.storeId = storeId;
+      whereCondition.storeId = Number(storeId);
     }
 
     const sales = await this.prisma.sale.findMany({
@@ -670,7 +670,7 @@ export class ReportService {
     }
 
     if (storeId) {
-      whereCondition.storeId = storeId;
+      whereCondition.storeId = Number(storeId);
     }
 
     const sales = await this.prisma.sale.findMany({
@@ -918,7 +918,7 @@ export class ReportService {
         const itemTotal = itemPrice * itemQuantity;
 
         // If filtering by serviceId, skip non-matching items
-        if (serviceId && itemServiceId !== serviceId) {
+        if (serviceId && itemServiceId !== Number(serviceId)) {
           return;
         }
 
@@ -958,7 +958,7 @@ export class ReportService {
     const filteredSales = serviceId
       ? processedSales.filter((sale) =>
           sale.items.some(
-            (item: any) => (item.serviceId || item.id) === serviceId,
+            (item: any) => (item.serviceId || item.id) === Number(serviceId),
           ),
         )
       : processedSales;
@@ -1016,6 +1016,53 @@ export class ReportService {
         service: serviceId ? servicePerformance[serviceId] || null : null,
       },
       message: 'Massage service sales fetched successfully',
+    };
+  }
+
+  // Get Massage Services List
+  async getMassageServicesList() {
+    // Get all massage sales to extract unique services
+    const massageSales = await this.prisma.massageSales.findMany({
+      select: {
+        items: true,
+      },
+    });
+
+    const servicesMap = new Map();
+
+    // Extract unique services from all sales
+    massageSales.forEach((sale) => {
+      try {
+        const items = Array.isArray(sale.items)
+          ? sale.items
+          : JSON.parse(sale.items as any);
+
+        items.forEach((item: any) => {
+          const serviceId = item.serviceId || item.id;
+          const serviceName = item.serviceName || item.name || 'Unknown Service';
+          const servicePrice = Number(item.price || 0);
+
+          if (!servicesMap.has(serviceId)) {
+            servicesMap.set(serviceId, {
+              id: serviceId,
+              name: serviceName.trim(),
+              price: servicePrice,
+            });
+          }
+        });
+      } catch (error) {
+        console.error('Error parsing massage sale items:', error);
+      }
+    });
+
+    const services = Array.from(servicesMap.values()).sort((a, b) =>
+      a.name.localeCompare(b.name)
+    );
+
+    return {
+      status: 200,
+      data: services,
+      message: 'Massage services list fetched successfully',
     };
   }
 

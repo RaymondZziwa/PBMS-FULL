@@ -37,6 +37,10 @@ export class StoreService {
   async findOne(id: number): Promise<GenericResponse> {
     const store = await this.prismaService.store.findUnique({
       where: { id },
+      include: {
+        branch: true,
+        dept: true,
+      },
     });
     return {
       status: 200,

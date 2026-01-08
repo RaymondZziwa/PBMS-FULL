@@ -13,6 +13,7 @@ interface ItemsGridProps {
   onBarcodeScan: (barcode: string) => void;
   stores: IStore[];
   activeStore: string;
+  onStoreChange?: (storeId: number, storeName: string) => void;
 }
 
 const ItemsGrid: React.FC<ItemsGridProps> = ({
@@ -23,6 +24,7 @@ const ItemsGrid: React.FC<ItemsGridProps> = ({
   onBarcodeScan,
   stores,
   activeStore,
+  onStoreChange,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -62,7 +64,7 @@ const ItemsGrid: React.FC<ItemsGridProps> = ({
 
   // Handle store change
   const handleStoreChange = (newStoreId: string) => {
-    const selected = stores.find(s => s.id === newStoreId);
+    const selected = stores.find(s => s.id.toString() === newStoreId);
     if (!selected) return;
     setSelectedStore(newStoreId);
 
@@ -72,6 +74,11 @@ const ItemsGrid: React.FC<ItemsGridProps> = ({
       timestamp: Date.now(),
     };
     localStorage.setItem('posStore', JSON.stringify(storeData));
+
+    // Notify parent component of store change
+    if (onStoreChange) {
+      onStoreChange(selected.id, selected.name);
+    }
     toast.success(`Active store changed to ${selected.name}`);
     window.location.reload(); // reload to refetch stock for the new store
   };
@@ -116,7 +123,7 @@ const ItemsGrid: React.FC<ItemsGridProps> = ({
             <FaStore className="text-gray-600" />
             <CustomDropdown
               options={stores.map(store => ({
-                value: store.id,
+                value: store.id.toString(),
                 label: store.name,
               }))}
               value={[selectedStore]}

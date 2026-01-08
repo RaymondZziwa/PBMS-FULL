@@ -24,7 +24,7 @@ const AddOrModifyClient: React.FC<AddOrModifyClientProps> = ({
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
-    contact: '',
+    phone: '',
     address: '',
   });
 
@@ -33,14 +33,14 @@ const AddOrModifyClient: React.FC<AddOrModifyClientProps> = ({
       setFormData({
         firstName: client.firstName || '',
         lastName: client.lastName || '',
-        contact: client.contact || '',
+        phone: client.phone || '',
         address: client.address || '',
       });
     } else {
       setFormData({
         firstName: '',
         lastName: '',
-        contact: '',
+        phone: '',
         address: '',
       });
     }
@@ -49,7 +49,7 @@ const AddOrModifyClient: React.FC<AddOrModifyClientProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.firstName || !formData.lastName || !formData.contact) {
+    if (!formData.firstName || !formData.lastName || !formData.phone) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -58,7 +58,7 @@ const AddOrModifyClient: React.FC<AddOrModifyClientProps> = ({
       const payload = {
         firstName: formData.firstName,
         lastName: formData.lastName,
-        contact: formData.contact,
+        phone: formData.phone,
         address: formData.address || undefined,
       };
 
@@ -71,7 +71,7 @@ const AddOrModifyClient: React.FC<AddOrModifyClientProps> = ({
        setFormData({
         firstName: '',
         lastName: '',
-        contact: '',
+        phone: '',
         address: '',
       });
       refreshClients();
@@ -117,16 +117,16 @@ const AddOrModifyClient: React.FC<AddOrModifyClientProps> = ({
             />
           </div>
 
-          {/* Contact */}
+          {/* phone */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Contact *
+              Phone *
             </label>
             <CustomTextInput
               type="text"
-              value={formData.contact}
-              onChange={(val) => setFormData(prev => ({ ...prev, contact: val }))}
-              placeholder="Enter contact information"
+              value={formData.phone}
+              onChange={(val) => setFormData(prev => ({ ...prev, phone: val }))}
+              placeholder="Enter phone information"
             />
           </div>
 

@@ -145,13 +145,13 @@ const CollectCreditPaymentModal: React.FC<CollectCreditPaymentModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
+      <div className="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="flex justify-between items-center p-6 border-b">
+        <div className="flex justify-between items-center p-6 border-b flex-shrink-0">
           <div>
             <h2 className="text-2xl font-bold text-gray-800">Collect Credit Payment</h2>
             <p className="text-sm text-gray-600 mt-1">
-              Sale #{sale.saleNumber || sale.id.slice(-8)}
+              Sale #{sale.saleNumber || sale.id.toString().slice(-8)}
             </p>
           </div>
           <button
@@ -163,7 +163,7 @@ const CollectCreditPaymentModal: React.FC<CollectCreditPaymentModalProps> = ({
           </button>
         </div>
 
-        <div className="overflow-auto max-h-[70vh] p-6">
+        <div className="overflow-auto p-6 flex-1">
           <div className="space-y-6">
             {/* Sale Information */}
             <div className="bg-gray-50 p-4 rounded-lg border">
@@ -177,12 +177,12 @@ const CollectCreditPaymentModal: React.FC<CollectCreditPaymentModalProps> = ({
                 </div>
                 <div>
                   <span className="text-gray-600">Total Due:</span>
-                  <p className="font-medium">{sale.total?.toLocaleString()} UGX</p>
+                  <p className="font-medium">{(sale.total || 0).toLocaleString()} UGX</p>
                 </div>
                 <div>
                   <span className="text-gray-600">Paid So Far:</span>
                   <p className="font-medium text-green-600">
-                    {(Number(sale.total) - Number(sale.balance)).toLocaleString()} UGX
+                    {(Number(sale.total || 0) - Number(sale.balance || 0)).toLocaleString()} UGX
                   </p>
                 </div>
                 <div>
@@ -226,7 +226,7 @@ const CollectCreditPaymentModal: React.FC<CollectCreditPaymentModalProps> = ({
 
                       <CustomTextInput
                         type="number"
-                        value={method.amount.toString()}
+                        value={(method.amount || 0).toString()}
                         onChange={(value) => handlePaymentMethodChange(index, 'amount', parseFloat(value) || 0)}
                         placeholder="Enter amount"
                         min="0"
@@ -316,7 +316,7 @@ const CollectCreditPaymentModal: React.FC<CollectCreditPaymentModalProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="flex justify-end gap-3 p-6 border-t bg-gray-50">
+        <div className="flex justify-end gap-3 p-6 border-t bg-gray-50 flex-shrink-0">
           <CustomButton
             type="negative"
             label="Cancel"

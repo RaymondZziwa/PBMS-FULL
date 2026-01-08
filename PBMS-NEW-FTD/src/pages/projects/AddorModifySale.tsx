@@ -281,7 +281,7 @@ const AddOrModifyProjectSale: React.FC<AddOrModifyProjectSaleProps> = ({
               </label>
               <CustomDropdown
                 options={clients?.map(client => ({
-                  label: `${client.firstName} ${client.lastName} - ${client.contact}`,
+                  label: `${client.firstName} ${client.lastName} - ${client.phone}`,
                   value: client.id
                 })) || []}
                 value={formData.clientId ? [formData.clientId] : []}

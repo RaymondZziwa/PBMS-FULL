@@ -10,45 +10,45 @@ import type { IClient } from '../../../redux/types/sales';
 import { formatDate } from '../../../libs/dateFormatter';
 
 interface ProjectPurchase {
-  id: string;
-  clientId: string;
-  projectId: string;
+  id: number;
+  clientId: number;
+  projectId: number;
   status: string;
-  saleTotal: string;
-  downPayment: string;
+  saleTotal: number;
+  downPayment: number;
   numberOfInstallments: number;
-  installmentAmount: string;
+  installmentAmount: number;
   deliveryNoteImage: string | null;
-  cashierId: string;
+  cashierId: number;
   updatedAt: string;
   createdAt: string;
   client: {
-    id: string;
+    id: number;
     firstName: string;
     lastName: string;
-    contact: string;
+    phone: string;
   };
   project: {
-    id: string;
+    id: number;
     name: string;
-    price: string;
+    price: number;
   };
   employee: {
-    id: string;
+    id: number;
     firstName: string;
     lastName: string;
   };
   ProjectPayments: Array<{
-    id: string;
-    saleId: string;
-    amount: string;
-    exhibitionId: string;
+    id: number;
+    saleId: number;
+    amount: number;
+    exhibitionId: number | null;
     paymentMethod: string;
     referenceId: string | null;
     notes: string | null;
     receiptImage: string | null;
     bankDepositSlipImage: string | null;
-    cashierId: string;
+    cashierId: number;
     updatedAt: string;
     createdAt: string;
     employee: {
@@ -59,64 +59,31 @@ interface ProjectPurchase {
 }
 
 interface ShopPurchase {
-  id: string;
-  clientId: string;
-  items: Array<{
-    id: string;
-    categoryId: string;
-    name: string;
-    price: string;
-    barcode: string | null;
-    updatedAt: string;
-    createdAt: string;
-    category: {
-      id: string;
-      name: string;
-      updatedAt: string;
-      createdAt: string;
-    };
-    quantity: number;
-    discount: number;
-    total: number;
-  }>;
-  servedBy: string;
-  storeId: string;
+  id: number;
+  clientId: number | null;
+  items: any[]; // JSON field from database
+  servedBy: number;
+  storeId: number;
   status: string;
-  total: string;
-  balance: string;
-  paymentMethods: Array<{
-    type: string;
-    amount: number;
-  }>;
-  notes: string;
+  total: number;
+  balance: number;
+  paymentMethods: any[]; // JSON field from database
+  notes: string | null;
   updatedAt: string;
   createdAt: string;
   store: {
-    id: string;
+    id: number;
     name: string;
-    branchId: string;
-    deptId: string;
-    authorizedPersonnel: string[];
+    branchId: number | null;
+    deptId: number | null;
+    authorizedPersonnel: number[];
     updatedAt: string;
     createdAt: string;
   };
   employee: {
-    id: string;
+    id: number;
     firstName: string;
     lastName: string;
-    gender: string;
-    email: string;
-    tel: string;
-    password: string;
-    salary: string;
-    hasAccess: boolean;
-    isActive: boolean;
-    profileImage: string | null;
-    roleId: string;
-    branchId: string;
-    deptId: string | null;
-    updatedAt: string;
-    createdAt: string;
   };
 }
 
@@ -136,13 +103,6 @@ const ClientPurchases: React.FC = () => {
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
   const [selectedPayment, setSelectedPayment] = useState<ProjectPurchase['ProjectPayments'][0] | null>(null);
 
-  // Debug logging
-  useEffect(() => {
-    console.log('Selected Client ID:', selectedClientId);
-    console.log('Selected Client:', selectedClient);
-    console.log('Clients data:', clients);
-    console.log('Clients loading:', clientsLoading);
-  }, [selectedClientId, selectedClient, clients, clientsLoading]);
 
   // Fetch purchases when client ID changes
   useEffect(() => {
@@ -156,18 +116,15 @@ const ClientPurchases: React.FC = () => {
   }, [selectedClientId]);
 
   const fetchClientPurchases = async (clientId: string) => {
-    console.log('Starting to fetch purchases for client:', clientId);
     setLoading(true);
     try {
       const response = await apiRequest(
         `/api/clients/fetch-purchases/${clientId}`,
         "GET"
       );
-      console.log('Purchase response received:', response);
       setPurchases(response.data);
       toast.success('Client purchases loaded successfully');
     } catch (error: any) {
-      console.log('Error fetching purchases:', error);
       const errorMessage = error?.response?.data?.message || 'Failed to fetch client purchases';
       toast.error(errorMessage);
       setPurchases(null);
@@ -178,35 +135,42 @@ const ClientPurchases: React.FC = () => {
 
   // Handle client selection
   const handleClientSelect = (selectedValues: string[]) => {
-    console.log('Dropdown selected values:', selectedValues);
     const clientId = selectedValues[0];
-    
+
     if (clientId && clientId.trim() !== '') {
       setSelectedClientId(clientId);
       // Find and set the full client object
-      const client = clients?.find(c => c.id === clientId) || null;
+      const client = clients?.find(c => c.id.toString() === clientId) || null;
       setSelectedClient(client);
-      console.log('Setting client:', client);
     } else {
-      console.log('Clearing client selection');
       setSelectedClientId('');
       setSelectedClient(null);
     }
   };
 
   // Calculate totals
-  const projectTotal = purchases?.projectPurchases?.reduce((sum, purchase) => 
-    sum + parseInt(purchase.saleTotal || '0'), 0) || 0;
+  const projectTotal = purchases?.projectPurchases?.reduce((sum, purchase) => {
+    const saleTotal = typeof purchase.saleTotal === 'string' ? parseFloat(purchase.saleTotal) : (purchase.saleTotal || 0);
+    return sum + saleTotal;
+  }, 0) || 0;
 
-  const shopTotal = purchases?.shopPurchases?.reduce((sum, purchase) => 
-    sum + parseInt(purchase.total || '0'), 0) || 0;
+  const shopTotal = purchases?.shopPurchases?.reduce((sum, purchase) => {
+    const total = typeof purchase.total === 'string' ? parseFloat(purchase.total) : (purchase.total || 0);
+    return sum + total;
+  }, 0) || 0;
 
-  const totalPaidProjects = purchases?.projectPurchases?.reduce((sum, purchase) => 
-    sum + (purchase.ProjectPayments?.reduce((paymentSum, payment) => 
-      paymentSum + parseInt(payment.amount || '0'), 0) || 0), 0) || 0;
+  const totalPaidProjects = purchases?.projectPurchases?.reduce((sum, purchase) =>
+    sum + (purchase.ProjectPayments?.reduce((paymentSum, payment) => {
+      const amount = typeof payment.amount === 'string' ? parseFloat(payment.amount) : (payment.amount || 0);
+      return paymentSum + amount;
+    }, 0) || 0), 0) || 0;
 
-  const totalPaidShop = purchases?.shopPurchases?.reduce((sum, purchase) => 
-    sum + (parseInt(purchase.total || '0') - parseInt(purchase.balance || '0')), 0) || 0;
+  const totalPaidShop = purchases?.shopPurchases?.reduce((sum, purchase) => {
+    const total = typeof purchase.total === 'string' ? parseFloat(purchase.total) : (purchase.total || 0);
+    const balance = typeof purchase.balance === 'string' ? parseFloat(purchase.balance) : (purchase.balance || 0);
+    return sum + (total - balance);
+  }, 0) || 0;
+
 
   // Project Purchases Columns
   const projectColumns = [
@@ -240,7 +204,10 @@ const ClientPurchases: React.FC = () => {
       label: 'Total (UGX)',
       sortable: true,
       filterable: true,
-      render: (value: string) => `${parseInt(value || '0').toLocaleString()} UGX`
+      render: (value: any) => {
+        const numValue = typeof value === 'string' ? parseFloat(value) : (value || 0);
+        return `${numValue.toLocaleString()} UGX`;
+      }
     },
     {
       key: 'paidAmount',
@@ -248,7 +215,10 @@ const ClientPurchases: React.FC = () => {
       sortable: true,
       filterable: true,
       render: (value: any, row: ProjectPurchase) => {
-        const paid = row.ProjectPayments?.reduce((sum, payment) => sum + parseInt(payment.amount || '0'), 0) || 0;
+        const paid = row.ProjectPayments?.reduce((sum, payment) => {
+          const amount = typeof payment.amount === 'string' ? parseFloat(payment.amount) : (payment.amount || 0);
+          return sum + amount;
+        }, 0) || 0;
         return `${paid.toLocaleString()} UGX`;
       }
     },
@@ -258,8 +228,12 @@ const ClientPurchases: React.FC = () => {
       sortable: true,
       filterable: true,
       render: (value: any, row: ProjectPurchase) => {
-        const paid = row.ProjectPayments?.reduce((sum, payment) => sum + parseInt(payment.amount || '0'), 0) || 0;
-        const balance = parseInt(row.saleTotal || '0') - paid;
+        const saleTotal = typeof row.saleTotal === 'string' ? parseFloat(row.saleTotal) : (row.saleTotal || 0);
+        const paid = row.ProjectPayments?.reduce((sum, payment) => {
+          const amount = typeof payment.amount === 'string' ? parseFloat(payment.amount) : (payment.amount || 0);
+          return sum + amount;
+        }, 0) || 0;
+        const balance = saleTotal - paid;
         return `${balance.toLocaleString()} UGX`;
       }
     },
@@ -329,7 +303,7 @@ const ClientPurchases: React.FC = () => {
         <div>
           {row.items?.map((item, index) => (
             <div key={item.id} className="text-sm">
-              {item.quantity}x {item.name} - {parseInt(item.price || '0').toLocaleString()} UGX
+              {item.quantity}x {item.name} - {(parseFloat(item.price || '0') || 0).toLocaleString()} UGX
             </div>
           )) || []}
         </div>
@@ -340,14 +314,20 @@ const ClientPurchases: React.FC = () => {
       label: 'Total (UGX)',
       sortable: true,
       filterable: true,
-      render: (value: string) => `${parseInt(value || '0').toLocaleString()} UGX`
+      render: (value: any) => {
+        const numValue = typeof value === 'string' ? parseFloat(value) : (value || 0);
+        return `${numValue.toLocaleString()} UGX`;
+      }
     },
     {
       key: 'balance',
       label: 'Balance (UGX)',
       sortable: true,
       filterable: true,
-      render: (value: string) => `${parseInt(value || '0').toLocaleString()} UGX`
+      render: (value: any) => {
+        const numValue = typeof value === 'string' ? parseFloat(value) : (value || 0);
+        return `${numValue.toLocaleString()} UGX`;
+      }
     },
     {
       key: 'status',
@@ -431,8 +411,8 @@ const ClientPurchases: React.FC = () => {
             </label>
             <CustomDropdown
               options={clients?.map((client: IClient) => ({
-                label: `${client.firstName} ${client.lastName} (${client.contact})`,
-                value: client.id
+                label: `${client.firstName} ${client.lastName} (${client.phone})`,
+                value: client.id.toString()
               })) || []}
               value={selectedClientId ? [selectedClientId] : []}
               onChange={handleClientSelect}
@@ -447,7 +427,7 @@ const ClientPurchases: React.FC = () => {
               <h3 className="font-medium text-gray-800">
                 {selectedClient.firstName} {selectedClient.lastName}
               </h3>
-              <p className="text-sm text-gray-600">{selectedClient.contact}</p>
+              <p className="text-sm text-gray-600">{selectedClient.phone}</p>
               <p className="text-xs text-gray-500">Client ID: {selectedClient.id}</p>
             </div>
           )}

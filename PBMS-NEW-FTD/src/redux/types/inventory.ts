@@ -20,7 +20,7 @@ export interface IItem {
 }
 
 export interface IStore {
-    id: string;
+    id: number;
     name: string;
     branch: IBranch;
     dept: IDepartment;

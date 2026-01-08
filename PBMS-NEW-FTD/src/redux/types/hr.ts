@@ -1,7 +1,7 @@
 import type { IBranch, IRole } from "./systemSettings";
 
 export interface IDepartment {
-    id: string;
+    id: number;
     name: string;
     branchId: string;
     branch: IBranch;
@@ -9,7 +9,7 @@ export interface IDepartment {
 }
 
 export interface IEmployee {
-    id: string;
+    id: number;
     firstName: string;
     lastName: string;
     gender: "MALE" | "FEMALE";
@@ -32,7 +32,7 @@ export interface IEmployee {
 }
 
 export interface IAttendance {
-    id: string;
+    id: number;
     employeeId: string;
     employee: IEmployee;
     date: string;
@@ -44,7 +44,7 @@ export interface IAttendance {
 }
 
 export interface IPayrollPeriod {
-  id: string;
+    id: number;
   startDate: string;
   endDate: string;
     payDate: string;
@@ -54,7 +54,7 @@ export interface IPayrollPeriod {
 }
 
 export interface IPayrollDetail {
-  id: string;
+    id: number;
   payrollPeriodId: string;
   employeeId: string;
   baseSalary: number;
@@ -70,7 +70,7 @@ export interface IPayrollDetail {
 }
 
 export interface IPayrollEmployee {
-  id: string;
+    id: number;
   firstName: string;
   lastName: string;
   branch: string;

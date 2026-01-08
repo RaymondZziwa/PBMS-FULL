@@ -10,6 +10,11 @@ const useStoreInventory = (id: string) => {
   //const { token, isFetchingLocalToken } = useAuth();
 
   const fetchDataFromApi = async (id: string) => {
+    // Don't fetch if no store ID provided
+    if (!id || id.trim() === '') {
+      return;
+    }
+
     //if (isFetchingLocalToken || !token?.access_token) return;
 
     dispatch(fetchDataStart());
@@ -37,7 +42,9 @@ const useStoreInventory = (id: string) => {
   };
 
   useEffect(()=> {
-    fetchDataFromApi(id)
+    if (id && id.trim() !== '') {
+      fetchDataFromApi(id);
+    }
   }, [id])
 
 

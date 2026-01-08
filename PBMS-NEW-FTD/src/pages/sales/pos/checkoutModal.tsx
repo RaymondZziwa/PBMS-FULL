@@ -42,7 +42,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [selectedCustomer, setSelectedCustomer] = useState<string>('');
   const [paymentStatus, setPaymentStatus] = useState<'FULLY_PAID' | 'UNPAID' | 'PARTIALLY_PAID'>('FULLY_PAID');
   const [paymentMethods, setPaymentMethods] = useState<IPaymentMethod[]>([
-    { type: 'CASH', amount: total }
+    { type: 'CASH' as const, amount: total }
   ]);
   const [notes, setNotes] = useState('');
   const [amountPaid, setAmountPaid] = useState(total);
@@ -66,11 +66,11 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const balance = total - amountPaid;
 
   // Get selected customer name for receipt
-  const selectedCustomerName = selectedCustomer 
-    ? clients?.find(c => c.id === selectedCustomer) 
-      ? `${clients.find(c => c.id === selectedCustomer)?.firstName} ${clients.find(c => c.id === selectedCustomer)?.lastName}`
-      : 'Walk-in Customer'
-    : 'Walk-in Customer';
+  const selectedCustomerName = (() => {
+    if (!selectedCustomer || !clients) return 'Walk-in Customer';
+    const client = clients.find(c => c.id === selectedCustomer);
+    return client ? `${client.firstName || ''} ${client.lastName || ''}` : 'Walk-in Customer';
+  })();
 
   // Format payment method for receipt
   const getPaymentMethodForReceipt = () => {
@@ -121,7 +121,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       toast.error('Maximum of 3 payment methods allowed');
       return;
     }
-    setPaymentMethods(prev => [...prev, { type: 'CASH', amount: 0 }]);
+    setPaymentMethods(prev => [...prev, { type: 'CASH' as const, amount: 0 }]);
   };
 
   const removePaymentMethod = (index: number) => {
@@ -176,30 +176,61 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       return;
     }
 
-    const checkoutData: ICheckoutData = {
-      customerId: selectedCustomer || undefined,
+    const storeId = (() => {
+      try {
+        const storedStore = localStorage.getItem('posStore');
+        return storedStore ? JSON.parse(storedStore).storeId : null;
+      } catch (error) {
+        console.error('Error reading store data from localStorage:', error);
+        return null;
+      }
+    })();
+
+    if (!storeId) {
+      toast.error('Store information not found. Please select a store.');
+      return;
+    }
+
+    const checkoutData = {
+      customerId: selectedCustomer ? Number(selectedCustomer) : undefined,
       status: paymentStatus,
-      paymentMethods: paymentStatus === 'UNPAID' ? [] : paymentMethods.filter(method => method.amount > 0),
+      paymentMethods: paymentStatus === 'UNPAID' ? [] : paymentMethods.filter(method => method.amount > 0).map(method => ({
+        type: method.type,
+        amount: method.amount
+      })),
       notes,
       total,
       balance,
-      items: cart,
-      storeId: localStorage.getItem('posStore') ? JSON.parse(localStorage.getItem('posStore')!).storeId : '',
-      servedBy: user.id
+      items: cart.map(item => ({
+        id: Number(item.id || 0),
+        categoryId: Number(item.category?.id || 0),
+        name: item.name || '',
+        price: (item.price || 0).toString(),
+        barcode: (item.barcode || '').toString(),
+        category: {
+          id: Number(item.category?.id || 0),
+          name: item.category?.name || ''
+        },
+        quantity: item.quantity || 0,
+        discount: item.discount || 0,
+        total: item.total || 0
+      })),
+      storeId: Number(storeId),
+      servedBy: user?.id ? Number(user.id) : 0
     };
 
     if (!checkoutData.customerId) {
-          toast.error('Please select a customer')
-          return;
+      toast.error('Please select a customer');
+      return;
     }
 
     try {
       await apiRequest(SALESENDPOINTS.POS.complete_sale, 'POST', '', checkoutData);
-      
+
       setSelectedCustomer('');
       setPaymentStatus('FULLY_PAID');
-        handlePrint();
-      
+      handlePrint();
+
       onCompleteSale();
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'An error occurred while processing the sale.');
@@ -207,6 +238,12 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   };
 
   if (!visible) return null;
+
+  if (!user) {
+    console.error('CheckoutModal: user data not available');
+    return null;
+  }
+
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -236,7 +273,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     options={[
                       ...(clients?.map(client => ({
                         value: client.id,
-                        label: `${client.firstName} ${client.lastName} - ${client.contact}`
+                        label: `${client.firstName || ''} ${client.lastName || ''} - ${client.phone || ''}`
                       })) || [])
                     ]}
                     value={[selectedCustomer]}
@@ -502,8 +539,8 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
               status={paymentStatus}
               amountPaid={amountPaid}
               balance={balance}
-              branch={user.branch.name}
-              department={user.dept.name}
+              branch={user.branch?.name || 'Unknown Branch'}
+              department={user.department?.name || 'Unknown Department'}
               user={user.lastName}
               paymentMethod={getPaymentMethodForReceipt()}
               transactionId={getTransactionIdForReceipt()}
@@ -511,13 +548,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
           </div>
         </div>
       </div>
-      
-      {/* Add Client Modal */}
-      <AddOrModifyClient
-        visible={modalProps.isOpen}
-        client={modalProps.client}
-        onCancel={() => setModalProps({ isOpen: false, mode: 'create', client: null })}
-      />
     </div>
   );
 };

@@ -12,48 +12,59 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '../../../redux/store';
 
 interface POSStore {
-  storeId: string;
+  storeId: number;
   storeName: string;
   timestamp: number;
 }
 
 const PointOfSale: React.FC = () => {
   const { data: stores } = useStores();
-  const store = JSON.parse(localStorage.getItem('posStore') || '{}');
-  const {data: allItems, refresh: getStockLevels} = useStoreInventory(store.storeId);
-  const [selectedStore, setSelectedStore] = useState<string | null>(null);
+  const [selectedStore, setSelectedStore] = useState<number | null>(null);
+  const {data: allItems, refresh: getStockLevels} = useStoreInventory(selectedStore?.toString() || '');
   const [showStoreModal, setShowStoreModal] = useState(false);
   const [cart, setCart] = useState<ICartItem[]>([]);
   const [showCheckout, setShowCheckout] = useState(false);
   const [filterCategory, setFilterCategory] = useState<string>('all');
     const user = useSelector((state: RootState) => state.userAuth.data);
 
-  const currentUserId = user.id;
+  const currentUserId = user?.id;
 
-  const userStores = stores.filter(store =>
-    store.authorizedPersonnel.includes(currentUserId)
-  );
+  const userStores = stores?.filter(store =>
+    store.authorizedPersonnel?.includes(Number(currentUserId))
+  ) || [];
 
   useEffect(() => {
     // Check for stored store selection
-    const storedStore = localStorage.getItem('posStore');
-    if (storedStore) {
-      const storeData: POSStore = JSON.parse(storedStore);
-      // Check if store selection is less than 24 hours old
-      if (Date.now() - storeData.timestamp < 24 * 60 * 60 * 1000) {
-        setSelectedStore(storeData.storeId);
+    try {
+      const storedStore = localStorage.getItem('posStore');
+      if (storedStore) {
+        const storeData: POSStore = JSON.parse(storedStore);
+        // Check if store selection is less than 24 hours old
+        if (Date.now() - storeData.timestamp < 24 * 60 * 60 * 1000) {
+          setSelectedStore(storeData.storeId);
+        } else {
+          localStorage.removeItem('posStore');
+          setShowStoreModal(true);
+        }
       } else {
-        localStorage.removeItem('posStore');
         setShowStoreModal(true);
       }
-    } else {
+    } catch (error) {
+      // If stored data is corrupted, clear it and show store modal
+      localStorage.removeItem('posStore');
       setShowStoreModal(true);
     }
 
     // Load cart from localStorage
-    const savedCart = localStorage.getItem('posCart');
-    if (savedCart) {
-      setCart(JSON.parse(savedCart));
+    try {
+      const savedCart = localStorage.getItem('posCart');
+      if (savedCart) {
+        setCart(JSON.parse(savedCart));
+      }
+    } catch (error) {
+      // If cart data is corrupted, clear it
+      localStorage.removeItem('posCart');
+      setCart([]);
     }
   }, []);
 
@@ -63,12 +74,12 @@ const PointOfSale: React.FC = () => {
 
   const handleStoreSelect = (storeId: string, storeName: string) => {
     const storeData: POSStore = {
-      storeId,
+      storeId: Number(storeId),
       storeName,
       timestamp: Date.now()
     };
     localStorage.setItem('posStore', JSON.stringify(storeData));
-    setSelectedStore(storeId);
+    setSelectedStore(Number(storeId));
     setShowStoreModal(false);
     toast.success(`Store set to ${storeName}`);
   };
@@ -160,14 +171,18 @@ const PointOfSale: React.FC = () => {
       {/* Items Section - 70% */}
       <div className="w-3/4 p-4">
         <ItemsGrid
-          items={allItems.filter((item) => item.item.showInPos === true) || []}
-          selectedStore={selectedStore}
+          items={(allItems || []).filter((item) => item.item.showInPos === true)}
+          selectedStore={selectedStore?.toString() || ''}
           filterCategory={filterCategory}
           onCategoryChange={setFilterCategory}
           onAddToCart={handleAddToCart}
           onBarcodeScan={handleBarcodeScan}
           stores={userStores}
-          activeStore={selectedStore}
+          activeStore={selectedStore?.toString() || ''}
+          onStoreChange={(storeId, storeName) => {
+            setSelectedStore(storeId);
+            toast.success(`Store changed to ${storeName}`);
+          }}
         />
       </div>
 
@@ -192,7 +207,9 @@ const PointOfSale: React.FC = () => {
         onCompleteSale={() => {
           setCart([]);
           setShowCheckout(false);
-          getStockLevels(store.storeId);
+          if (selectedStore) {
+            getStockLevels(selectedStore.toString());
+          }
         }}
       />
     </div>

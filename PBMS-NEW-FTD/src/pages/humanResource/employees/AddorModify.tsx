@@ -57,9 +57,9 @@ const AddorModifyEmployee: React.FC<AddorModifyEmployeeProps> = ({
         hasAccess: Employee.hasAccess || false,
         hasPrescriptionAccess: Employee.hasPrescriptionAccess || false,
         isActive: Employee.isActive !== undefined ? Employee.isActive : true,
-        roleId: Employee.roleId || '',
-        branchId: Employee.branchId || '',
-        deptId: Employee.deptId || ''
+        roleId: Employee.roleId?.toString() || '',
+        branchId: Employee.branchId?.toString() || '',
+        deptId: Employee.deptId?.toString() || ''
       });
     } else {
       // Reset form for new employee
@@ -121,12 +121,12 @@ const AddorModifyEmployee: React.FC<AddorModifyEmployeeProps> = ({
       toast.error("Please enter employee email");
       return;
     }
-     if (!formData.deptId.trim()) {
+     if (!formData.deptId || (typeof formData.deptId === 'string' && !formData.deptId.trim())) {
       toast.error("Please assign a department to the new employee");
       return;
      }
-    
-     if (!formData.branchId.trim()) {
+
+     if (!formData.branchId || (typeof formData.branchId === 'string' && !formData.branchId.trim())) {
       toast.error("Please assign the new employee to a branch");
       return;
     }
@@ -156,9 +156,9 @@ const AddorModifyEmployee: React.FC<AddorModifyEmployeeProps> = ({
         hasAccess: formData.hasAccess,
         hasPrescriptionAccess: formData.hasPrescriptionAccess,
         isActive: formData.isActive,
-        roleId: formData.roleId,
-        branchId: formData.branchId || undefined, // Optional field
-        deptId: formData.deptId || undefined // Optional field
+        roleId: Number(formData.roleId),
+        branchId: formData.branchId ? Number(formData.branchId) : undefined, // Optional field
+        deptId: formData.deptId ? Number(formData.deptId) : undefined // Optional field
       };
 
       // Remove password field if editing and password is empty (not changing password)
@@ -291,7 +291,7 @@ const AddorModifyEmployee: React.FC<AddorModifyEmployeeProps> = ({
                 <CustomDropdown
                   options={roles?.map(role => ({
                     label: role.name,
-                    value: role.id
+                    value: role.id.toString()
                   })) || []}
                   value={formData.roleId ? [formData.roleId] : []}
                   onChange={handleDropdownChange('roleId')}
@@ -307,7 +307,7 @@ const AddorModifyEmployee: React.FC<AddorModifyEmployeeProps> = ({
                 <CustomDropdown
                   options={departments?.map(dept => ({
                     label: `${dept.name} - ${dept.branch.name}`,
-                    value: dept.id
+                    value: dept.id.toString()
                   })) || []}
                   value={formData.deptId ? [formData.deptId] : []}
                   onChange={handleDropdownChange('deptId')}
@@ -323,7 +323,7 @@ const AddorModifyEmployee: React.FC<AddorModifyEmployeeProps> = ({
                 <CustomDropdown
                   options={branches?.map(branch => ({
                     label: branch.name,
-                    value: branch.id
+                    value: branch.id.toString()
                   })) || []}
                   value={formData.branchId ? [formData.branchId] : []}
                   onChange={handleDropdownChange('branchId')}

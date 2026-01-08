@@ -41,12 +41,12 @@ export class StockMovementService {
 
     // 1. Validate store and authorization
     const store = await this.prisma.store.findUnique({
-      where: { id: storeId },
+      where: { id: Number(storeId) },
     });
     if (!store) throw new NotFoundException('Store not found');
 
     const authorized = (store.authorizedPersonnel as string[]) || [];
-    if (!authorized.includes(employeeId.toString())) {
+    if (!authorized.includes(Number(employeeId).toString())) {
       throw new ForbiddenException(
         'You are not authorized to perform operations in this store',
       );
@@ -54,7 +54,7 @@ export class StockMovementService {
 
     // 2. Handle inventory logic and calculate remaining quantity
     let productInventory = await this.prisma.productInventory.findFirst({
-      where: { itemId, storeId, unitId },
+      where: { itemId: Number(itemId), storeId: Number(storeId), unitId: Number(unitId) },
     });
 
     let remainingQuantity = 0;
@@ -63,7 +63,7 @@ export class StockMovementService {
       case InventoryRecordCategory.RESTOCK:
         if (!productInventory) {
           productInventory = await this.prisma.productInventory.create({
-            data: { itemId, storeId, unitId, qty },
+            data: { itemId: Number(itemId), storeId: Number(storeId), unitId: Number(unitId), qty },
           });
           remainingQuantity = qty;
         } else {
@@ -94,7 +94,7 @@ export class StockMovementService {
       case InventoryRecordCategory.ADJUSTMENT:
         if (!productInventory) {
           productInventory = await this.prisma.productInventory.create({
-            data: { itemId, storeId, unitId, qty },
+            data: { itemId: Number(itemId), storeId: Number(storeId), unitId: Number(unitId), qty },
           });
           remainingQuantity = qty;
         } else {
@@ -124,19 +124,19 @@ export class StockMovementService {
 
         await this.prisma.inventoryRecord.create({
           data: {
-            itemId,
-            storeId,
-            toStoreId,
-            unitId,
+            itemId: Number(itemId),
+            storeId: Number(storeId),
+            toStoreId: Number(toStoreId),
+            unitId: Number(unitId),
             category,
-            deliveryNoteId,
+            deliveryNoteId: Number(deliveryNoteId),
             initiatedQty: qty,
             qty,
             remainingQuantity: newQtyTransfer,
             images: imagePaths,
             source,
             description,
-            recordedBy: employeeId,
+            recordedBy: Number(employeeId),
             transferId,
             transferStatus: StockTransferStatus.PENDING,
           },
@@ -152,17 +152,17 @@ export class StockMovementService {
     // 3. Log movement for non-transfer types with remaining quantity
     await this.prisma.inventoryRecord.create({
       data: {
-        itemId,
-        storeId,
-        unitId,
-        deliveryNoteId,
+        itemId: Number(itemId),
+        storeId: Number(storeId),
+        unitId: Number(unitId),
+        deliveryNoteId: Number(deliveryNoteId),
         category,
         qty,
         remainingQuantity, // Store remaining quantity
         images: imagePaths,
         source,
         description,
-        recordedBy: employeeId,
+        recordedBy: Number(employeeId),
       },
     });
 

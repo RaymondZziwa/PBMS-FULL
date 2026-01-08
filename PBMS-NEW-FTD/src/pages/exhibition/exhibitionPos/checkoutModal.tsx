@@ -199,7 +199,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     options={[
                       ...(clients?.map(client => ({
                         value: client.id,
-                        label: `${client.firstName} ${client.lastName} - ${client.contact}`
+                        label: `${client.firstName} ${client.lastName} - ${client.phone}`
                       })) || [])
                     ]}
                     value={[selectedCustomer]}

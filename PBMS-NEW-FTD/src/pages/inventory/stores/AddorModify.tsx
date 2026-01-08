@@ -33,7 +33,7 @@ const AddorModifyStore: React.FC<AddorModifyStoreProps> = ({
     branchId: '',
     deptId: '',
     name: '',
-    authorizedPersonnel: [] as string[], // store IDs
+    authorizedPersonnel: [] as number[], // store IDs
   });
 
   // Normalize departments by selected branch
@@ -52,11 +52,15 @@ const AddorModifyStore: React.FC<AddorModifyStoreProps> = ({
       const deptId =
         (store as any).dept?.id || (store as any).deptId || '';
 
-      // authorizedPersonnel might be stored as ['empId', ...] or [{id: 'empId'}, ...]
-      let auth: string[] = [];
+      // authorizedPersonnel might be stored as ['empId', ...], [1, 2, ...], or [{id: 'empId'}, ...]
+      let auth: number[] = [];
       const rawAuth = (store as any).authorizedPersonnel;
       if (Array.isArray(rawAuth)) {
-        auth = rawAuth.map(a => (typeof a === 'string' ? a : a?.id || a?.employeeId || '')).filter(Boolean);
+        auth = rawAuth.map(a => {
+          if (typeof a === 'string') return parseInt(a, 10);
+          if (typeof a === 'number') return a;
+          return a?.id || a?.employeeId || 0;
+        }).filter(Boolean);
       }
 
       setFormData({
@@ -77,10 +81,10 @@ const AddorModifyStore: React.FC<AddorModifyStoreProps> = ({
 
   // Helpers: dropdown options
   const branchOptions = branches?.map((b: IBranch) => ({ label: b.name, value: b.id })) || [];
-  const deptOptions = filteredDepartments.map((d: IDepartment) => ({ label: d.name, value: d.id })) || [];
-  const employeeOptions = employees?.map((emp: IEmployee) => ({
+  const deptOptions = filteredDepartments.map((d: IDepartment) => ({ label: d.name, value: d.id.toString() })) || [];
+  const employeeOptions: { label: string; value: string }[] = employees?.map((emp: IEmployee) => ({
     label: `${emp.firstName} ${emp.lastName}`,
-    value: emp.id
+    value: emp.id.toString()
   })) || [];
 
   // Map authorizedPersonnel (ids) to display names for chips
@@ -90,10 +94,10 @@ const AddorModifyStore: React.FC<AddorModifyStoreProps> = ({
         const emp = employees?.find((e: IEmployee) => e.id === id);
         return emp ? { id, label: `${emp.firstName} ${emp.lastName}` } : null;
       })
-      .filter(Boolean) as { id: string; label: string }[];
+      .filter(Boolean) as { id: number; label: string }[];
   }, [formData.authorizedPersonnel, employees]);
 
-  const removeAuthorized = (idToRemove: string) => {
+  const removeAuthorized = (idToRemove: number) => {
     setFormData(prev => ({
       ...prev,
       authorizedPersonnel: prev.authorizedPersonnel.filter(id => id !== idToRemove)
@@ -126,7 +130,7 @@ const AddorModifyStore: React.FC<AddorModifyStoreProps> = ({
         branchId: '',
         deptId: '',
         name: '',
-        authorizedPersonnel: [] as string[], // store IDs
+        authorizedPersonnel: [], // store IDs
       })
       refresh();
       onCancel();
@@ -206,11 +210,11 @@ const AddorModifyStore: React.FC<AddorModifyStoreProps> = ({
 
             <CustomDropdown
               options={employeeOptions}
-              value={formData.authorizedPersonnel}
+              value={formData.authorizedPersonnel.map(id => id.toString())}
               onChange={(val) =>
                 setFormData((prev) => ({
                   ...prev,
-                  authorizedPersonnel: val, // val is string[] of ids
+                  authorizedPersonnel: val.map(id => parseInt(id, 10)), // val is string[] of ids
                 }))
               }
               placeholder="Select employees"

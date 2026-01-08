@@ -94,7 +94,7 @@ const ClientPrescriptionsManagement = () => {
   // Prepare data for table
   const tableData = prescriptions.map(prescription => ({
     clientName: `${prescription.client?.firstName || ''} ${prescription.client?.lastName || ''}`.trim() || 'N/A',
-    clientContact: prescription.client?.contact || 'N/A',
+    clientContact: prescription.client?.phone || 'N/A',
     prescribedByName: `${prescription.employee?.firstName || ''} ${prescription.employee?.lastName || ''}`.trim() || 'N/A',
     isReviewed: prescription.isReviewed ? (
       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">

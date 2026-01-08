@@ -297,7 +297,7 @@ export class ProjectPaymentsService {
                 select: {
                   firstName: true,
                   lastName: true,
-                  contact: true,
+                  phone: true,
                 },
               },
               project: {

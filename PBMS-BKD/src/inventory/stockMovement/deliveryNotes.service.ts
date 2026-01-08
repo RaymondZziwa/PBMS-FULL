@@ -16,7 +16,7 @@ export class DeliveryNoteService {
         images: imagePaths,
         name: dto.name,
         notes: dto.notes,
-        registeredBy: dto.registeredBy,
+        registeredBy: Number(dto.registeredBy),
       },
     });
 

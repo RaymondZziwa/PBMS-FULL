@@ -11,7 +11,7 @@ export interface ISale {
     id: string;
     firstName: string;
     lastName: string;
-    contact: string;
+    phone: string;
   };
   items: IItem[];
   servedBy: string;
@@ -40,7 +40,7 @@ export interface IClient {
     id: string;
     firstName: string;
     lastName: string;
-    contact: string;
+    phone: string;
     address?: string;
     updatedAt: Date;
     createdAt: Date;
@@ -61,21 +61,21 @@ export interface ICartItem {
 }
 
 export interface IPaymentMethod {
-  type: 'cash' | 'mtn_momo' | 'airtel_momo' | 'card' | 'prof_momo';
+  type: 'CASH' | 'MTN_MOMO' | 'AIRTEL_MOMO' | 'CARD' | 'PROF_MOMO';
   amount: number;
   transactionId?: string;
 }
 
 export interface ICheckoutData {
-  customerId?: string;
-  status: 'fully_paid' | 'unpaid' | 'partially_paid';
+  customerId?: number;
+  status: 'FULLY_PAID' | 'UNPAID' | 'PARTIALLY_PAID';
   paymentMethods: IPaymentMethod[];
   notes?: string;
   total: number;
   balance: number;
   items: ICartItem[];
-  storeId: string;
-  servedBy: string
+  storeId: number;
+  servedBy: number;
 }
 
 export interface POSStore {
@@ -109,7 +109,7 @@ export interface IProjectSale {
     id: string;
     firstName: string;
     lastName: string;
-    contact: string;
+    phone: string;
     address?: string;
   };
   project?: {

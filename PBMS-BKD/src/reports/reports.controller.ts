@@ -244,6 +244,12 @@ export class ReportsController {
     );
   }
 
+  // Massage Services List
+  @Get('massage-services/list')
+  async getMassageServicesList() {
+    return await this.reportService.getMassageServicesList();
+  }
+
   // Product Performance
   @Get('sales/product-performance')
   async getProductPerformance(

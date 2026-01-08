@@ -6,9 +6,9 @@ import type { RootState } from '../../../redux/store';
 import { useNavigate } from 'react-router-dom';
 
 interface Store {
-  id: string;
+  id: number;
   name: string;
-  authorizedPersonnel: string[];
+  authorizedPersonnel: number[];
 }
 
 interface StoreSelectionModalProps {
@@ -31,7 +31,7 @@ const StoreSelectionModal: React.FC<StoreSelectionModalProps> = ({
   const currentUserId = user.id;
 
   const userStores = stores.filter(store =>
-    store.authorizedPersonnel.includes(currentUserId)
+    store.authorizedPersonnel.includes(Number(currentUserId))
   );
 
   return (
@@ -60,7 +60,7 @@ const StoreSelectionModal: React.FC<StoreSelectionModalProps> = ({
           {userStores.map(store => (
             <button
               key={store.id}
-              onClick={() => onStoreSelect(store.id, store.name)}
+              onClick={() => onStoreSelect(store.id.toString(), store.name)}
               className="w-full p-4 border border-gray-300 rounded-lg hover:border-gray-500 hover:bg-gray-50 transition-colors text-left"
             >
               <h3 className="font-semibold text-gray-800">{store.name}</h3>

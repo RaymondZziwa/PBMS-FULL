@@ -176,7 +176,7 @@ const CreditSalesManagement = () => {
                             setSelectedSale(null);
                         }}
                         onPaymentCollected={handlePaymentCollected}
-                        currentUser={{ id: user.id }}
+                        currentUser={{ id: user.id, name: `${user.firstName} ${user.lastName}` }}
                         />
                     )}
 

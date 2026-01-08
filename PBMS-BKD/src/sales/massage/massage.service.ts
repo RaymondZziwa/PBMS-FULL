@@ -27,46 +27,49 @@ export class MassageSalesService {
       status,
     } = createSaleDto;
 
-    // Create the sale
-    const sale = await this.prisma.massageSales.create({
-      data: {
-        clientId: customerId,
-        servedBy,
-        status,
-        total,
-        balance,
-        paymentMethods: JSON.parse(JSON.stringify(paymentMethods)),
-        notes,
-        items: JSON.parse(JSON.stringify(items)),
-      },
-      include: {
-        client: true,
-        employee: true,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      // Create the sale
+      const sale = await tx.massageSales.create({
+        data: {
+          clientId: customerId,
+          servedBy,
+          status,
+          total,
+          balance,
+          paymentMethods: JSON.parse(JSON.stringify(paymentMethods)),
+          notes,
+          items: JSON.parse(JSON.stringify(items)),
+        },
+        include: {
+          client: true,
+          employee: true,
+        },
+      });
+
+      // Create payment records for all payment methods
+      if (paymentMethods && paymentMethods.length > 0) {
+        await Promise.all(
+          paymentMethods.map((method) =>
+            tx.massageServicePayments.create({
+              data: {
+                saleId: sale.id,
+                amount: method.amount,
+                paymentMethod: method.type,
+                referenceId: '',
+                notes: notes,
+                cashierId: servedBy,
+              },
+            }),
+          ),
+        );
+      }
+
+      return {
+        message: 'Sale created successfully',
+        data: sale,
+        status: 200,
+      };
     });
-
-    if (balance > 0) {
-      await Promise.all(
-        paymentMethods.map((method) =>
-          this.prisma.massageServicePayments.create({
-            data: {
-              saleId: sale.id,
-              amount: method.amount,
-              paymentMethod: method.type,
-              referenceId: '',
-              notes: notes,
-              cashierId: servedBy,
-            },
-          }),
-        ),
-      );
-    }
-
-    return {
-      message: 'Sale created successfully',
-      data: sale,
-      status: 200,
-    };
   }
 
   async findAll() {

@@ -482,7 +482,7 @@ model Client {
   id        Int      @id @default(autoincrement())
   firstName String
   lastName  String
-  contact   String   @unique
+  phone   String   @unique
   address   String?
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
@@ -494,7 +494,7 @@ model Client {
   ClientPrescription ClientPrescription[]
 
   @@index([firstName, lastName])
-  @@index([contact])
+  @@index([phone])
   @@index([createdAt])
   @@map("clients")
 }

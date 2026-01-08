@@ -84,10 +84,11 @@ export class SalesService {
         },
       });
 
-      if (balance > 0) {
+      // Create payment records for all payment methods
+      if (paymentMethods && paymentMethods.length > 0) {
         await Promise.all(
           paymentMethods.map((method) =>
-            this.prisma.salePayments.create({
+            tx.salePayments.create({
               data: {
                 saleId: sale.id,
                 amount: method.amount,
