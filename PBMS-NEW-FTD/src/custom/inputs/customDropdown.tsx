@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { FaChevronDown, FaTimes, FaCheck } from 'react-icons/fa';
 
 interface DropdownOption {
@@ -30,21 +31,46 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0, maxHeight: 400 });
+
+  // Calculate dropdown position when opened (using viewport coordinates for fixed positioning)
+  useEffect(() => {
+    if (isOpen && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const spaceBelow = viewportHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      // Use available space, but prefer space below, with a minimum of 200px
+      const availableHeight = Math.max(spaceBelow, spaceAbove) - 20; // 20px padding
+      const calculatedMaxHeight = Math.max(200, Math.min(availableHeight, 600)); // Cap at 600px
+      
+      setDropdownPosition({
+        top: rect.bottom + 4, // Fixed positioning uses viewport coordinates
+        left: rect.left,
+        width: rect.width,
+        maxHeight: calculatedMaxHeight,
+      });
+    }
+  }, [isOpen]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node) &&
+          triggerRef.current && !triggerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
         setSearchTerm('');
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [isOpen]);
 
   // FIXED: Updated toggleOption to handle single selection
   const toggleOption = (optionValue: string) => {
@@ -93,6 +119,7 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
     <div className="relative w-full" ref={dropdownRef}>
       {/* Dropdown trigger */}
       <div
+        ref={triggerRef}
         className={`
           w-full
           border border-gray-300
@@ -158,9 +185,17 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
         </div>
       </div>
 
-      {/* Dropdown menu */}
-      {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg overflow-hidden">
+      {/* Dropdown menu - Rendered via portal to appear above scrollable containers */}
+      {isOpen && createPortal(
+        <div 
+          ref={dropdownRef}
+          className="fixed z-[9999] bg-white border border-gray-200 rounded-md shadow-lg overflow-hidden"
+          style={{
+            top: `${dropdownPosition.top}px`,
+            left: `${dropdownPosition.left}px`,
+            width: `${dropdownPosition.width}px`,
+          }}
+        >
           {/* Search input */}
           <div className="p-2 border-b border-gray-200">
             <input
@@ -184,10 +219,10 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
             />
           </div>
 
-          {/* Options list */}
+          {/* Options list - Dynamically sized to show maximum options without scrolling */}
           <div 
             className="overflow-y-auto"
-            style={{ maxHeight: `${maxHeight}px` }}
+            style={{ maxHeight: `${dropdownPosition.maxHeight - 60}px` }}
           >
             {filteredOptions.length > 0 ? (
               filteredOptions.map((option) => {
@@ -252,7 +287,8 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
               </button>
             </div>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

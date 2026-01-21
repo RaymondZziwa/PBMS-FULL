@@ -110,7 +110,7 @@ const PointOfSale: React.FC = () => {
   };
 
   const handleBarcodeScan = (barcode: string) => {
-    const item = allItems?.find(i => i.item.barcode.toString() === barcode);
+    const item = allItems?.find(i => i.item.barcode && i.item.barcode.toString() === barcode);
     if (item) {
       handleAddToCart(item.item);
       toast.success(`Added ${item.item.name} to cart`);

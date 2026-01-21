@@ -24,14 +24,14 @@ const ItemsGrid: React.FC<ItemsGridProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
-  // Get unique categories
-  const categories = ['all', ...new Set(items.map(item => item.item.category.name))];
+  // Get unique categories - filter out items without categories
+  const categories = ['all', ...new Set(items.filter(item => item.item.category).map(item => item.item.category.name))];
 
   // Filter items based on search and category
   const filteredItems = items.filter(item => {
     const matchesSearch = item.item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          item.item.barcode.toString().includes(searchTerm);
-    const matchesCategory = filterCategory === 'all' || item.item.category.name === filterCategory;
+    const matchesCategory = filterCategory === 'all' || (item.item.category && item.item.category.name === filterCategory);
     return matchesSearch && matchesCategory;
   });
 
@@ -106,7 +106,7 @@ const ItemsGrid: React.FC<ItemsGridProps> = ({
               <div className="text-sm text-gray-600 space-y-1">
                 <p>Price: {item.item.price.toLocaleString()} UGX</p>
                 <p>Barcode: {item.item.barcode}</p>
-                <p>Category: {item.item.category.name}</p>
+                <p>Category: {item.item.category ? item.item.category.name : 'Uncategorized'}</p>
                 {
                   item.qty == 0 ? (
                     <p className="text-red-600">Out of Stock</p>

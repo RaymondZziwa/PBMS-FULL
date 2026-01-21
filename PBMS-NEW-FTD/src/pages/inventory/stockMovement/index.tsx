@@ -10,7 +10,7 @@ import {
   FaImages,
   FaEye,
 } from "react-icons/fa";
-import AddOrModifyRecord from "./AddorModify";
+import StockMovementForm from "./StockMovementForm";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../../redux/store";
 import { Modal } from "antd";
@@ -36,11 +36,8 @@ const StockMovementRecords = () => {
 }>({ visible: false, notesData: {} });
 
 
-  const [modalProps, setModalProps] = useState<{
-    isOpen: boolean;
-    mode: "create" | "edit" | "";
-    record: IStockMovement | null;
-  }>({ isOpen: false, mode: "create", record: null });
+
+  const [bulkRestockModal, setBulkRestockModal] = useState(false);
 
   const [confirmModal, setConfirmModal] = useState<{
     visible: boolean;
@@ -317,13 +314,11 @@ const StockMovementRecords = () => {
           Stock Movement Records
         </h2>
         <button
-          onClick={() =>
-            setModalProps({ isOpen: true, mode: "create", record: null })
-          }
+          onClick={() => setBulkRestockModal(true)}
           className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
         >
           <FaPlus className="mr-2" />
-          Add New Record
+          Add Movement
         </button>
       </div>
 
@@ -334,13 +329,10 @@ const StockMovementRecords = () => {
         getRowClass={getRowClass}
       />
 
-      <AddOrModifyRecord
-        visible={modalProps.isOpen}
-        record={modalProps.record}
+      <StockMovementForm
+        visible={bulkRestockModal}
         employeeId={user}
-        onCancel={() =>
-          setModalProps({ isOpen: false, mode: "create", record: null })
-        }
+        onCancel={() => setBulkRestockModal(false)}
       />
 
       <Modal
