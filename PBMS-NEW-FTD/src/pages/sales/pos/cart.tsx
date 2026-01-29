@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { FaTrash, FaShoppingCart, FaMoneyBillWave } from 'react-icons/fa';
 import type { ICartItem } from '../../../redux/types/sales';
 
@@ -22,10 +22,19 @@ const Cart: React.FC<CartProps> = ({
   onCheckout,
   total,
 }) => {
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when cart items change
+  useEffect(() => {
+    if (scrollContainerRef.current && cart.length > 0) {
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+    }
+  }, [cart]);
+
   return (
     <div className="h-full flex flex-col">
       {/* Cart Header */}
-      <div className="p-4 border-b bg-white">
+      <div className="p-4 border-b bg-white flex-shrink-0">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold text-gray-800 flex items-center">
             <FaShoppingCart className="mr-2" />
@@ -42,8 +51,11 @@ const Cart: React.FC<CartProps> = ({
         </div>
       </div>
 
-      {/* Cart Items */}
-      <div className="flex-1 overflow-auto p-4 space-y-4">
+      {/* Cart Items - Scrollable section */}
+      <div 
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-4 min-h-0"
+      >
         {cart.length === 0 ? (
           <div className="text-center text-gray-500 py-8">
             <FaShoppingCart className="text-4xl mx-auto mb-4 opacity-50" />
@@ -114,7 +126,7 @@ const Cart: React.FC<CartProps> = ({
 
       {/* Cart Footer */}
       {cart.length > 0 && (
-        <div className="p-4 border-t bg-white">
+        <div className="p-4 border-t bg-white flex-shrink-0">
           <div className="space-y-3">
             <div className="flex justify-between text-lg font-bold">
               <span>Total:</span>

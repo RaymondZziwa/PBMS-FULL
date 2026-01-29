@@ -167,9 +167,9 @@ const PointOfSale: React.FC = () => {
   }
 
   return (
-    <div className="flex bg-gray-100">
+    <div className="flex bg-gray-100 h-screen overflow-hidden">
       {/* Items Section - 70% */}
-      <div className="w-3/4 p-4">
+      <div className="w-[70%] p-4">
         <ItemsGrid
           items={(allItems || []).filter((item) => item.item.showInPos === true)}
           selectedStore={selectedStore?.toString() || ''}
@@ -187,7 +187,7 @@ const PointOfSale: React.FC = () => {
       </div>
 
       {/* Cart Section - 30% */}
-      <div className="w-1/4 bg-white border-l">
+      <div className="w-[30%] bg-white border-l h-screen flex flex-col">
         <Cart
           cart={cart}
           onQuantityChange={handleQuantityChange}

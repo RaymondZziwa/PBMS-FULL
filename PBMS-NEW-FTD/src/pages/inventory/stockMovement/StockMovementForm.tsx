@@ -183,17 +183,17 @@ const StockMovementForm: React.FC<BulkRestockFormProps> = ({
     return true;
   };
 
-  const validateStep3 = () => {
-    if (attachmentMode === 'deliveryNote' && !basicDetails.deliveryNoteId) {
-      toast.error('Please select a delivery note');
-      return false;
-    }
-    if (attachmentMode === 'images' && selectedFiles.length === 0) {
-      toast.error('Please upload at least one evidence image');
-      return false;
-    }
-    return true;
-  };
+  // const validateStep3 = () => {
+  //   if (attachmentMode === 'deliveryNote' && !basicDetails.deliveryNoteId) {
+  //     toast.error('Please select a delivery note');
+  //     return false;
+  //   }
+  //   if (attachmentMode === 'images' && selectedFiles.length === 0) {
+  //     toast.error('Please upload at least one evidence image');
+  //     return false;
+  //   }
+  //   return true;
+  // };
 
   // Navigation
   const nextStep = () => {
@@ -212,7 +212,7 @@ const StockMovementForm: React.FC<BulkRestockFormProps> = ({
 
   // Submit
   const handleSubmit = async () => {
-    if (!validateStep3()) return;
+    // if (!validateStep3()) return;
 
     setIsSubmitting(true);
 

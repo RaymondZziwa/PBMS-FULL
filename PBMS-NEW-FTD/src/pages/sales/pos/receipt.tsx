@@ -38,8 +38,7 @@ export class PrintableContent extends React.Component<PrintableContentProps> {
           <img src={Logo} alt="receipt-logo" height="30px" />
           <h4>
             Prof-bioresearch{" "}
-            {branch ?? "N/A"}{" "}
-            {department} Receipt
+            {branch ?? "N/A"}{" "} Receipt
           </h4>
         </div>
         <div

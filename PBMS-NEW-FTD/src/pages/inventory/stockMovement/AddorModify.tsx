@@ -114,10 +114,10 @@ const AddOrModifyRecord: React.FC<AddOrModifyRecordProps> = ({
     //   return;
     // }
 
-    if (attachmentMode === 'deliveryNote' && !formData.deliveryNoteId) {
-      toast.error("Please select a delivery note");
-      return;
-    }
+    // if (attachmentMode === 'deliveryNote' && !formData.deliveryNoteId) {
+    //   toast.error("Please select a delivery note");
+    //   return;
+    // }
 
     setIsUploading(true);
 

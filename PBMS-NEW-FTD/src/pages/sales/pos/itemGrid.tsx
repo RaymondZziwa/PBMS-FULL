@@ -146,7 +146,10 @@ const ItemsGrid: React.FC<ItemsGridProps> = ({
             {paginatedItems.map(item => (
               <div
                 key={item.id}
-                onClick={() => onAddToCart(item.item)}
+                onClick={() => {
+                  onAddToCart(item.item);
+                  setSearchTerm(''); // Clear search after adding to cart
+                }}
                 className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow cursor-pointer"
               >
                 <h3 className="font-semibold text-gray-800 mb-2">{item.item.name}</h3>
@@ -158,7 +161,7 @@ const ItemsGrid: React.FC<ItemsGridProps> = ({
                     <p className="text-red-600 font-medium">Out of Stock</p>
                   ) : (
                     <p className="text-green-600 font-medium">
-                      In Stock: {item.qty} Available
+                      {item.qty} Available
                     </p>
                   )}
                 </div>
