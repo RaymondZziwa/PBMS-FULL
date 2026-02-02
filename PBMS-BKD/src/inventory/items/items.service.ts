@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { generateEAN13 } from 'src/utils/barcodeGenerator';
 import { GenericResponse } from 'src/utils/genericResponse';
@@ -89,12 +89,36 @@ export class ItemService {
 
   async update(
     id: number,
-    data: {  categoryId?: number; name?: string; price?: number },
+    data: {
+      categoryId?: number;
+      name?: string;
+      price?: number;
+    },
   ): Promise<GenericResponse> {
+    const updateData: any = {
+      name: data.name,
+      price: data.price,
+    };
+
+    if (data.categoryId) {
+      const exists = await this.prismaService.itemCategory.findUnique({
+        where: { id: data.categoryId },
+      });
+
+      if (!exists) {
+        throw new BadRequestException('Invalid category');
+      }
+
+      updateData.categoryId = {
+        connect: { id: data.categoryId },
+      };
+    }
+
     const item = await this.prismaService.item.update({
       where: { id },
-      data,
+      data: updateData,
     });
+
     return {
       status: 200,
       data: item,

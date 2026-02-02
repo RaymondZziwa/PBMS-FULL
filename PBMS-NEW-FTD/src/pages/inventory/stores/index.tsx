@@ -8,10 +8,14 @@ import type { IStore } from '../../../redux/types/inventory';
 import { InventoryEndpoints } from '../../../endpoints/inventory/inventory';
 import useStores from '../../../hooks/inventory/useStores';
 import AddorModifyStore from './AddorModify';
+import { useSelector } from 'react-redux';
+import type { RootState } from '../../../redux/store';
 
 const StoresManagement = () => {
   const { data, refresh } = useStores();
   const [stores, setStores] = useState(data);
+  const user = useSelector((state: RootState) => state.userAuth.data);
+  const isAdministrator = user?.role?.name?.toLowerCase() === 'administrator';
 
   useEffect(() => {
     setStores(data);
@@ -72,7 +76,7 @@ const StoresManagement = () => {
   const tableData = stores.map(store => ({
     ...store,
     createdAt: formatDate(store.createdAt),
-    actions: (
+    actions: isAdministrator ? (
     <div className="flex gap-3">
       {/* Edit Button with Tooltip */}
             <div className="relative group">
@@ -103,6 +107,8 @@ const StoresManagement = () => {
               </span>
             </div >
               </div>
+    ) : (
+      <span className="text-gray-400 text-sm">No actions available</span>
     )
   }));
 
@@ -110,13 +116,15 @@ const StoresManagement = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">Stores</h2>
-        <button
-          onClick={()=> setModalProps({ isOpen: true, mode: 'create', store: null })}
-          className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-        >
-          <FaPlus className="mr-2" />
-          Add New Store
-        </button>
+        {isAdministrator && (
+          <button
+            onClick={()=> setModalProps({ isOpen: true, mode: 'create', store: null })}
+            className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+          >
+            <FaPlus className="mr-2" />
+            Add New Store
+          </button>
+        )}
       </div>
 
       <CustomTable columns={columns} data={tableData} pageSize={10} />

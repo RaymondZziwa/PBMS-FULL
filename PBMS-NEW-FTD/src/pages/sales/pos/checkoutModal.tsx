@@ -24,7 +24,7 @@ interface CheckoutModalProps {
 const PAYMENT_METHOD_OPTIONS = [
   { value: 'CASH', label: 'Cash' },
   { value: 'MTN_MOMO', label: 'MTN Momo' },
-  { value: 'AIRTELL_MOMO', label: 'Airtel Momo' },
+  { value: 'AIRTEL_MOMO', label: 'Airtel Momo' },
   { value: 'CARD', label: 'Card' },
   { value: 'PROF_MOMO', label: 'Prof Momo' }
 ];
@@ -85,7 +85,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const getTransactionIdForReceipt = () => {
     const momoMethod = paymentMethods.find(method => 
-      method.type === 'MTN_MOMO' || method.type === 'AIRTELL_MOMO' || method.type === 'PROF_MOMO'
+      method.type === 'MTN_MOMO' || method.type === 'AIRTEL_MOMO' || method.type === 'PROF_MOMO'
     );
     return momoMethod?.transactionId || '';
   };
@@ -137,7 +137,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   // Check if payment method requires transaction ID
   const requiresTransactionId = (methodType: string) => {
-    return methodType === 'MTN_MOMO' || methodType === 'AIRTELL_MOMO' || methodType === 'PROF_MOMO' || methodType === 'CARD';
+    return methodType === 'MTN_MOMO' || methodType === 'AIRTEL_MOMO' || methodType === 'PROF_MOMO' || methodType === 'CARD';
   };
 
   const validatePaymentMethods = () => {
@@ -227,8 +227,12 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     try {
       await apiRequest(SALESENDPOINTS.POS.complete_sale, 'POST', '', checkoutData);
 
+      // Clear all form fields after successful sale
       setSelectedCustomer('');
       setPaymentStatus('FULLY_PAID');
+      setPaymentMethods([]); // Clear payment methods completely
+      setNotes('');
+      setAmountPaid(0);
       handlePrint();
 
       onCompleteSale();

@@ -20,7 +20,7 @@ interface CollectCreditPaymentModalProps {
 const PAYMENT_METHOD_OPTIONS = [
   { value: 'CASH', label: 'Cash' },
   { value: 'MTN_MOMO', label: 'MTN Momo' },
-  { value: 'AIRTELL_MOMO', label: 'Airtel Momo' },
+  { value: 'AIRTEL_MOMO', label: 'Airtel Momo' },
   { value: 'CARD', label: 'Card' },
   { value: 'PROF_MOMO', label: 'Prof Momo' }
 ];
@@ -76,7 +76,7 @@ const CollectCreditPaymentModal: React.FC<CollectCreditPaymentModalProps> = ({
 
   // Check if payment method requires transaction ID
   const requiresTransactionId = (methodType: string) => {
-    return methodType === 'MTN_MOMO' || methodType === 'AIRTELL_MOMO' || methodType === 'PROF_MOMO' || methodType === 'CARD';
+    return methodType === 'MTN_MOMO' || methodType === 'AIRTEL_MOMO' || methodType === 'PROF_MOMO' || methodType === 'CARD';
   };
 
   const validateForm = () => {

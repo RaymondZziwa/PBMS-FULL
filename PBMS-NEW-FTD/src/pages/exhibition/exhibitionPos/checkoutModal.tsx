@@ -162,7 +162,15 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
     try {
       await apiRequest(ExhibitionEndpoints.EXHIBITION_POS.create, 'POST', '', checkoutData);
-      handlePrint()
+      
+      // Clear all form fields after successful sale
+      setSelectedCustomer('');
+      setPaymentStatus('FULLY_PAID');
+      setPaymentMethods([]); // Clear payment methods completely
+      setNotes('');
+      setAmountPaid(0);
+      handlePrint();
+      
       onCompleteSale();
     } catch (error) {
       toast.error(error?.response?.data?.message || 'An error occurred while processing the sale.');
