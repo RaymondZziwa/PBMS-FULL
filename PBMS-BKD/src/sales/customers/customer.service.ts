@@ -138,7 +138,7 @@ export class ClientService {
   }
 
   async uploadPrescriptionImages(
-    clientId: number,
+    clientId: string,
     files: Express.Multer.File[],
     dto: { notes: string; prescribedBy: string },
   ) {
@@ -148,7 +148,7 @@ export class ClientService {
 
     // ✅ Verify client exists
     const client = await this.prisma.client.findUnique({
-      where: { id: clientId },
+      where: { id: parseInt(clientId) },
     });
 
     if (!client) {
@@ -163,7 +163,7 @@ export class ClientService {
     // ✅ Save new prescription record
     const prescription = await this.prisma.clientPrescription.create({
       data: {
-        clientId,
+        clientId: parseInt(clientId),
         images: imagePaths,
         notes: dto.notes,
         prescribedBy: parseInt(dto.prescribedBy),

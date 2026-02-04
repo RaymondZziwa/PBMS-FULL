@@ -77,7 +77,7 @@ export class ClientController {
     }),
   )
   async uploadClientPrescriptions(
-    @Param('id') id: number,
+    @Param('id') id: string,
     @UploadedFiles() files: Express.Multer.File[],
     @Body() body: { notes: string; prescribedBy: string },
   ) {
