@@ -109,9 +109,7 @@ export class ItemService {
         throw new BadRequestException('Invalid category');
       }
 
-      updateData.categoryId = {
-        connect: { id: data.categoryId },
-      };
+      updateData.categoryId = data.categoryId;
     }
 
     const item = await this.prismaService.item.update({
