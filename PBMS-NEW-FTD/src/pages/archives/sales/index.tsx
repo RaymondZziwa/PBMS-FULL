@@ -1,69 +1,51 @@
-import React, { useEffect, useState } from 'react';
-import { legacyApiRequest } from '../../../libs/apiConfig';
-
-interface ArchiveSalesRecord {
-  id: number;
-  receiptNumber?: string;
-  clientName?: string;
-  branch?: string;
-  date: string;
-  totalAmount?: number;
-  paymentMethod?: string;
-  status?: string;
-  createdAt?: string;
-}
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  fetchLegacySales,
+  type LegacyBranch,
+  type LegacySalesType,
+  type LegacySaleRecord,
+} from '../../../libs/legacyArchiveApi';
+import CustomDateInput from '../../../custom/inputs/customDateSelector';
 
 interface SalesFilters {
   startDate?: string;
   endDate?: string;
-  specificDate?: string;
-  clientName?: string;
-  receiptNumber?: string;
-  branch?: string;
 }
 
 const ArchiveSalesRecords: React.FC = () => {
-  const [salesRecords, setSalesRecords] = useState<ArchiveSalesRecord[]>([]);
+  const [salesRecords, setSalesRecords] = useState<LegacySaleRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<SalesFilters>({});
   const [searchTerm, setSearchTerm] = useState('');
+  const [legacyBranch, setLegacyBranch] = useState<LegacyBranch>('equatorial');
+  const [salesType, setSalesType] = useState<LegacySalesType>('shop');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
 
-  const fetchSalesRecords = async (searchFilters: SalesFilters = {}) => {
+  const fetchSalesRecords = useCallback(async (searchFilters: SalesFilters = {}) => {
     try {
       setLoading(true);
-      const response = await legacyApiRequest<{ message: string; records: ArchiveSalesRecord[] }>(
-        '/api/sales/get-sales',
-        'POST',
-        searchFilters
+      const response = await fetchLegacySales(
+        legacyBranch,
+        legacyBranch === 'masanafu' ? 'shop' : salesType,
+        {
+          startDate: searchFilters.startDate,
+          endDate: searchFilters.endDate,
+        }
       );
-      setSalesRecords(response.records || []);
+      setSalesRecords(response.report || []);
     } catch (err) {
       console.error('Error fetching sales records:', err);
       setError('Failed to load sales records. Please ensure the legacy API is running.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [legacyBranch, salesType]);
 
   useEffect(() => {
     fetchSalesRecords();
-  }, []);
-
-  const handleSearch = () => {
-    const searchFilters: SalesFilters = {};
-
-    if (searchTerm) {
-      // Try to determine if it's a receipt number or client name
-      if (searchTerm.match(/^\d+$/)) {
-        searchFilters.receiptNumber = searchTerm;
-      } else {
-        searchFilters.clientName = searchTerm;
-      }
-    }
-
-    fetchSalesRecords(searchFilters);
-  };
+  }, [fetchSalesRecords]);
 
   const handleFilterChange = (field: keyof SalesFilters, value: string) => {
     setFilters(prev => ({ ...prev, [field]: value }));
@@ -77,6 +59,39 @@ const ArchiveSalesRecords: React.FC = () => {
     setFilters({});
     setSearchTerm('');
     fetchSalesRecords();
+  };
+
+  const displayedRecords = useMemo(() => {
+    if (!searchTerm) return salesRecords;
+    const term = searchTerm.toLowerCase();
+    return salesRecords.filter((record) => {
+      const receipt = String(record.receiptNumber ?? '').toLowerCase();
+      const customer = String(record.customerNames ?? '').toLowerCase();
+      return receipt.includes(term) || customer.includes(term);
+    });
+  }, [salesRecords, searchTerm]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [legacyBranch, salesType, filters.startDate, filters.endDate, searchTerm]);
+
+  const totalPages = Math.max(1, Math.ceil(displayedRecords.length / pageSize));
+  const paginatedRecords = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return displayedRecords.slice(start, start + pageSize);
+  }, [currentPage, displayedRecords]);
+
+  const getPaymentMethod = (record: LegacySaleRecord) => {
+    if (record.paymentMethod) return record.paymentMethod;
+    const pm = record['paymentmethod'];
+    return typeof pm === 'string' ? pm : undefined;
+  };
+
+  const formatMoney = (value: unknown) => {
+    if (value === null || value === undefined || value === '') return '-';
+    const num = typeof value === 'number' ? value : Number(value);
+    if (Number.isNaN(num)) return '-';
+    return `${num.toLocaleString(undefined, { maximumFractionDigits: 0 })} UGX`;
   };
 
   if (loading) {
@@ -125,78 +140,72 @@ const ArchiveSalesRecords: React.FC = () => {
 
       {/* Search and Filters */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Quick Search */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Quick Search
+              Legacy Branch
             </label>
-            <div className="flex">
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Receipt # or Client Name"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <button
-                onClick={handleSearch}
-                className="px-4 py-2 bg-blue-600 text-white rounded-r-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-              >
-                Search
-              </button>
-            </div>
-          </div>
-
-          {/* Date Filters */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Start Date
-            </label>
-            <input
-              type="date"
-              value={filters.startDate || ''}
-              onChange={(e) => handleFilterChange('startDate', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+            <select
+              value={legacyBranch}
+              onChange={(e) => setLegacyBranch(e.target.value as LegacyBranch)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3d5aa0] focus:border-transparent"
+            >
+              <option value="equatorial">Equatorial</option>
+              <option value="masanafu">Masanafu</option>
+            </select>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              End Date
+              Sales Type
             </label>
-            <input
-              type="date"
-              value={filters.endDate || ''}
-              onChange={(e) => handleFilterChange('endDate', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+            <select
+              value={legacyBranch === 'masanafu' ? 'shop' : salesType}
+              onChange={(e) => setSalesType(e.target.value as LegacySalesType)}
+              disabled={legacyBranch === 'masanafu'}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3d5aa0] focus:border-transparent disabled:bg-gray-100"
+            >
+              <option value="shop">Shop Sales</option>
+              <option value="massage">Massage Sales</option>
+            </select>
           </div>
+
+          <CustomDateInput
+            label="Start Date"
+            value={filters.startDate || ''}
+            onChange={(value) => handleFilterChange('startDate', value)}
+          />
+
+          <CustomDateInput
+            label="End Date"
+            value={filters.endDate || ''}
+            onChange={(value) => handleFilterChange('endDate', value)}
+          />
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Branch
+              Search
             </label>
             <input
               type="text"
-              value={filters.branch || ''}
-              onChange={(e) => handleFilterChange('branch', e.target.value)}
-              placeholder="Branch name"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Receipt # / Customer"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3d5aa0] focus:border-transparent"
             />
           </div>
         </div>
 
-        <div className="flex justify-end space-x-2 mt-4">
+        <div className="flex flex-col sm:flex-row sm:justify-end gap-2 mt-4">
           <button
             onClick={applyFilters}
-            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+            className="px-4 py-2 bg-[#3d5aa0] text-white rounded-md hover:bg-[#2f477f] focus:outline-none focus:ring-2 focus:ring-[#3d5aa0] focus:ring-offset-2"
           >
             Apply Filters
           </button>
           <button
             onClick={clearFilters}
-            className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2"
           >
             Clear All
           </button>
@@ -207,54 +216,51 @@ const ArchiveSalesRecords: React.FC = () => {
       <div className="bg-white shadow-sm rounded-lg overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">
           <h2 className="text-lg font-medium text-gray-900">
-            Sales Records ({salesRecords.length} records)
+            Sales Records ({displayedRecords.length} records) - {legacyBranch}
           </h2>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+          <table className="w-full table-fixed divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="w-28 px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Receipt #
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Client Name
+                <th className="w-48 px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Customer
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="w-28 px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Date
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="w-32 px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Amount
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Branch
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="w-40 px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Payment Method
                 </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {salesRecords.map((record) => (
-                <tr key={record.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+              {paginatedRecords.map((record, idx) => (
+                <tr key={String(record.receiptNumber ?? idx)} className="hover:bg-gray-50">
+                  <td className="px-3 py-2 whitespace-nowrap text-xs font-medium text-gray-900">
                     {record.receiptNumber || '-'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {record.clientName || '-'}
+                  <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                    <span className="block truncate" title={String(record.customerNames ?? '-')}
+                    >
+                      {record.customerNames || '-'}
+                    </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {record.date || record.createdAt || '-'}
+                  <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-600">
+                    {record.saleDate || record.createdAt || record.createdat || '-'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {record.totalAmount ? `$${record.totalAmount.toFixed(2)}` : '-'}
+                  <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                    {formatMoney(record.totalAmount)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {record.branch || '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {record.paymentMethod || '-'}
+                  <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-600">
+                    {getPaymentMethod(record) || '-'}
                   </td>
                 </tr>
               ))}
@@ -262,7 +268,63 @@ const ArchiveSalesRecords: React.FC = () => {
           </table>
         </div>
 
-        {salesRecords.length === 0 && (
+        {displayedRecords.length > 0 && (
+          <div className="px-4 py-3 border-t border-gray-200 bg-gray-50 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="text-xs text-gray-700">
+              Showing <span className="font-medium">{(currentPage - 1) * pageSize + 1}</span> to{' '}
+              <span className="font-medium">{Math.min(currentPage * pageSize, displayedRecords.length)}</span> of{' '}
+              <span className="font-medium">{displayedRecords.length}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 rounded-md border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Prev
+              </button>
+
+              <div className="flex items-center">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`w-8 h-8 mx-0.5 rounded-md text-xs ${
+                        currentPage === pageNum
+                          ? 'bg-[#3d5aa0] text-white'
+                          : 'border border-gray-300 text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1.5 rounded-md border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+
+        {displayedRecords.length === 0 && (
           <div className="px-6 py-12 text-center">
             <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />

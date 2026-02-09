@@ -138,9 +138,9 @@ export class ClientService {
   }
 
   async uploadPrescriptionImages(
-    clientId: string,
+    clientId: number,
     files: Express.Multer.File[],
-    dto: { notes: string; prescribedBy: string },
+    dto: { notes: string; prescribedBy: number },
   ) {
     if (!files || files.length === 0) {
       throw new NotFoundException('No files uploaded');
@@ -148,7 +148,7 @@ export class ClientService {
 
     // ✅ Verify client exists
     const client = await this.prisma.client.findUnique({
-      where: { id: parseInt(clientId) },
+      where: { id: clientId },
     });
 
     if (!client) {
@@ -163,10 +163,10 @@ export class ClientService {
     // ✅ Save new prescription record
     const prescription = await this.prisma.clientPrescription.create({
       data: {
-        clientId: parseInt(clientId),
+        clientId,
         images: imagePaths,
         notes: dto.notes,
-        prescribedBy: parseInt(dto.prescribedBy),
+        prescribedBy: dto.prescribedBy,
       },
     });
 

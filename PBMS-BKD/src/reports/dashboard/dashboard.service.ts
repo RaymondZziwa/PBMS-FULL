@@ -6,6 +6,29 @@ import { subDays, startOfDay, endOfDay, format } from 'date-fns';
 export class DashboardService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null;
+  }
+
+  private extractSaleItems(
+    items: unknown,
+  ): Array<{ name: string; quantity: number }> {
+    if (!Array.isArray(items)) return [];
+
+    return items
+      .filter((item): item is Record<string, unknown> => this.isRecord(item))
+      .map((item) => {
+        const name = typeof item.name === 'string' ? item.name : 'Unnamed Item';
+        const rawQty = item.quantity;
+        const quantity =
+          typeof rawQty === 'number' || typeof rawQty === 'string'
+            ? Number(rawQty) || 0
+            : 0;
+
+        return { name, quantity };
+      });
+  }
+
   // --- 1️⃣ SALES POINT DATA ---
   private async getSalesPointData() {
     const sales = await this.prisma.sale.findMany({
@@ -68,12 +91,8 @@ export class DashboardService {
 
     const itemSalesMap: Record<string, number> = {};
     for (const sale of sales) {
-      const saleItems = sale.items as any[];
-      if (!Array.isArray(saleItems)) continue;
-
-      for (const item of saleItems) {
-        const name = item.name || 'Unnamed Item';
-        const quantity = Number(item.quantity) || 0;
+      const saleItems = this.extractSaleItems(sale.items);
+      for (const { name, quantity } of saleItems) {
         itemSalesMap[name] = (itemSalesMap[name] || 0) + quantity;
       }
     }
@@ -265,6 +284,265 @@ export class DashboardService {
         weeklyRevenue,
         topSellingItems,
         metrics,
+      },
+    };
+  }
+
+  //Other employee dashboard metrics
+  async getStoreInventoryMetrics(storeId?: number) {
+    const inventory = await this.prisma.productInventory.findMany({
+      where: storeId ? { storeId } : {},
+      select: {
+        qty: true,
+        item: {
+          select: {
+            id: true,
+            name: true,
+            category: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        unit: {
+          select: {
+            name: true,
+          },
+        },
+        store: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    const outOfStockItems = inventory.filter((i) => (i.qty ?? 0) <= 0);
+    const lowStockItems = inventory.filter((i) => i.qty > 0 && i.qty <= 20);
+    const inStockItems = inventory.filter((i) => i.qty > 20 && i.qty <= 100);
+    const overStockedItems = inventory.filter((i) => i.qty > 100);
+
+    const lowStockPreview = [...lowStockItems]
+      .sort((a, b) => (a.qty ?? 0) - (b.qty ?? 0))
+      .slice(0, 10)
+      .map((i) => ({
+        itemId: i.item?.id,
+        itemName: i.item?.name,
+        category: i.item?.category?.name,
+        qty: i.qty,
+        unit: i.unit?.name,
+        storeId: i.store?.id,
+        storeName: i.store?.name,
+      }));
+
+    const recentInventoryActivity = await this.prisma.inventoryRecord.findMany({
+      where: storeId
+        ? {
+            OR: [{ storeId }, { toStoreId: storeId }],
+          }
+        : {},
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+      select: {
+        id: true,
+        category: true,
+        qty: true,
+        transferStatus: true,
+        createdAt: true,
+        item: { select: { id: true, name: true } },
+        unit: { select: { name: true } },
+        store: { select: { id: true, name: true } },
+        toStore: { select: { id: true, name: true } },
+        employee: { select: { firstName: true, lastName: true } },
+      },
+    });
+
+    return {
+      totalInventoryRecords: inventory.length,
+      outOfStockCount: outOfStockItems.length,
+      lowStockCount: lowStockItems.length,
+      inStockCount: inStockItems.length,
+      overStockedCount: overStockedItems.length,
+      lowStockItems: lowStockPreview,
+      recentInventoryActivity,
+    };
+  }
+
+  async getStoreSalesMetrics(storeId?: number, days = 7) {
+    const today = new Date();
+    const start = startOfDay(subDays(today, Math.max(days - 1, 0)));
+    const end = endOfDay(today);
+
+    const sales = await this.prisma.sale.findMany({
+      where: {
+        createdAt: {
+          gte: start,
+          lte: end,
+        },
+        ...(storeId ? { storeId } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        status: true,
+        items: true,
+        createdAt: true,
+        store: { select: { id: true, name: true } },
+        employee: { select: { firstName: true, lastName: true } },
+        client: { select: { firstName: true, lastName: true } },
+      },
+    });
+
+    const statusCounts = sales.reduce(
+      (acc, s) => {
+        const key = s.status;
+        acc[key] = (acc[key] ?? 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+
+    const itemSalesMap: Record<string, number> = {};
+    let totalItemsSold = 0;
+    for (const sale of sales) {
+      const saleItems = this.extractSaleItems(sale.items);
+      for (const { name, quantity } of saleItems) {
+        totalItemsSold += quantity;
+        itemSalesMap[name] = (itemSalesMap[name] || 0) + quantity;
+      }
+    }
+
+    const topItemsByQuantity = Object.entries(itemSalesMap)
+      .map(([name, quantity]) => ({ name, quantity }))
+      .sort((a, b) => b.quantity - a.quantity)
+      .slice(0, 7);
+
+    const recentSales = sales.slice(0, 10).map((s) => {
+      const saleItems = this.extractSaleItems(s.items);
+      const itemCount = saleItems.reduce((sum, it) => sum + it.quantity, 0);
+      const servedBy = `${s.employee?.firstName ?? ''} ${
+        s.employee?.lastName ?? ''
+      }`.trim();
+
+      return {
+        id: s.id,
+        status: s.status,
+        createdAt: s.createdAt,
+        storeId: s.store?.id,
+        storeName: s.store?.name,
+        servedBy,
+        clientName: s.client
+          ? `${s.client.firstName ?? ''} ${s.client.lastName ?? ''}`.trim()
+          : undefined,
+        itemsCount: itemCount,
+      };
+    });
+
+    return {
+      range: {
+        startDate: start,
+        endDate: end,
+        days,
+      },
+      totalSalesCount: sales.length,
+      statusCounts,
+      totalItemsSold,
+      topItemsByQuantity,
+      recentSales,
+    };
+  }
+
+  async getStoreExpensesMetrics(branchId?: number, days = 30) {
+    const today = new Date();
+    const start = startOfDay(subDays(today, Math.max(days - 1, 0)));
+    const end = endOfDay(today);
+
+    const expenses = await this.prisma.branchExpense.findMany({
+      where: {
+        dateIncurred: {
+          gte: start,
+          lte: end,
+        },
+        ...(branchId ? { branchId } : {}),
+      },
+      orderBy: { dateIncurred: 'desc' },
+      take: 50,
+      select: {
+        id: true,
+        category: true,
+        title: true,
+        description: true,
+        dateIncurred: true,
+        createdAt: true,
+        branch: { select: { id: true, name: true } },
+        employee: { select: { firstName: true, lastName: true } },
+      },
+    });
+
+    const byCategory = expenses.reduce(
+      (acc, e) => {
+        const key = e.category;
+        acc[key] = (acc[key] ?? 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+
+    const recentExpenses = expenses.slice(0, 10).map((e) => {
+      const recordedBy = `${e.employee?.firstName ?? ''} ${
+        e.employee?.lastName ?? ''
+      }`.trim();
+
+      return {
+        id: e.id,
+        title: e.title,
+        category: e.category,
+        dateIncurred: e.dateIncurred,
+        branchId: e.branch?.id,
+        branchName: e.branch?.name,
+        recordedBy,
+      };
+    });
+
+    return {
+      range: {
+        startDate: start,
+        endDate: end,
+        days,
+      },
+      totalExpenseEntries: expenses.length,
+      byCategory,
+      recentExpenses,
+    };
+  }
+
+  async getEmployeeDashboardMetrics(params?: {
+    storeId?: number;
+    branchId?: number;
+    salesDays?: number;
+    expenseDays?: number;
+  }) {
+    const storeId = params?.storeId;
+    const branchId = params?.branchId;
+    const salesDays = params?.salesDays ?? 7;
+    const expenseDays = params?.expenseDays ?? 30;
+
+    const [inventory, sales, expenses] = await Promise.all([
+      this.getStoreInventoryMetrics(storeId),
+      this.getStoreSalesMetrics(storeId, salesDays),
+      this.getStoreExpensesMetrics(branchId, expenseDays),
+    ]);
+
+    return {
+      status: 200,
+      message: 'Employee dashboard data fetched successfully',
+      data: {
+        inventory,
+        sales,
+        expenses,
       },
     };
   }

@@ -49,6 +49,7 @@ const handleSubmit = async (e: React.FormEvent) => {
         headers: {
           'Content-Type': 'application/json',
         },
+        withCredentials: true,
         timeout: 10000, // 10 second timeout
       }
     );
@@ -60,27 +61,31 @@ const handleSubmit = async (e: React.FormEvent) => {
 
     navigate('/dashboard')
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Login failed:', error);
-    
+
     // Handle different error types
-    if (error.response) {
-      // Server responded with error status
-      console.error('Server error:', error.response.data);
-      toast.error(error.response.data?.message || 'Login failed');
-    } else if (error.request) {
-      // Request was made but no response received
-      console.error('Network error:', error.request);
-      toast.error('Network error. Please check your connection.');
+    if (axios.isAxiosError(error)) {
+      if (error.response) {
+        // Server responded with error status
+        console.error('Server error:', error.response.data);
+        toast.error((error.response.data as { message?: string })?.message || 'Login failed');
+      } else if (error.request) {
+        // Request was made but no response received
+        console.error('Network error:', error.request);
+        toast.error('Network error. Please check your connection.');
+      } else {
+        // Something else happened
+        console.error('Error:', error.message);
+        toast.error('An unexpected error occurred');
+      }
+
+      // Dispatch failure action if needed
+      dispatch(fetchDataFailure(error.message));
     } else {
-      // Something else happened
-      console.error('Error:', error.message);
       toast.error('An unexpected error occurred');
+      dispatch(fetchDataFailure(error instanceof Error ? error.message : 'Login failed'));
     }
-    
-    // Dispatch failure action if needed
-    dispatch(fetchDataFailure(error.message));
-    
   } finally {
     setIsLoading(false);
   }

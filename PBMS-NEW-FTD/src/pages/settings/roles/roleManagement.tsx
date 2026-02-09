@@ -55,68 +55,73 @@ const RoleManagement: React.FC = () => {
     },
   ];
 
-  // Transform roles into table rows
-  const tableData = roles.map((role) => ({
-    ...role,
-    actions: (
-      <div className="flex items-center gap-2">
-        {/* View Users */}
-        <button
-          onClick={() => {
-            setShowModal(true)
-            setSelectedRole(role)
-          }}
-          className="px-3 py-1.5 bg-gray-500 text-white rounded-lg flex items-center gap-2 shadow-sm hover:bg-gray-600 transition"
-        >
-          <FaUsers className="w-4 h-4" />
-          <span>View Users</span>
-        </button>
-    
-        {/* View Permissions */}
-        <button
-           onClick={() => {
-            setShowPermModal(true)
-            setSelectedRole(role)
-          }}
-          className="px-3 py-1.5 bg-gray-500 text-white rounded-lg flex items-center gap-2 shadow-sm hover:bg-gray-600 transition"
-        >
-          <FaKey className="w-4 h-4" />
-          <span> View Permissions</span>
-        </button>
+// Transform roles into table rows
+const tableData = roles.map((role) => ({
+  ...role,
+  actions: (
+    <div className="flex items-center gap-2">
+      {/* View Users */}
+      <button
+        onClick={() => {
+          setShowModal(true);
+          setSelectedRole(role);
+        }}
+        className="px-3 py-1.5 bg-gray-500 text-white rounded-lg flex items-center gap-2 shadow-sm hover:bg-gray-600 transition"
+      >
+        <FaUsers className="w-4 h-4" />
+        <span>View Users</span>
+      </button>
 
-            <div className="flex gap-3">
-      {/* Edit Button with Tooltip */}
-            <div className="relative group">
-              <button
-                className="text-blue-600 hover:text-blue-800 transition-colors"
-                onClick={()=> setModalProps({ isOpen: true, mode: 'edit', role: role })}
-              >
-                <FaEdit />
-              </button>
-              <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-                Edit
-              </span>
-            </div>
-            
-            {/* Delete Button with Tooltip */}
-            <div className="relative group">
-              <button
-                className="text-red-600 hover:text-red-800 transition-colors"
-                 onClick={() => {
-                    setModalProps({isOpen: false, mode: "", role: role})
-                    setIsDeleteModalOpen(true)
-                  }}
-                      >
-                <FaTrash />
-              </button>
-              <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-                Delete
-              </span>
-            </div >
-              </div>
-      </div>
-    ),    
-  }));
+      {/* View Permissions */}
+      <button
+        onClick={() => {
+          setShowPermModal(true);
+          setSelectedRole(role);
+        }}
+        className="px-3 py-1.5 bg-gray-500 text-white rounded-lg flex items-center gap-2 shadow-sm hover:bg-gray-600 transition"
+      >
+        <FaKey className="w-4 h-4" />
+        <span>View Permissions</span>
+      </button>
+
+      {role.name.toLowerCase() !== 'administrator' && (
+        <div className="flex gap-3">
+          {/* Edit Button */}
+          <div className="relative group">
+            <button
+              className="text-blue-600 hover:text-blue-800 transition-colors"
+              onClick={() =>
+                setModalProps({ isOpen: true, mode: 'edit', role })
+              }
+            >
+              <FaEdit />
+            </button>
+            <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+              Edit
+            </span>
+          </div>
+
+          {/* Delete Button */}
+          <div className="relative group">
+            <button
+              className="text-red-600 hover:text-red-800 transition-colors"
+              onClick={() => {
+                setModalProps({ isOpen: false, mode: '', role });
+                setIsDeleteModalOpen(true);
+              }}
+            >
+              <FaTrash />
+            </button>
+            <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+              Delete
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  ),
+}));
+
 
   return (
     <div className="p-6">

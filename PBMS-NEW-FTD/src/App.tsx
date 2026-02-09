@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import LayoutSkeleton from './layout/skeleton';
 import SalesDashboard from './pages/dashboard/dashboard';
+import NonAdminDashboard from './pages/dashboard/nonAdminDashboard';
 import CompanyProfile from './pages/settings/company-profile';
 import BranchesManagement from './pages/settings/branch/branchManagement';
 import RoleManagement from './pages/settings/roles/roleManagement';
@@ -31,7 +32,8 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useEffect, useState } from 'react';
 import type { RootState } from './redux/store';
 import { apiRequest } from './libs/apiConfig';
-import { fetchDataStart, fetchDataSuccess, fetchDataFailure } from "./redux/slices/auth/userAuthSlice";
+import { fetchDataSuccess, fetchDataFailure } from "./redux/slices/auth/userAuthSlice";
+import type { IUserAuth } from './redux/types/userAuth';
 import StockLevelAnalysisReport from './pages/reports/inventoryReports/stockLevelAnalysis';
 import StockMovementAnalysisReport from './pages/reports/inventoryReports/stockLevelMovementAnalysis';
 import ExhibitionRevenueComparisonReport from './pages/reports/exhibition/exhibitionRevenueComparisonReport';
@@ -62,7 +64,7 @@ interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const [checkingAuth, setCheckingAuth] = useState(true);
   const { data } = useSelector((state: RootState) => state.userAuth);
   const dispatch = useDispatch();
@@ -70,11 +72,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   useEffect(() => {
     const verifyAuth = async () => {
       // If we have user data, verify it's still valid
-      if (data) {
+      if (data?.id) {
         try {
-          await apiRequest.get('/auth/verify', { withCredentials: true });
+          await apiRequest('/api/auth/verify', 'GET');
           // Session is valid
-        } catch (error) {
+        } catch {
           // Session expired, clear data
           dispatch(fetchDataFailure('Session expired'));
         }
@@ -82,9 +84,9 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
       // If no user data but might have cookies
       else {
         try {
-          const response = await apiRequest('/auth/me', { withCredentials: true });
+          const response = await apiRequest<{ data: IUserAuth }>('/api/auth/me', 'GET');
           dispatch(fetchDataSuccess(response.data));
-        } catch (error) {
+        } catch {
           // Not authenticated
           dispatch(fetchDataFailure('Not authenticated'));
         }
@@ -137,6 +139,13 @@ const PublicRoute: React.FC<PublicRouteProps> = ({ children }) => {
   );
 };
 
+const RoleBasedDashboard: React.FC = () => {
+  const roleName = useSelector((state: RootState) => state.userAuth.data.role?.name);
+  const isAdmin = (roleName ?? "").trim().toLowerCase() === "administrator";
+
+  return isAdmin ? <SalesDashboard /> : <NonAdminDashboard />;
+};
+
 function App() {
   return (
     <Routes>
@@ -155,7 +164,7 @@ function App() {
         path="/dashboard"
         element={
           <ProtectedRoute>
-            <SalesDashboard />
+            <RoleBasedDashboard />
           </ProtectedRoute>
         }
       />

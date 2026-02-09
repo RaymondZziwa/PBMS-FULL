@@ -44,7 +44,7 @@ export class ItemController {
   @Patch('modify/:id')
   update(
     @Param('id') id: string,
-    @Body() data: {  categoryId?: number; name?: string; price?: number },
+    @Body() data: { categoryId?: number; name?: string; price?: number },
   ) {
     return this.itemCategoryService.update(Number(id), data);
   }

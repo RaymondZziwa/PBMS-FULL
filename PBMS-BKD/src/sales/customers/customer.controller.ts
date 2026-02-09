@@ -79,9 +79,9 @@ export class ClientController {
   async uploadClientPrescriptions(
     @Param('id') id: string,
     @UploadedFiles() files: Express.Multer.File[],
-    @Body() body: { notes: string; prescribedBy: string },
+    @Body() body: { notes: string; prescribedBy: number },
   ) {
-    return await this.clientService.uploadPrescriptionImages(id, files, body);
+    return await this.clientService.uploadPrescriptionImages(Number(id), files, body);
   }
 
   @Get('fetch-prescriptions/:id')
@@ -95,11 +95,7 @@ export class ClientController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    return this.clientService.prescriptionHistory(
-      Number(id),
-      startDate,
-      endDate,
-    );
+    return this.clientService.prescriptionHistory(Number(id), startDate, endDate);
   }
 
   @Put('review-prescription/:id')

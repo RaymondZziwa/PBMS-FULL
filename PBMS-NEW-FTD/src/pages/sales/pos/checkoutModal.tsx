@@ -85,7 +85,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const getTransactionIdForReceipt = () => {
     const momoMethod = paymentMethods.find(method => 
-      method.type === 'MTN_MOMO' || method.type === 'AIRTEL_MOMO' || method.type === 'PROF_MOMO'
+        method.type === 'MTN_MOMO' || method.type === 'AIRTEL_MOMO' || method.type === 'PROF_MOMO'
     );
     return momoMethod?.transactionId || '';
   };
@@ -176,20 +176,23 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       return;
     }
 
-    const storeId = (() => {
-      try {
-        const storedStore = localStorage.getItem('posStore');
-        return storedStore ? JSON.parse(storedStore).storeId : null;
-      } catch (error) {
-        console.error('Error reading store data from localStorage:', error);
-        return null;
-      }
-    })();
+    // const storeId = (() => {
+    //   try {
+    //     const storedStore = localStorage.getItem('posStore');
+    //     return storedStore ? JSON.parse(storedStore).storeId : null;
+    //   } catch (error) {
+    //     console.error('Error reading store data from localStorage:', error);
+    //     return null;
+    //   }
+    // })();
 
-    if (!storeId) {
-      toast.error('Store information not found. Please select a store.');
-      return;
-    }
+    // if (!storeId) {
+    //   toast.error('Store information not found. Please select a store.');
+    //   return;
+    // }
+
+    const storedStore = localStorage.getItem('posStore');
+    const storeId = storedStore ? JSON.parse(storedStore).storeId : null;
 
     const checkoutData = {
       customerId: selectedCustomer ? Number(selectedCustomer) : undefined,

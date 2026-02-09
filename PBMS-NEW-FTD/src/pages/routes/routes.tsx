@@ -91,7 +91,8 @@ import { ArchiveRoutes } from './archiveRoutes';
         name: "PB Prescription Database",
         icon: FaUserInjured,
         path: "/client-prescriptions",
-        routes: [],
+       routes: [],
+       requiredPermission: "prescription_database_module"
     },
       {
         name: "Expenses",

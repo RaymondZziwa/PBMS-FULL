@@ -43,25 +43,28 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const authResult = await this.authService.login(loginDto);
+    const { token, ...userData } = authResult;
+
+    const isProd = process.env.NODE_ENV === 'production';
+    const sameSite: 'none' | 'lax' = isProd ? 'none' : 'lax';
+    const cookieOptions = {
+      httpOnly: true,
+      secure: isProd,
+      sameSite,
+    };
 
     // Set HTTP-only cookies
-    res.cookie('accessToken', authResult.token.accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+    res.cookie('accessToken', token.accessToken, {
+      ...cookieOptions,
       maxAge: 86400000, // 1 day
     });
 
-    res.cookie('refreshToken', authResult.token.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+    res.cookie('refreshToken', token.refreshToken, {
+      ...cookieOptions,
       maxAge: 7 * 86400000, // 7 days
     });
 
     // Remove tokens from the response since they're in cookies
-    const { token, ...userData } = authResult;
-
     return {
       message: 'Login successful',
       user: userData,
@@ -75,25 +78,28 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const authResult = await this.authService.pbdLogin(loginDto);
+    const { token, ...userData } = authResult;
+
+    const isProd = process.env.NODE_ENV === 'production';
+    const sameSite: 'none' | 'lax' = isProd ? 'none' : 'lax';
+    const cookieOptions = {
+      httpOnly: true,
+      secure: isProd,
+      sameSite,
+    };
 
     // Set HTTP-only cookies
-    res.cookie('accessToken', authResult.token.accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+    res.cookie('accessToken', token.accessToken, {
+      ...cookieOptions,
       maxAge: 86400000, // 1 day
     });
 
-    res.cookie('refreshToken', authResult.token.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+    res.cookie('refreshToken', token.refreshToken, {
+      ...cookieOptions,
       maxAge: 7 * 86400000, // 7 days
     });
 
     // Remove tokens from the response since they're in cookies
-    const { token, ...userData } = authResult;
-
     return {
       message: 'Login successful',
       user: userData,
@@ -102,7 +108,7 @@ export class AuthController {
 
   @Get('verify')
   @UseGuards(JwtAuthGuard)
-  async verifyAuth(@Req() req: Request) {
+  verifyAuth(@Req() req: Request) {
     // If JwtAuthGuard passes, the user is authenticated
     if (!req.user) {
       throw new UnauthorizedException('User not authenticated');
@@ -151,18 +157,22 @@ export class AuthController {
 
     const newTokens = await this.authService.refreshTokens(req.user.id);
 
+    const isProd = process.env.NODE_ENV === 'production';
+    const sameSite: 'none' | 'lax' = isProd ? 'none' : 'lax';
+    const cookieOptions = {
+      httpOnly: true,
+      secure: isProd,
+      sameSite,
+    };
+
     // Set new HTTP-only cookies
     res.cookie('accessToken', newTokens.accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      ...cookieOptions,
       maxAge: 86400000, // 1 day
     });
 
     res.cookie('refreshToken', newTokens.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      ...cookieOptions,
       maxAge: 7 * 86400000, // 7 days
     });
 
@@ -176,19 +186,23 @@ export class AuthController {
    * Logout - clear cookies
    */
   @Post('logout')
-  async logout(@Res({ passthrough: true }) res: Response) {
+  logout(@Res({ passthrough: true }) res: Response) {
+    const isProd = process.env.NODE_ENV === 'production';
+    const sameSite: 'none' | 'lax' = isProd ? 'none' : 'lax';
+    const cookieOptions = {
+      httpOnly: true,
+      secure: isProd,
+      sameSite,
+    };
+
     // Clear the HTTP-only cookies
     res.cookie('accessToken', '', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      ...cookieOptions,
       maxAge: 0, // Expire immediately
     });
 
     res.cookie('refreshToken', '', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      ...cookieOptions,
       maxAge: 0, // Expire immediately
     });
 

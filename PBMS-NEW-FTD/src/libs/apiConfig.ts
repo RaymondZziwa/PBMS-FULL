@@ -5,7 +5,7 @@ export const baseURL = "http://localhost:3005"
 export const imageURL = "http://localhost:3005/storage"
 // export const baseURL = "https://pbmsapi.megaerpug.com"
 // export const imageURL = "https://pbmsapi.megaerpug.com/storage"
-export const legacyBaseURL = "http://localhost:3008"
+export const legacyBaseURL = "http://localhost:3040"
 export const system = 'PBMS'
 
 let isRefreshing = false;

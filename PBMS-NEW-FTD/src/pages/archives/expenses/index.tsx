@@ -1,68 +1,47 @@
-import React, { useEffect, useState } from 'react';
-import { legacyApiRequest } from '../../../libs/apiConfig';
-
-interface ArchiveExpenseRecord {
-  id: number;
-  branch?: string;
-  date: string;
-  category?: string;
-  name?: string;
-  description?: string;
-  cost?: number;
-  amountPaid?: number;
-  balance?: number;
-  paymentMethod?: string;
-  paymentStatus?: string;
-  createdAt?: string;
-}
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  fetchLegacyExpenses,
+  type LegacyBranch,
+  type LegacyExpenseRecord,
+} from '../../../libs/legacyArchiveApi';
+import CustomDateInput from '../../../custom/inputs/customDateSelector';
 
 interface ExpenseFilters {
-  branch?: string;
   category?: string;
   name?: string;
   startDate?: string;
   endDate?: string;
-  specificDate?: string;
 }
 
 const ArchiveExpenseRecords: React.FC = () => {
-  const [expenseRecords, setExpenseRecords] = useState<ArchiveExpenseRecord[]>([]);
+  const [expenseRecords, setExpenseRecords] = useState<LegacyExpenseRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<ExpenseFilters>({});
   const [searchTerm, setSearchTerm] = useState('');
+  const [legacyBranch, setLegacyBranch] = useState<LegacyBranch>('equatorial');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
 
-  const fetchExpenseRecords = async (searchFilters: ExpenseFilters = {}) => {
+  const fetchExpenseRecords = useCallback(async (searchFilters: ExpenseFilters = {}) => {
     try {
       setLoading(true);
-      const response = await legacyApiRequest<{ message: string; records: ArchiveExpenseRecord[] }>(
-        '/api/expenses/get-expenses',
-        'POST',
-        searchFilters
-      );
-      setExpenseRecords(response.records || []);
+      const response = await fetchLegacyExpenses(legacyBranch, {
+        startDate: searchFilters.startDate,
+        endDate: searchFilters.endDate,
+      });
+      setExpenseRecords(response.data || []);
     } catch (err) {
       console.error('Error fetching expense records:', err);
       setError('Failed to load expense records. Please ensure the legacy API is running.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [legacyBranch]);
 
   useEffect(() => {
     fetchExpenseRecords();
-  }, []);
-
-  const handleSearch = () => {
-    const searchFilters: ExpenseFilters = {};
-
-    if (searchTerm) {
-      // Search by expense name or category
-      searchFilters.name = searchTerm;
-    }
-
-    fetchExpenseRecords(searchFilters);
-  };
+  }, [fetchExpenseRecords]);
 
   const handleFilterChange = (field: keyof ExpenseFilters, value: string) => {
     setFilters(prev => ({ ...prev, [field]: value }));
@@ -76,6 +55,40 @@ const ArchiveExpenseRecords: React.FC = () => {
     setFilters({});
     setSearchTerm('');
     fetchExpenseRecords();
+  };
+
+  const displayedRecords = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    const categoryFilter = (filters.category ?? '').trim().toLowerCase();
+    const nameFilter = (filters.name ?? '').trim().toLowerCase();
+
+    return expenseRecords.filter((r) => {
+      const category = String(r.expenditurecategory ?? '').toLowerCase();
+      const name = String(r.expenditurename ?? '').toLowerCase();
+      const desc = String(r.expendituredescription ?? '').toLowerCase();
+
+      if (term && !(name.includes(term) || category.includes(term) || desc.includes(term))) return false;
+      if (categoryFilter && !category.includes(categoryFilter)) return false;
+      if (nameFilter && !name.includes(nameFilter)) return false;
+      return true;
+    });
+  }, [expenseRecords, filters.category, filters.name, searchTerm]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [legacyBranch, filters.startDate, filters.endDate, filters.category, filters.name, searchTerm]);
+
+  const totalPages = Math.max(1, Math.ceil(displayedRecords.length / pageSize));
+  const paginatedRecords = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return displayedRecords.slice(start, start + pageSize);
+  }, [currentPage, displayedRecords]);
+
+  const formatMoney = (value: unknown) => {
+    if (value === null || value === undefined || value === '') return '-';
+    const num = typeof value === 'number' ? value : Number(value);
+    if (Number.isNaN(num)) return '-';
+    return `${num.toLocaleString(undefined, { maximumFractionDigits: 0 })} UGX`;
   };
 
   if (loading) {
@@ -124,53 +137,32 @@ const ArchiveExpenseRecords: React.FC = () => {
 
       {/* Search and Filters */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Quick Search */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Quick Search
+              Legacy Branch
             </label>
-            <div className="flex">
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Expense name or category"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <button
-                onClick={handleSearch}
-                className="px-4 py-2 bg-blue-600 text-white rounded-r-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-              >
-                Search
-              </button>
-            </div>
+            <select
+              value={legacyBranch}
+              onChange={(e) => setLegacyBranch(e.target.value as LegacyBranch)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3d5aa0] focus:border-transparent"
+            >
+              <option value="equatorial">Equatorial</option>
+              <option value="masanafu">Masanafu</option>
+            </select>
           </div>
 
-          {/* Date Filters */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Start Date
-            </label>
-            <input
-              type="date"
-              value={filters.startDate || ''}
-              onChange={(e) => handleFilterChange('startDate', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
+          <CustomDateInput
+            label="Start Date"
+            value={filters.startDate || ''}
+            onChange={(value) => handleFilterChange('startDate', value)}
+          />
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              End Date
-            </label>
-            <input
-              type="date"
-              value={filters.endDate || ''}
-              onChange={(e) => handleFilterChange('endDate', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
+          <CustomDateInput
+            label="End Date"
+            value={filters.endDate || ''}
+            onChange={(value) => handleFilterChange('endDate', value)}
+          />
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -180,22 +172,48 @@ const ArchiveExpenseRecords: React.FC = () => {
               type="text"
               value={filters.category || ''}
               onChange={(e) => handleFilterChange('category', e.target.value)}
-              placeholder="Expense category"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Category"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3d5aa0] focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Name
+            </label>
+            <input
+              type="text"
+              value={filters.name || ''}
+              onChange={(e) => handleFilterChange('name', e.target.value)}
+              placeholder="Name"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3d5aa0] focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Search
+            </label>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Any text"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3d5aa0] focus:border-transparent"
             />
           </div>
         </div>
 
-        <div className="flex justify-end space-x-2 mt-4">
+        <div className="flex flex-col sm:flex-row sm:justify-end gap-2 mt-4">
           <button
             onClick={applyFilters}
-            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+            className="px-4 py-2 bg-[#3d5aa0] text-white rounded-md hover:bg-[#2f477f] focus:outline-none focus:ring-2 focus:ring-[#3d5aa0] focus:ring-offset-2"
           >
             Apply Filters
           </button>
           <button
             onClick={clearFilters}
-            className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2"
           >
             Clear All
           </button>
@@ -206,73 +224,70 @@ const ArchiveExpenseRecords: React.FC = () => {
       <div className="bg-white shadow-sm rounded-lg overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">
           <h2 className="text-lg font-medium text-gray-900">
-            Expense Records ({expenseRecords.length} records)
+            Expense Records ({displayedRecords.length} records) - {legacyBranch}
           </h2>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+          <table className="w-full table-fixed divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="w-24 px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Date
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="w-32 px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Category
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="w-44 px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Name
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="w-24 px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Cost
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="w-24 px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Paid
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="w-24 px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Balance
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Branch
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="w-28 px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
                 </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {expenseRecords.map((record) => (
-                <tr key={record.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {record.date || record.createdAt || '-'}
+              {paginatedRecords.map((record, idx) => (
+                <tr key={String(record.expenditureid ?? idx)} className="hover:bg-gray-50">
+                  <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-600">
+                    {record.date || record.createdat || '-'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {record.category || '-'}
+                  <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                    {record.expenditurecategory || '-'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {record.name || '-'}
+                  <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                    <span className="block truncate" title={String(record.expenditurename ?? '-')}
+                    >
+                      {record.expenditurename || '-'}
+                    </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {record.cost ? `$${record.cost.toFixed(2)}` : '-'}
+                  <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                    {formatMoney(record.expenditurecost)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {record.amountPaid ? `$${record.amountPaid.toFixed(2)}` : '-'}
+                  <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                    {formatMoney(record.amountspent)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {record.balance ? `$${record.balance.toFixed(2)}` : '-'}
+                  <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                    {formatMoney(record.balance)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {record.branch || '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                  <td className="px-3 py-2 whitespace-nowrap text-xs">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      record.paymentStatus === 'Paid' || record.paymentStatus === 'Completed'
+                      record.paymentstatus === 'Paid' || record.paymentstatus === 'Completed'
                         ? 'bg-green-100 text-green-800'
-                        : record.paymentStatus === 'Pending'
+                        : record.paymentstatus === 'Pending'
                         ? 'bg-yellow-100 text-yellow-800'
                         : 'bg-gray-100 text-gray-800'
                     }`}>
-                      {record.paymentStatus || 'Unknown'}
+                      {record.paymentstatus || 'Unknown'}
                     </span>
                   </td>
                 </tr>
@@ -281,7 +296,63 @@ const ArchiveExpenseRecords: React.FC = () => {
           </table>
         </div>
 
-        {expenseRecords.length === 0 && (
+        {displayedRecords.length > 0 && (
+          <div className="px-4 py-3 border-t border-gray-200 bg-gray-50 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="text-xs text-gray-700">
+              Showing <span className="font-medium">{(currentPage - 1) * pageSize + 1}</span> to{' '}
+              <span className="font-medium">{Math.min(currentPage * pageSize, displayedRecords.length)}</span> of{' '}
+              <span className="font-medium">{displayedRecords.length}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 rounded-md border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Prev
+              </button>
+
+              <div className="flex items-center">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`w-8 h-8 mx-0.5 rounded-md text-xs ${
+                        currentPage === pageNum
+                          ? 'bg-[#3d5aa0] text-white'
+                          : 'border border-gray-300 text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1.5 rounded-md border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+
+        {displayedRecords.length === 0 && (
           <div className="px-6 py-12 text-center">
             <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />

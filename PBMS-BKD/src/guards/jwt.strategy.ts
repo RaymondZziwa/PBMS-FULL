@@ -1,9 +1,16 @@
 // src/auth/strategies/jwt.strategy.ts
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PassportStrategy } from '@nestjs/passport';
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AuthService } from 'src/auth/auth.service';
+import type { Request } from 'express';
+
+type JwtPayload = {
+  sub: number;
+  email?: string;
+  lastName?: string;
+};
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -13,12 +20,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
-        (request: any) => {
+        (request: Request) => {
           // Check cookies first
-          let token = null;
-          if (request && request.cookies) {
-            token = request.cookies.accessToken;
-          }
+          let token: string | null = request.cookies?.accessToken ?? null;
 
           // Fallback to Authorization header
           if (!token && request.headers.authorization) {
@@ -33,11 +37,23 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: any) {
-    const user = await this.authService.validateUser(payload);
+  async validate(payload: JwtPayload) {
+    const rawUserId = payload?.sub;
+    const userId =
+      typeof rawUserId === 'number'
+        ? rawUserId
+        : typeof rawUserId === 'string'
+          ? Number(rawUserId)
+          : NaN;
+
+    if (!Number.isFinite(userId)) {
+      throw new UnauthorizedException('Invalid or expired access token');
+    }
+
+    const user = await this.authService.validateUser(userId);
 
     if (!user) {
-      throw new Error('User not found or inactive');
+      throw new UnauthorizedException('User not found or inactive');
     }
 
     return user;

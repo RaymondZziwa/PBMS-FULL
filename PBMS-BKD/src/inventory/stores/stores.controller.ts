@@ -19,7 +19,7 @@ export class StoresController {
   constructor(private readonly storeService: StoreService) {}
 
   @Post('create')
-  @UseGuards(JwtAuthGuard)
+  //@UseGuards(JwtAuthGuard)
   create(
     @Body()
     data: {
@@ -30,15 +30,21 @@ export class StoresController {
     },
     @Req() req: Request,
   ) {
-    const user = (req as any).user;
-    if (!user || !user.role || user.role.name?.toLowerCase() !== 'administrator') {
-      throw new ForbiddenException('Only administrators can create stores');
-    }
+    console.log(req);
+    // const user = (req as any).user;
+    // console.log('user', user);
+    // if (
+    //   !user ||
+    //   !user.role ||
+    //   user.role.name?.toLowerCase() !== 'administrator'
+    // ) {
+    //   throw new ForbiddenException('Only administrators can create stores');
+    // }
     return this.storeService.create({
       ...data,
       branchId: Number(data.branchId),
       deptId: Number(data.deptId),
-      authorizedPersonnel: data.authorizedPersonnel.map(id => Number(id)),
+      authorizedPersonnel: data.authorizedPersonnel.map((id) => Number(id)),
     });
   }
 
@@ -53,7 +59,7 @@ export class StoresController {
   }
 
   @Patch('modify/:id')
-  @UseGuards(JwtAuthGuard)
+  //@UseGuards(JwtAuthGuard)
   update(
     @Param('id') id: string,
     @Body()
@@ -65,25 +71,33 @@ export class StoresController {
     },
     @Req() req: Request,
   ) {
-    const user = (req as any).user;
-    if (!user || !user.role || user.role.name?.toLowerCase() !== 'administrator') {
-      throw new ForbiddenException('Only administrators can modify stores');
-    }
+    // const user = (req as any).user;
+    // if (
+    //   !user ||
+    //   !user.role ||
+    //   user.role.name?.toLowerCase() !== 'administrator'
+    // ) {
+    //   throw new ForbiddenException('Only administrators can modify stores');
+    // }
     return this.storeService.update(Number(id), {
       ...data,
       branchId: data.branchId ? Number(data.branchId) : undefined,
       deptId: data.deptId ? Number(data.deptId) : undefined,
-      authorizedPersonnel: data.authorizedPersonnel.map(id => Number(id)),
+      authorizedPersonnel: data.authorizedPersonnel.map((id) => Number(id)),
     });
   }
 
   @Delete('delete/:id')
-  @UseGuards(JwtAuthGuard)
+  //@UseGuards(JwtAuthGuard)
   remove(@Param('id') id: string, @Req() req: Request) {
-    const user = (req as any).user;
-    if (!user || !user.role || user.role.name?.toLowerCase() !== 'administrator') {
-      throw new ForbiddenException('Only administrators can delete stores');
-    }
+    // const user = (req as any).user;
+    // if (
+    //   !user ||
+    //   !user.role ||
+    //   user.role.name?.toLowerCase() !== 'administrator'
+    // ) {
+    //   throw new ForbiddenException('Only administrators can delete stores');
+    // }
     return this.storeService.remove(Number(id));
   }
 }

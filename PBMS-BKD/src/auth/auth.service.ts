@@ -58,6 +58,10 @@ export class AuthService {
         throw new ForbiddenException('User account is disabled');
       }
 
+      if (!user.isActive) {
+        throw new ForbiddenException('User account is inactive');
+      }
+
       // Validate password
       const isValid = await bcrypt.compare(password, user.password);
       if (!isValid) {
@@ -73,11 +77,14 @@ export class AuthService {
 
       const [accessToken, refreshToken] = await Promise.all([
         this.jwtService.signAsync(payload, {
-          secret: this.configService.get<string>('JWT_SECRET'),
+          secret:
+            this.configService.get<string>('JWT_SECRET') || 'fallback-secret',
           expiresIn: accessTokenExpiry,
         }),
         this.jwtService.signAsync(payload, {
-          secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+          secret:
+            this.configService.get<string>('JWT_REFRESH_SECRET') ||
+            'fallback-refresh-secret',
           expiresIn: refreshTokenExpiry,
         }),
       ]);
@@ -175,6 +182,10 @@ export class AuthService {
         throw new ForbiddenException('User account is disabled');
       }
 
+      if (!user.isActive) {
+        throw new ForbiddenException('User account is inactive');
+      }
+
       //Validate prescription database access
       if (!user.hasPrescriptionAccess) {
         throw new ForbiddenException(
@@ -197,11 +208,13 @@ export class AuthService {
 
       const [accessToken, refreshToken] = await Promise.all([
         this.jwtService.signAsync(payload, {
-          secret: this.configService.get<string>('JWT_SECRET'),
+          secret: this.configService.get<string>('JWT_SECRET') || 'fallback-secret',
           expiresIn: accessTokenExpiry,
         }),
         this.jwtService.signAsync(payload, {
-          secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+          secret:
+            this.configService.get<string>('JWT_REFRESH_SECRET') ||
+            'fallback-refresh-secret',
           expiresIn: refreshTokenExpiry,
         }),
       ]);
@@ -246,7 +259,7 @@ export class AuthService {
       if (typeof error === 'object' && error !== null && 'code' in error) {
         const err = error as { code?: string };
         if (err.code === 'P2025') {
-          console.log(err)
+          console.log(err);
           throw new NotFoundException('Credentials not found');
         }
       }
@@ -265,10 +278,7 @@ export class AuthService {
     }
   }
 
-  async refreshTokens(
-    userId: number,
-    res?: any,
-  ): Promise<IRefreshTokenResponse> {
+  async refreshTokens(userId: number): Promise<IRefreshTokenResponse> {
     try {
       // Check if user still exists and is active
       const user = await this.prismaService.employee.findUnique({
@@ -295,28 +305,16 @@ export class AuthService {
       };
 
       const newAccessToken = await this.jwtService.signAsync(newPayload, {
-        secret: this.configService.get<string>('JWT_SECRET'),
+        secret:
+          this.configService.get<string>('JWT_SECRET') || 'fallback-secret',
         expiresIn: '1d',
       });
 
       const newRefreshToken = await this.jwtService.signAsync(newPayload, {
-        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+        secret:
+          this.configService.get<string>('JWT_REFRESH_SECRET') ||
+          'fallback-refresh-secret',
         expiresIn: '7d',
-      });
-
-      // Set new tokens as HTTP-only cookies
-      res.cookie('access_token', newAccessToken, {
-        httpOnly: true,
-        secure: this.configService.get('NODE_ENV') === 'production',
-        sameSite: 'strict',
-        maxAge: 86400000, // 1 day
-      });
-
-      res.cookie('refresh_token', newRefreshToken, {
-        httpOnly: true,
-        secure: this.configService.get('NODE_ENV') === 'production',
-        sameSite: 'strict',
-        maxAge: 7 * 86400000, // 7 days
       });
 
       return {
@@ -324,10 +322,15 @@ export class AuthService {
         refreshToken: newRefreshToken,
         message: 'Tokens refreshed successfully',
       };
-    } catch (error) {
-      if (error.name === 'TokenExpiredError') {
+    } catch (error: unknown) {
+      const errorName =
+        typeof error === 'object' && error !== null && 'name' in error
+          ? String((error as { name?: unknown }).name)
+          : '';
+
+      if (errorName === 'TokenExpiredError') {
         throw new UnauthorizedException('Refresh token expired');
-      } else if (error.name === 'JsonWebTokenError') {
+      } else if (errorName === 'JsonWebTokenError') {
         throw new UnauthorizedException('Invalid refresh token');
       }
       throw new UnauthorizedException('Token refresh failed');
@@ -439,7 +442,7 @@ export class AuthService {
         dept: user.dept || null,
         role: user.role || null,
       };
-    } catch (error) {
+    } catch {
       return null;
     }
   }

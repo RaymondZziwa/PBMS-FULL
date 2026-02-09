@@ -73,8 +73,8 @@ const LayoutSkeleton: React.FC<{ children: React.ReactNode }> = ({ children }) =
         </header>
 
         {/* Main content */}
-        <main className="flex-1 mt-16 overflow-auto">
-          <div className="min-w-full min-h-full p-4">{children}</div>
+        <main className="flex-1 mt-12 overflow-auto">
+          <div className="w-full min-h-full p-4">{children}</div>
         </main>
       </div>
     </div>
