@@ -5,18 +5,23 @@ export const baseURL = "http://localhost:3005"
 export const imageURL = "http://localhost:3005/storage"
 // export const baseURL = "https://pbmsapi.megaerpug.com"
 // export const imageURL = "https://pbmsapi.megaerpug.com/storage"
-export const legacyBaseURL = "http://localhost:3040"
+export const legacyBaseURL = "https://pbmslegacyapi.megaerpug.com"
 export const system = 'PBMS'
 
 let isRefreshing = false;
-let failedQueue: Array<{ resolve: (value: any) => void; reject: (error: any) => void }> = [];
+type FailedQueueItem = {
+  resolve: (value: void | PromiseLike<void>) => void;
+  reject: (error: unknown) => void;
+};
 
-const processQueue = (error: any = null) => {
+let failedQueue: FailedQueueItem[] = [];
+
+const processQueue = (error: unknown | null = null) => {
   failedQueue.forEach(({ resolve, reject }) => {
     if (error) {
       reject(error);
     } else {
-      resolve();
+      resolve(undefined);
     }
   });
   failedQueue = [];
@@ -25,11 +30,15 @@ const processQueue = (error: any = null) => {
 export const apiRequest = async <T>(
   endpoint: string,
   method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE" = "GET",
-  token?: string, //--- IGNORE ---
-  data?: any, // Remove token parameter since we're using cookies
+  tokenOrData?: unknown, //--- IGNORE TOKEN (cookies are used) ---
+  data?: unknown,
   retry = true
 ): Promise<T> => {
   const url = `${baseURL}${endpoint}`;
+
+  // Backward compatibility: many call sites pass (endpoint, method, data)
+  // even though the signature historically had a `token` param.
+  const resolvedData = typeof tokenOrData === 'string' ? data : tokenOrData;
 
   const config: AxiosRequestConfig = {
     url,
@@ -38,30 +47,32 @@ export const apiRequest = async <T>(
       "Content-Type": "application/json",
     },
     withCredentials: true, // This sends cookies automatically
-    ...(data && { data }),
+    ...(resolvedData !== undefined && { data: resolvedData }),
   };
 
   try {
     const response: AxiosResponse<T> = await axios.request(config);
     
     // Only show success toast for non-GET requests that have a message
-    if (method !== 'GET' && (response.data as any)?.message) {
-      toast.success((response.data as any).message);
+    const maybeMessage = (response.data as unknown as { message?: unknown })?.message;
+    if (method !== 'GET' && typeof maybeMessage === 'string' && maybeMessage) {
+      toast.success(maybeMessage);
     }
     
     return response.data;
   } catch (error) {
     if (axios.isAxiosError(error)) {
-      const responseData = error.response?.data as any;
+      const responseData = error.response?.data as unknown;
+      const status = error.response?.status;
       
       // Auto-refresh token on 401 and retry the request
-      if (error.response?.status === 401 && retry) {
+      if (status === 401 && retry) {
         if (isRefreshing) {
           // Queue the request while token is being refreshed
-          return new Promise((resolve, reject) => {
+          return new Promise<void>((resolve, reject) => {
             failedQueue.push({ resolve, reject });
           })
-            .then(() => apiRequest<T>(endpoint, method, data, false))
+            .then(() => apiRequest<T>(endpoint, method, tokenOrData, data, false))
             .catch((err) => Promise.reject(err));
         }
 
@@ -74,7 +85,7 @@ export const apiRequest = async <T>(
           });
           
           processQueue(null); // Process queued requests with success
-          return apiRequest<T>(endpoint, method, data, false); // Retry original request
+          return apiRequest<T>(endpoint, method, tokenOrData, data, false); // Retry original request
         } catch (refreshError) {
           processQueue(refreshError); // Process queued requests with error
           
@@ -93,13 +104,21 @@ export const apiRequest = async <T>(
       }
 
       // Handle other error cases
-      if (responseData?.message) {
-        toast.error(responseData.message);
-      } else if (error.response?.status === 403) {
+      const errorMessage =
+        typeof responseData === 'object' &&
+        responseData !== null &&
+        'message' in responseData &&
+        typeof (responseData as { message?: unknown }).message === 'string'
+          ? String((responseData as { message?: unknown }).message)
+          : '';
+
+      if (errorMessage) {
+        toast.error(errorMessage);
+      } else if (status === 403) {
         toast.error("You don't have permission to perform this action");
-      } else if (error.response?.status === 404) {
+      } else if (status === 404) {
         toast.error("Resource not found");
-      } else if (error.response?.status >= 500) {
+      } else if (typeof status === 'number' && status >= 500) {
         toast.error("Server error. Please try again later.");
       } else {
         toast.error("An error occurred");
@@ -119,7 +138,7 @@ export const apiRequest = async <T>(
 export const legacyApiRequest = async <T>(
   endpoint: string,
   method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE" = "GET",
-  data?: any
+  data?: unknown
 ): Promise<T> => {
   const url = `${legacyBaseURL}${endpoint}`;
 
@@ -129,7 +148,7 @@ export const legacyApiRequest = async <T>(
     headers: {
       "Content-Type": "application/json",
     },
-    ...(data && { data }),
+    ...(data !== undefined ? { data } : {}),
   };
 
   try {
@@ -137,11 +156,19 @@ export const legacyApiRequest = async <T>(
     return response.data;
   } catch (error) {
     if (axios.isAxiosError(error)) {
-      const responseData = error.response?.data as any;
+      const responseData = error.response?.data as unknown;
 
       // Handle legacy API errors with toast notifications
-      if (responseData?.message) {
-        toast.error(`Legacy API Error: ${responseData.message}`);
+      const legacyErrorMessage =
+        typeof responseData === 'object' &&
+        responseData !== null &&
+        'message' in responseData &&
+        typeof (responseData as { message?: unknown }).message === 'string'
+          ? String((responseData as { message?: unknown }).message)
+          : '';
+
+      if (legacyErrorMessage) {
+        toast.error(`Legacy API Error: ${legacyErrorMessage}`);
       } else if (error.response?.status === 404) {
         toast.error("Legacy API endpoint not found. Please check if the legacy API is running.");
       } else if (error.response?.status >= 500) {

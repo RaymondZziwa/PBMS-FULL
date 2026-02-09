@@ -40,16 +40,33 @@ export class AuthController {
   @Post('login')
   async login(
     @Body() loginDto: AuthDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
     const authResult = await this.authService.login(loginDto);
     const { token, ...userData } = authResult;
 
-    const isProd = process.env.NODE_ENV === 'production';
-    const sameSite: 'none' | 'lax' = isProd ? 'none' : 'lax';
+    const forwardedProto = req.headers['x-forwarded-proto'];
+    const isForwardedHttps =
+      typeof forwardedProto === 'string'
+        ? forwardedProto.includes('https')
+        : false;
+
+    const origin = req.headers.origin;
+    const isHttpsOrigin =
+      typeof origin === 'string' ? origin.startsWith('https://') : false;
+
+    const isHttpsRequest = req.secure || isForwardedHttps;
+    const useCrossSiteCookies = [
+      isHttpsRequest,
+      process.env.NODE_ENV === 'production',
+      isHttpsOrigin,
+    ].some(Boolean);
+
+    const sameSite: 'none' | 'lax' = useCrossSiteCookies ? 'none' : 'lax';
     const cookieOptions = {
       httpOnly: true,
-      secure: isProd,
+      secure: useCrossSiteCookies,
       sameSite,
     };
 
@@ -75,16 +92,32 @@ export class AuthController {
   @Post('pbd/login')
   async Pbdlogin(
     @Body() loginDto: AuthDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
     const authResult = await this.authService.pbdLogin(loginDto);
     const { token, ...userData } = authResult;
 
-    const isProd = process.env.NODE_ENV === 'production';
-    const sameSite: 'none' | 'lax' = isProd ? 'none' : 'lax';
+    const forwardedProto = req.headers['x-forwarded-proto'];
+    const isForwardedHttps =
+      typeof forwardedProto === 'string'
+        ? forwardedProto.includes('https')
+        : false;
+
+    const origin = req.headers.origin;
+    const isHttpsOrigin =
+      typeof origin === 'string' ? origin.startsWith('https://') : false;
+
+    const isHttpsRequest = req.secure || isForwardedHttps;
+    const useCrossSiteCookies =
+      isHttpsRequest ||
+      process.env.NODE_ENV === 'production' ||
+      isHttpsOrigin;
+
+    const sameSite: 'none' | 'lax' = useCrossSiteCookies ? 'none' : 'lax';
     const cookieOptions = {
       httpOnly: true,
-      secure: isProd,
+      secure: useCrossSiteCookies,
       sameSite,
     };
 
@@ -157,11 +190,26 @@ export class AuthController {
 
     const newTokens = await this.authService.refreshTokens(req.user.id);
 
-    const isProd = process.env.NODE_ENV === 'production';
-    const sameSite: 'none' | 'lax' = isProd ? 'none' : 'lax';
+    const forwardedProto = req.headers['x-forwarded-proto'];
+    const isForwardedHttps =
+      typeof forwardedProto === 'string'
+        ? forwardedProto.includes('https')
+        : false;
+
+    const origin = req.headers.origin;
+    const isHttpsOrigin =
+      typeof origin === 'string' ? origin.startsWith('https://') : false;
+
+    const isHttpsRequest = req.secure || isForwardedHttps;
+    const useCrossSiteCookies =
+      isHttpsRequest
+      || process.env.NODE_ENV === 'production'
+      || isHttpsOrigin;
+
+    const sameSite: 'none' | 'lax' = useCrossSiteCookies ? 'none' : 'lax';
     const cookieOptions = {
       httpOnly: true,
-      secure: isProd,
+      secure: useCrossSiteCookies,
       sameSite,
     };
 
@@ -186,12 +234,26 @@ export class AuthController {
    * Logout - clear cookies
    */
   @Post('logout')
-  logout(@Res({ passthrough: true }) res: Response) {
-    const isProd = process.env.NODE_ENV === 'production';
-    const sameSite: 'none' | 'lax' = isProd ? 'none' : 'lax';
+  logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const forwardedProto = req.headers['x-forwarded-proto'];
+    const isForwardedHttps =
+      typeof forwardedProto === 'string'
+        ? forwardedProto.includes('https')
+        : false;
+
+    const origin = req.headers.origin;
+    const isHttpsOrigin =
+      typeof origin === 'string' ? origin.startsWith('https://') : false;
+
+    const isHttpsRequest = req.secure || isForwardedHttps;
+    const useCrossSiteCookies =
+      isHttpsRequest || process.env.NODE_ENV === 'production' ||
+      isHttpsOrigin;
+
+    const sameSite: 'none' | 'lax' = useCrossSiteCookies ? 'none' : 'lax';
     const cookieOptions = {
       httpOnly: true,
-      secure: isProd,
+      secure: useCrossSiteCookies,
       sameSite,
     };
 
