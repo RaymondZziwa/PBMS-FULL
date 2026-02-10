@@ -5,9 +5,9 @@ import type { ICartItem } from '../../../redux/types/sales';
 
 interface CartProps {
   cart: ICartItem[];
-  onQuantityChange: (itemId: string, quantity: number) => void;
-  onDiscountChange: (itemId: string, discount: number) => void;
-  onRemoveItem: (itemId: string) => void;
+  onQuantityChange: (itemId: string, unitId: number, quantity: number) => void;
+  onDiscountChange: (itemId: string, unitId: number, discount: number) => void;
+  onRemoveItem: (itemId: string, unitId: number) => void;
   onClearCart: () => void;
   onCheckout: () => void;
   total: number;
@@ -64,11 +64,11 @@ const Cart: React.FC<CartProps> = ({
           </div>
         ) : (
           cart.map(item => (
-            <div key={item.id} className="bg-white p-4 rounded-lg border border-gray-200">
+            <div key={`${item.id}-${item.unitId}`} className="bg-white p-4 rounded-lg border border-gray-200">
               <div className="flex justify-between items-start mb-2">
                 <h3 className="font-semibold text-gray-800">{item.name}</h3>
                 <button
-                  onClick={() => onRemoveItem(item.id)}
+                  onClick={() => onRemoveItem(item.id, item.unitId)}
                   className="text-red-500 hover:text-red-700"
                 >
                   <FaTrash size={14} />
@@ -81,14 +81,14 @@ const Cart: React.FC<CartProps> = ({
                   <span className="text-sm text-gray-600">Quantity:</span>
                   <div className="flex items-center space-x-2">
                     <button
-                      onClick={() => onQuantityChange(item.id, item.quantity - 1)}
+                      onClick={() => onQuantityChange(item.id, item.unitId, item.quantity - 1)}
                       className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center"
                     >
                       -
                     </button>
                     <span className="w-8 text-center">{item.quantity}</span>
                     <button
-                      onClick={() => onQuantityChange(item.id, item.quantity + 1)}
+                      onClick={() => onQuantityChange(item.id, item.unitId, item.quantity + 1)}
                       className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center"
                     >
                       +
@@ -104,7 +104,7 @@ const Cart: React.FC<CartProps> = ({
                   <input
                     type="number"
                     value={item.discount}
-                    onChange={(e) => onDiscountChange(item.id, Number(e.target.value))}
+                    onChange={(e) => onDiscountChange(item.id, item.unitId, Number(e.target.value))}
                     className="w-full p-2 border border-gray-300 rounded text-sm"
                     min="0"
                     max={item.price * item.quantity}

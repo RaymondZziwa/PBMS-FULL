@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { FaTimes, FaUserPlus, FaPrint, FaCheck } from 'react-icons/fa';
 import { useReactToPrint } from 'react-to-print';
 import useClients from '../../../hooks/sales/useClients';
-import type { ICartItem, ICheckoutData, IClient, IPaymentMethod } from '../../../redux/types/sales';
+import type { ICartItem, IPaymentMethod } from '../../../redux/types/sales';
 import { PrintableContent } from './receipt';
 import CustomDropdown from '../../../custom/inputs/customDropdown';
 import { useSelector } from 'react-redux';
@@ -10,7 +10,6 @@ import type { RootState } from '../../../redux/store';
 import { toast } from 'sonner';
 import { apiRequest } from '../../../libs/apiConfig';
 import { SALESENDPOINTS } from '../../../endpoints/sales/salesEndpoints';
-import AddOrModifyClient from '../customers/AddorModify';
 
 interface CheckoutModalProps {
   visible: boolean;
@@ -46,16 +45,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   ]);
   const [notes, setNotes] = useState('');
   const [amountPaid, setAmountPaid] = useState(total);
-
-  const [modalProps, setModalProps] = useState<{
-    isOpen: boolean;
-    mode: 'create' | 'edit' | '';
-    client: IClient | null;
-  }>({
-    isOpen: false,
-    mode: 'create',
-    client: null
-  });
 
   const receiptRef = useRef<HTMLDivElement>(null);
   const handlePrint = useReactToPrint({
@@ -216,7 +205,8 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         },
         quantity: item.quantity || 0,
         discount: item.discount || 0,
-        total: item.total || 0
+        total: item.total || 0,
+        unitId: item.unitId || 0
       })),
       storeId: Number(storeId),
       servedBy: user?.id ? Number(user.id) : 0
@@ -291,7 +281,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     maxHeight={200}
                   />
                   <button
-                    onClick={() => setModalProps({ isOpen: true, mode: 'create', client: null })}
                     className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 flex items-center transition-colors"
                   >
                     <FaUserPlus className="mr-2" />
@@ -536,15 +525,9 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
           <div ref={receiptRef}>
             <PrintableContent
               client_names={selectedCustomerName}
-              cart={cart.map(item => ({
-                ...item,
-                price: item.price.toString(),
-                quantity: item.quantity.toString(),
-                discount: item.discount.toString()
-              }))}
+              cart={cart}
               total={total}
               status={paymentStatus}
-              amountPaid={amountPaid}
               balance={balance}
               branch={user.branch?.name || 'Unknown Branch'}
               department={user.department?.name || 'Unknown Department'}

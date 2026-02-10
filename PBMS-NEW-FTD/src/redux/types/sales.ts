@@ -58,6 +58,7 @@ export interface ICartItem {
   quantity: number;
   discount: number;
   total: number;
+  unitId: number;
 }
 
 export interface IPaymentMethod {

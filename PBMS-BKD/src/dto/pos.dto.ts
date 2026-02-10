@@ -89,7 +89,18 @@ export class CreateSaleDto {
 
   @IsArray()
   @ValidateNested({ each: true })
-  items: any[];
+  items: {
+    id: number;
+    categoryId: number;
+    name: string;
+    price: string;
+    barcode: string;
+    category: any;
+    quantity: number;
+    discount: number;
+    total: number;
+    unitId: number;
+  }[];
 
   @IsNumber()
   @IsNotEmpty()
@@ -153,7 +164,8 @@ export class CollectCreditPaymentDto {
 
   @IsNumber()
   @IsNotEmpty()
-  servedBy: number;  referenceId?: number;
+  servedBy: number;
+  referenceId?: number;
 
   @IsOptional()
   @IsString()

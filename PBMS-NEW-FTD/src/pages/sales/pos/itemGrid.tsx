@@ -147,7 +147,7 @@ const ItemsGrid: React.FC<ItemsGridProps> = ({
               <div
                 key={item.id}
                 onClick={() => {
-                  onAddToCart(item.item);
+                  onAddToCart(item.item, item.unit.id);
                   setSearchTerm(''); // Clear search after adding to cart
                 }}
                 className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow cursor-pointer"

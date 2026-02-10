@@ -28,20 +28,28 @@ export class SalesService {
       status,
     } = createSaleDto;
 
-    const itemIds = items.map((item) => item.id);
-
     return this.prisma.$transaction(async (tx) => {
-      // 1️⃣ Fetch current inventory for all items in the store
+      // 1️⃣ Fetch inventory matching itemId + unitId in this store
       const inventories = await tx.productInventory.findMany({
         where: {
           storeId,
-          itemId: { in: itemIds },
+          OR: items.map((item) => ({
+            itemId: item.id,
+            unitId: item.unitId,
+          })),
         },
       });
 
-      // 2️⃣ Check if all items have sufficient quantity
+      // Build lookup map: "itemId-unitId" → inventory
+      const inventoryMap = new Map(
+        inventories.map((inv) => [`${inv.itemId}-${inv.unitId}`, inv]),
+      );
+
+      // 2️⃣ Check stock availability
       for (const saleItem of items) {
-        const inventory = inventories.find((inv) => inv.itemId === saleItem.id);
+        const key = `${saleItem.id}-${saleItem.unitId}`;
+        const inventory = inventoryMap.get(key);
+
         if (!inventory || inventory.qty < saleItem.quantity) {
           throw new BadRequestException(
             `Insufficient stock for item "${saleItem.name}". Available: ${inventory?.qty ?? 0}, Required: ${saleItem.quantity}`,
@@ -51,20 +59,24 @@ export class SalesService {
 
       // 3️⃣ Reduce inventory quantities
       for (const saleItem of items) {
-        const inventory = inventories.find((inv) => inv.itemId === saleItem.id);
+        const key = `${saleItem.id}-${saleItem.unitId}`;
+        const inventory = inventoryMap.get(key);
 
         if (!inventory) {
           throw new BadRequestException(
             `Inventory record not found for item "${saleItem.name}"`,
           );
         }
+
         await tx.productInventory.update({
-          where: { id: inventory?.id },
-          data: { qty: inventory?.qty - saleItem.quantity },
+          where: { id: inventory.id },
+          data: {
+            qty: inventory.qty - saleItem.quantity,
+          },
         });
       }
 
-      // 4️⃣ Create the sale
+      // 4️⃣ Create sale record
       const sale = await tx.sale.create({
         data: {
           clientId: customerId,
@@ -84,7 +96,7 @@ export class SalesService {
         },
       });
 
-      // Create payment records for all payment methods
+      // 5️⃣ Create payment records
       if (paymentMethods && paymentMethods.length > 0) {
         await Promise.all(
           paymentMethods.map((method) =>
@@ -94,7 +106,7 @@ export class SalesService {
                 amount: method.amount,
                 paymentMethod: method.type,
                 referenceId: '',
-                notes: notes,
+                notes,
                 cashierId: servedBy,
               },
             }),

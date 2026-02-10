@@ -84,12 +84,13 @@ const PointOfSale: React.FC = () => {
     toast.success(`Store set to ${storeName}`);
   };
 
-  const handleAddToCart = (item: IItem) => {
+  const handleAddToCart = (item: IItem, unitId: number) => {
+    console.log('itemcadded', item, unitId)
     setCart(prevCart => {
-      const existingItem = prevCart.find(cartItem => cartItem.id === item.id);
+      const existingItem = prevCart.find(cartItem => cartItem.id === item.id && cartItem.unitId === unitId);
       if (existingItem) {
         return prevCart.map(cartItem =>
-          cartItem.id === item.id
+          cartItem.id === item.id && cartItem.unitId === unitId
             ?
             { 
               ...cartItem, 
@@ -103,7 +104,8 @@ const PointOfSale: React.FC = () => {
           ...item,
           quantity: 1,
           discount: 0,
-          total: Number(item.price)
+          total: Number(item.price),
+          unitId: Number(unitId)
         }];
       }
     });
@@ -112,39 +114,39 @@ const PointOfSale: React.FC = () => {
   const handleBarcodeScan = (barcode: string) => {
     const item = allItems?.find(i => i.item.barcode && i.item.barcode.toString() === barcode);
     if (item) {
-      handleAddToCart(item.item);
+      handleAddToCart(item.item, item.unit.id);
       toast.success(`Added ${item.item.name} to cart`);
     } else {
       toast.error('Item not found');
     }
   };
 
-  const handleQuantityChange = (itemId: string, newQuantity: number) => {
+  const handleQuantityChange = (itemId: string, unitId: number, newQuantity: number) => {
     if (newQuantity < 1) {
-      handleRemoveFromCart(itemId);
+      handleRemoveFromCart(itemId, unitId);
       return;
     }
     setCart(prevCart =>
       prevCart.map(item =>
-        item.id === itemId
+        item.id === itemId && item.unitId === unitId
           ? { ...item, quantity: newQuantity, total: (item.price * newQuantity) - item.discount }
           : item
       )
     );
   };
 
-  const handleDiscountChange = (itemId: string, discount: number) => {
+  const handleDiscountChange = (itemId: string, unitId: number, discount: number) => {
     setCart(prevCart =>
       prevCart.map(item =>
-        item.id === itemId
+        item.id === itemId && item.unitId === unitId
           ? { ...item, discount, total: (item.price * item.quantity) - discount }
           : item
       )
     );
   };
 
-  const handleRemoveFromCart = (itemId: string) => {
-    setCart(prevCart => prevCart.filter(item => item.id !== itemId));
+  const handleRemoveFromCart = (itemId: string, unitId: number) => {
+    setCart(prevCart => prevCart.filter(item => !(item.id === itemId && item.unitId === unitId)));
   };
 
   const handleClearCart = () => {
