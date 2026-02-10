@@ -81,7 +81,11 @@ export class ClientController {
     @UploadedFiles() files: Express.Multer.File[],
     @Body() body: { notes: string; prescribedBy: number },
   ) {
-    return await this.clientService.uploadPrescriptionImages(Number(id), files, body);
+    return await this.clientService.uploadPrescriptionImages(
+      Number(id),
+      files,
+      body,
+    );
   }
 
   @Get('fetch-prescriptions/:id')

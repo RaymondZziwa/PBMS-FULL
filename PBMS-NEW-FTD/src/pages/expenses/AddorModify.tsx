@@ -123,6 +123,15 @@ const AddOrModifyBranchExpense: React.FC<AddOrModifyBranchExpenseProps> = ({
         </h3>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+           {/* Date Incurred */}
+          <div>
+  <CustomDateInput
+    label="Date Incurred"
+    value={formData.dateIncurred}
+    onChange={(val) => setFormData((p) => ({ ...p, dateIncurred: val }))}
+    isRequired={true}
+  />
+</div>
           {/* Category - FIXED: Added singleSelect and corrected onChange */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -182,16 +191,6 @@ const AddOrModifyBranchExpense: React.FC<AddOrModifyBranchExpenseProps> = ({
 
             />
           </div>
-
-          {/* Date Incurred */}
-          <div>
-  <CustomDateInput
-    label="Date Incurred"
-    value={formData.dateIncurred}
-    onChange={(val) => setFormData((p) => ({ ...p, dateIncurred: val }))}
-    isRequired={true}
-  />
-</div>
 
           <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
             <CustomButton type="negative" fn={onCancel} label="Cancel" />

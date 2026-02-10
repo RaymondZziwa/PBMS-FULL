@@ -16,6 +16,7 @@ async function bootstrap() {
       'https://kingserp.netlify.app',
       'https://pbms.megaerpug.com',
       'http://localhost:8081',
+      'https://pbdp.megaerpug.com'
     ],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,

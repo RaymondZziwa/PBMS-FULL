@@ -158,10 +158,10 @@ const ItemsGrid: React.FC<ItemsGridProps> = ({
                   <p>Barcode: {item.item.barcode}</p>
                   <p>Category: {item.item.category ? item.item.category.name : 'Uncategorized'}</p>
                   {item.qty === 0 ? (
-                    <p className="text-red-600 font-medium">Out of Stock</p>
+                    <p className="text-red-600 font-medium">{item.qty} {item.unit.abr} Available</p>
                   ) : (
                     <p className="text-green-600 font-medium">
-                      {item.qty} Available
+                      {item.qty} {item.unit.abr} Available
                     </p>
                   )}
                 </div>
