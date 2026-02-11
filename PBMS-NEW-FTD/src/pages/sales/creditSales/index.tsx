@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { FaPlus, FaEdit, FaTrash } from 'react-icons/fa';
+import { FaTrash, FaEye } from 'react-icons/fa';
 import CustomTable from '../../../custom/table/customTable';
 import CustomDeleteModal from '../../../custom/modals/customDeleteModal';
 import { toast } from 'sonner';
@@ -39,6 +39,7 @@ const CreditSalesManagement = () => {
 
       const [selectedSale, setSelectedSale] = useState<ISale | null>(null);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [showViewModal, setShowViewModal] = useState(false);
 
     const handleCollectPayment = (sale: ISale) => {
         setSelectedSale(sale);
@@ -47,6 +48,11 @@ const CreditSalesManagement = () => {
 
     const handlePaymentCollected = () => {
         refresh(selectedStore);
+    };
+
+    const handleViewSale = (sale: ISale) => {
+        setSelectedSale(sale);
+        setShowViewModal(true);
     };
 
     useEffect(() => {
@@ -105,6 +111,18 @@ const CreditSalesManagement = () => {
         createdAt: formatDate(sale.createdAt),
         actions: (
             <div className="flex gap-3">
+                <div className="relative group">
+                    <button
+                        className="text-green-600 hover:text-green-800 transition-colors"
+                        onClick={() => handleViewSale(sale)}
+                    >
+                        <FaEye />
+                    </button>
+                    <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                        View Sale
+                    </span>
+                </div>
+
                 <div className="relative group">
                     <button
                         className="text-blue-600 hover:text-blue-800 transition-colors"
@@ -179,6 +197,122 @@ const CreditSalesManagement = () => {
                         currentUser={{ id: user.id, name: `${user.firstName} ${user.lastName}` }}
                         />
                     )}
+
+            {/* View Sale Items Modal */}
+            {selectedSale && showViewModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-xl font-bold text-gray-800">
+                                Sale Details - {selectedSale.client?.firstName} {selectedSale.client?.lastName}
+                            </h3>
+                            <button
+                                onClick={() => {
+                                    setShowViewModal(false);
+                                    setSelectedSale(null);
+                                }}
+                                className="text-gray-500 hover:text-gray-700 text-2xl"
+                            >
+                                &times;
+                            </button>
+                        </div>
+
+                        <div className="mb-4 grid grid-cols-2 gap-4">
+                            <div>
+                                <span className="font-semibold">Sale ID:</span> #{selectedSale.id}
+                            </div>
+                            <div>
+                                <span className="font-semibold">Status:</span>{' '}
+                                <span className={`px-2 py-1 rounded text-xs ${
+                                    selectedSale.status === 'FULLY_PAID'
+                                        ? 'bg-green-100 text-green-800'
+                                        : selectedSale.status === 'PARTIALLY_PAID'
+                                        ? 'bg-yellow-100 text-yellow-800'
+                                        : 'bg-red-100 text-red-800'
+                                }`}>
+                                    {selectedSale.status}
+                                </span>
+                            </div>
+                            <div>
+                                <span className="font-semibold">Total:</span> UGX {Number(selectedSale.total).toLocaleString()}
+                            </div>
+                            <div>
+                                <span className="font-semibold">Balance:</span> UGX {Number(selectedSale.balance).toLocaleString()}
+                            </div>
+                            <div>
+                                <span className="font-semibold">Store:</span> {selectedSale.store?.name}
+                            </div>
+                            <div>
+                                <span className="font-semibold">Served By:</span> {selectedSale.employee?.firstName} {selectedSale.employee?.lastName}
+                            </div>
+                            <div>
+                                <span className="font-semibold">Date:</span> {new Date(selectedSale.createdAt).toLocaleString()}
+                            </div>
+                            {selectedSale.notes && (
+                                <div className="col-span-2">
+                                    <span className="font-semibold">Notes:</span> {selectedSale.notes}
+                                </div>
+                            )}
+                        </div>
+
+                        <h4 className="text-lg font-semibold mb-3">Items</h4>
+                        <div className="overflow-x-auto">
+                            <table className="w-full border-collapse">
+                                <thead>
+                                    <tr className="bg-gray-100">
+                                        <th className="border border-gray-300 px-4 py-2 text-left">Item</th>
+                                        <th className="border border-gray-300 px-4 py-2 text-left">Barcode</th>
+                                        <th className="border border-gray-300 px-4 py-2 text-right">Qty</th>
+                                        <th className="border border-gray-300 px-4 py-2 text-right">Unit Price</th>
+                                        <th className="border border-gray-300 px-4 py-2 text-right">Discount</th>
+                                        <th className="border border-gray-300 px-4 py-2 text-right">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {selectedSale.items.map((item) => (
+                                        <tr key={item.id} className="hover:bg-gray-50">
+                                            <td className="border border-gray-300 px-4 py-2">{item.name}</td>
+                                            <td className="border border-gray-300 px-4 py-2">{item.barcode}</td>
+                                            <td className="border border-gray-300 px-4 py-2 text-right">{item.quantity}</td>
+                                            <td className="border border-gray-300 px-4 py-2 text-right">
+                                                UGX {Number(item.price).toLocaleString()}
+                                            </td>
+                                            <td className="border border-gray-300 px-4 py-2 text-right">
+                                                UGX {Number(item.discount).toLocaleString()}
+                                            </td>
+                                            <td className="border border-gray-300 px-4 py-2 text-right">
+                                                UGX {Number(item.total).toLocaleString()}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                                <tfoot>
+                                    <tr className="bg-gray-100 font-semibold">
+                                        <td colSpan={5} className="border border-gray-300 px-4 py-2 text-right">
+                                            Total:
+                                        </td>
+                                        <td className="border border-gray-300 px-4 py-2 text-right">
+                                            UGX {selectedSale.items.reduce((sum, item) => sum + Number(item.total), 0).toLocaleString()}
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+
+                        <div className="mt-6 flex justify-end">
+                            <button
+                                onClick={() => {
+                                    setShowViewModal(false);
+                                    setSelectedSale(null);
+                                }}
+                                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <CustomDeleteModal
                 visible={isDeleteModalOpen}

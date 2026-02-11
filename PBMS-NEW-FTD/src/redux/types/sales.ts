@@ -1,4 +1,18 @@
 import type { IItem } from "./inventory";
+
+// Item as it appears in a sale (with quantity, discount, total)
+export interface ISaleItem extends Omit<IItem, 'category'> {
+  quantity: number;
+  discount: number;
+  total: number;
+  unitId: number;
+  categoryId: number;
+  category: {
+    id: number;
+    name: string;
+  };
+}
+
 export interface PaymentMethodDto {
   method: 'CASH' | 'MTN_MOMO' | 'AIRTEL_MOMO' | 'CARD' | 'PROF_MOMO';
   amount: number;
@@ -13,7 +27,7 @@ export interface ISale {
     lastName: string;
     phone?: string;
   };
-  items: IItem[];
+  items: ISaleItem[];
   servedBy: string;
   employee: {
     id: string;
