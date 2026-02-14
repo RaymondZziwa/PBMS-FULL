@@ -49,7 +49,7 @@ const ClientsManagement = () => {
   const columns = [
     { key: 'firstName', label: 'First Name', sortable: true, filterable: true },
     { key: 'lastName', label: 'Last Name', sortable: true, filterable: true },
-    { key: 'contact', label: 'Contact', sortable: true, filterable: true },
+    { key: 'phone', label: 'Contact', sortable: true, filterable: true },
     { key: 'address', label: 'Address', sortable: true, filterable: true },
     { key: 'createdAt', label: 'Created At', sortable: true, filterable: false },
     { key: 'actions', label: 'Actions', sortable: false, filterable: false },
