@@ -20,6 +20,7 @@ export class ItemService {
     const item = await this.prismaService.item.create({
       data: {
         ...data,
+        categoryId: data.categoryId ? Number(data.categoryId) : null,
         barcode,
       },
     });

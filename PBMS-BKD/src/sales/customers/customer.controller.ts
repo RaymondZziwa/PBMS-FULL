@@ -99,7 +99,11 @@ export class ClientController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    return this.clientService.prescriptionHistory(Number(id), startDate, endDate);
+    return this.clientService.prescriptionHistory(
+      Number(id),
+      startDate,
+      endDate,
+    );
   }
 
   @Put('review-prescription/:id')

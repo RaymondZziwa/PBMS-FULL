@@ -45,6 +45,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   ]);
   const [notes, setNotes] = useState('');
   const [amountPaid, setAmountPaid] = useState(total);
+  const [phoneNumber, setPhoneNumber] = useState('');
 
   const receiptRef = useRef<HTMLDivElement>(null);
   const handlePrint = useReactToPrint({
@@ -53,6 +54,43 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   });
 
   const balance = total - amountPaid;
+
+  // Format phone number to always start with +256
+  const formatPhoneNumber = (number: string) => {
+    if (!number) return '';
+    // Remove all non-digit characters
+    const cleanNumber = number.replace(/\D/g, '');
+    
+    // If number starts with 0, replace with +256
+    if (cleanNumber.startsWith('0') && cleanNumber.length === 10) {
+      return '+256' + cleanNumber.substring(1);
+    }
+    
+    // If number already starts with 256, add +
+    if (cleanNumber.startsWith('256') && cleanNumber.length === 12) {
+      return '+' + cleanNumber;
+    }
+    
+    // If number already starts with +256, return as is
+    if (number.startsWith('+256')) {
+      return number;
+    }
+    
+    // If it's a 9-digit number (without leading 0), add +256
+    if (cleanNumber.length === 9) {
+      return '+256' + cleanNumber;
+    }
+    
+    // Return original if no pattern matches
+    return number;
+  };
+
+  // Check if there are mobile money payments
+  const hasMobileMoneyPayments = () => {
+    return paymentMethods.some(method => 
+      (method.type === 'AIRTEL_MOMO' || method.type === 'MTN_MOMO') && method.amount > 0
+    );
+  };
 
   // Get selected customer name for receipt
   const selectedCustomerName = (() => {
@@ -74,7 +112,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const getTransactionIdForReceipt = () => {
     const momoMethod = paymentMethods.find(method => 
-        method.type === 'MTN_MOMO' || method.type === 'AIRTEL_MOMO' || method.type === 'PROF_MOMO'
+        method.type === 'MTN_MOMO' || method.type === 'AIRTEL_MOMO'
     );
     return momoMethod?.transactionId || '';
   };
@@ -126,7 +164,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   // Check if payment method requires transaction ID
   const requiresTransactionId = (methodType: string) => {
-    return methodType === 'MTN_MOMO' || methodType === 'AIRTEL_MOMO' || methodType === 'PROF_MOMO' || methodType === 'CARD';
+    return methodType === 'MTN_MOMO' || methodType === 'AIRTEL_MOMO' ;
   };
 
   const validatePaymentMethods = () => {
@@ -143,14 +181,29 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       return false;
     }
 
-    // Validate transaction IDs for required methods
-    for (const method of paymentMethods) {
-      if (requiresTransactionId(method.type) && !method.transactionId?.trim()) {
-        const methodName = PAYMENT_METHOD_OPTIONS.find(opt => opt.value === method.type)?.label || method.type;
-        toast.error(`Please enter transaction ID for ${methodName}`);
+    // Validate phone number if mobile money payments exist
+    if (hasMobileMoneyPayments() && !phoneNumber.trim()) {
+      toast.error('Please enter a phone number for mobile money payments');
+      return false;
+    }
+
+    // Validate phone number format
+    if (hasMobileMoneyPayments() && phoneNumber.trim()) {
+      const formattedNumber = formatPhoneNumber(phoneNumber);
+      if (!formattedNumber.startsWith('+256') || formattedNumber.length !== 13) {
+        toast.error('Please enter a valid phone number (e.g., 07xx... or +256xxx...)');
         return false;
       }
     }
+
+    // Validate transaction IDs for required methods
+    // for (const method of paymentMethods) {
+    //   if (requiresTransactionId(method.type) && !method.transactionId?.trim()) {
+    //     const methodName = PAYMENT_METHOD_OPTIONS.find(opt => opt.value === method.type)?.label || method.type;
+    //     toast.error(`Please enter transaction ID for ${methodName}`);
+    //     return false;
+    //   }
+    // }
 
     return true;
   };
@@ -183,7 +236,21 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     const storedStore = localStorage.getItem('posStore');
     const storeId = storedStore ? JSON.parse(storedStore).storeId : null;
 
-    const checkoutData = {
+    // Calculate mobile money charges (8% only on mobile money payments)
+    const chargePercentage = 0.08;
+    const mobileMoneyMethods = paymentMethods.filter(method => 
+      (method.type === 'AIRTEL_MOMO' || method.type === 'MTN_MOMO') && method.amount > 0
+    );
+    const mobileMoneyTotal = mobileMoneyMethods.reduce((sum, method) => sum + method.amount, 0);
+    const charges = mobileMoneyTotal * chargePercentage;
+    const totalWithCharges = total + charges;
+
+    console.log('total', total);
+    console.log('mobileMoneyTotal', mobileMoneyTotal);
+    console.log('charges', charges);
+    console.log('totalWithCharges', totalWithCharges);
+
+    const checkoutData: any = {
       customerId: selectedCustomer ? Number(selectedCustomer) : undefined,
       status: paymentStatus,
       paymentMethods: paymentStatus === 'UNPAID' ? [] : paymentMethods.filter(method => method.amount > 0).map(method => ({
@@ -212,6 +279,16 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       servedBy: user?.id ? Number(user.id) : 0
     };
 
+    // Add totalWithCharges only if there are mobile money payments
+    if (mobileMoneyTotal > 0) {
+      checkoutData.totalWithCharges = totalWithCharges;
+    }
+
+    // Add formatted phone number if mobile money payments exist
+    if (hasMobileMoneyPayments() && phoneNumber.trim()) {
+      checkoutData.phoneNumber = formatPhoneNumber(phoneNumber);
+    }
+
     if (!checkoutData.customerId) {
       toast.error('Please select a customer');
       return;
@@ -226,6 +303,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       setPaymentMethods([]); // Clear payment methods completely
       setNotes('');
       setAmountPaid(0);
+      setPhoneNumber('');
       handlePrint();
 
       onCompleteSale();
@@ -406,6 +484,25 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       Total from payment methods: {paymentMethods.reduce((sum, method) => sum + method.amount, 0).toLocaleString()} UGX
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Phone Number for Mobile Money */}
+              {hasMobileMoneyPayments() && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Phone Number for Mobile Money
+                  </label>
+                  <input
+                    type="tel"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter phone number (e.g., 07xx... or +256xxx...)"
+                  />
+                  <div className="text-xs text-gray-500 mt-1">
+                    Phone number will be formatted to +256 format
+                  </div>
                 </div>
               )}
 

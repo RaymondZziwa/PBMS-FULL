@@ -23,6 +23,7 @@ import type { RootState } from "../redux/store";
     "access_cheque_management_module",
     "access_exhibition_module",
     "access_ticket_module",
+    "access_wallets_module",
     "view_sales_reports",
     "create_and_modify_roles",
     "view_event_tickets",
@@ -110,7 +111,7 @@ const SidebarItem = ({
   const hasChildren = route.routes && route.routes.length > 0;
   const isActive = pathname === route.path;
 
-  if (!checkPermission(route.requiredPermission)) return null;
+  if (!hasPermission(route.requiredPermission)) return null;
 
   return (
     <div>

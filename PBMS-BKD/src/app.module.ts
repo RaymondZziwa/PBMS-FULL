@@ -20,7 +20,8 @@ import { ReportsModule } from './reports/reports.module';
 import { MassagePosModule } from './sales/massage/massagepos.module';
 import { FarmModule } from './farm/farm.module';
 import { ManufacturingModule } from './manufacturing/manufacturing.module';
-
+import { ScheduleModule } from '@nestjs/schedule';
+import { FinanceModule } from './finance/finance.module';
 @Module({
   imports: [
     ServeStaticModule.forRoot({
@@ -31,6 +32,7 @@ import { ManufacturingModule } from './manufacturing/manufacturing.module';
         redirect: false,
       },
     }),
+    ScheduleModule.forRoot(),
     CompanyModule,
     BranchModule,
     PrismaModule,
@@ -50,6 +52,7 @@ import { ManufacturingModule } from './manufacturing/manufacturing.module';
     MassagePosModule,
     FarmModule,
     ManufacturingModule,
+    FinanceModule,
   ],
 })
 export class AppModule {}

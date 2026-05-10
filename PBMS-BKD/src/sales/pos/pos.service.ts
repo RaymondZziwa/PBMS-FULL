@@ -1,8 +1,10 @@
+import { HttpService } from '@nestjs/axios';
 import {
   BadRequestException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { SaleStatus } from '@prisma/client';
 import {
   CollectCreditPaymentDto,
@@ -10,10 +12,49 @@ import {
   UpdateSaleDto,
 } from 'src/dto/pos.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { collectPayment } from 'src/utils/payments/collectPayment';
 
+interface CollectionResponse {
+  status: string;
+  message: string;
+
+  data: {
+    transaction: {
+      uuid: string;
+      reference: string;
+      status: string;
+      provider_reference: string;
+    };
+
+    collection: {
+      amount: {
+        total?: number;
+        currency?: string;
+      };
+
+      provider: string;
+      phone_number: string;
+      mode: string;
+    };
+
+    timeline: {
+      initiated_at: string;
+      estimated_settlement: string;
+    };
+
+    metadata: {
+      response_timestamp: string;
+      sandbox_mode: boolean;
+    };
+  };
+}
 @Injectable()
 export class SalesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly httpService: HttpService,
+    private readonly configService: ConfigService,
+  ) {}
 
   async create(createSaleDto: CreateSaleDto) {
     const {
@@ -24,11 +65,71 @@ export class SalesService {
       paymentMethods,
       notes,
       total,
+      totalWithCharges,
       balance,
       status,
+      phoneNumber,
     } = createSaleDto;
 
     return this.prisma.$transaction(async (tx) => {
+      // If totalWithCharges is provided, process payment gateway first
+      let paymentResult: CollectionResponse = {
+        status: 'success',
+        message: '',
+
+        data: {
+          transaction: {
+            uuid: '',
+            reference: '',
+            status: 'processing',
+            provider_reference: '',
+          },
+
+          collection: {
+            amount: {
+              total: 0,
+              currency: '',
+            },
+
+            provider: '',
+            phone_number: '',
+            mode: '',
+          },
+
+          timeline: {
+            initiated_at: '',
+            estimated_settlement: '',
+          },
+
+          metadata: {
+            response_timestamp: '',
+            sandbox_mode: false,
+          },
+        },
+      };
+      let amountToProcess = total;
+
+      if (totalWithCharges && totalWithCharges > total) {
+        amountToProcess = totalWithCharges;
+        paymentResult = await collectPayment(
+          this.httpService,
+          this.configService,
+          {
+            amount: amountToProcess,
+            //method: 'Mobile_Money',
+            country: 'UG',
+            description: 'POS Sale Payment',
+            phone_number: phoneNumber,
+          },
+        );
+
+        console.log('result', paymentResult);
+
+        // The initial request always returns success, real status comes from callback
+        // We proceed with the sale and wait for callback to confirm payment status
+        // Store the transaction reference for tracking
+        const transactionReference = paymentResult.data.transaction.reference;
+      }
       // 1️⃣ Fetch inventory matching itemId + unitId in this store
       const inventories = await tx.productInventory.findMany({
         where: {
@@ -105,8 +206,8 @@ export class SalesService {
                 saleId: sale.id,
                 amount: method.amount,
                 paymentMethod: method.type,
-                referenceId: '',
-                notes,
+                referenceId: paymentResult ? paymentResult.data.transaction.reference : '',
+                notes: paymentResult ? `Transaction Ref: ${paymentResult.data.transaction.reference}` : notes,
                 cashierId: servedBy,
               },
             }),
@@ -114,9 +215,24 @@ export class SalesService {
         );
       }
 
+      // 6️⃣ For async payments, wallet balance will be updated via callback
+      // Don't update wallet here - wait for callback confirmation
+      if (paymentResult) {
+        console.log(`Payment initiated. Transaction Reference: ${paymentResult.data.transaction.reference}`);
+        console.log('Waiting for callback to confirm payment status...');
+      }
+
       return {
         message: 'Sale created successfully',
-        data: sale,
+        data: {
+          ...sale,
+          paymentInitiated: !!paymentResult,
+          transactionReference: paymentResult ? paymentResult.data.transaction.reference : null,
+          amountProcessed: amountToProcess,
+          message: paymentResult 
+            ? `Payment initiated. Transaction Reference: ${paymentResult.data.transaction.reference}. Waiting for payment confirmation...`
+            : 'No payment processing required',
+        },
         status: 200,
       };
     });
@@ -267,5 +383,34 @@ export class SalesService {
     await this.prisma.sale.delete({ where: { id } });
 
     return { message: 'Sale deleted successfully' };
+  }
+
+  private async processPaymentGatewaySimulation(
+    amount: number,
+    paymentType: string,
+    metadata?: any,
+  ): Promise<{ success: boolean; transactionId?: string; message: string }> {
+    // TODO: Integrate with actual payment gateway (Stripe, PayPal, Mobile Money, etc.)
+    // This is where you'll call the payment gateway API for POS sales
+
+    // Simulate payment processing delay
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    // Simulate payment success (90% success rate for demo)
+    const isSuccess = Math.random() > 0.1;
+
+    if (isSuccess) {
+      return {
+        success: true,
+        transactionId: `pos_sale_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        message: 'Payment processed successfully',
+      };
+    } else {
+      return {
+        success: false,
+        message:
+          'Payment gateway simulation failed - insufficient funds or declined',
+      };
+    }
   }
 }

@@ -87,6 +87,10 @@ export class CreateSaleDto {
   @IsNumber()
   balance: number;
 
+  @IsOptional()
+  @IsNumber()
+  totalWithCharges?: number;
+
   @IsArray()
   @ValidateNested({ each: true })
   items: {
@@ -113,6 +117,10 @@ export class CreateSaleDto {
   @IsNumber()
   @IsNotEmpty()
   servedBy: number;
+
+  @IsString()
+  @IsOptional()
+  phoneNumber: string;
 }
 
 export class ExhibitionCreateSaleDto {

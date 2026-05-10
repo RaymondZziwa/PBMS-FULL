@@ -17,7 +17,8 @@ import {
     FaReceipt,
     FaUserInjured,
     FaIndustry,
-    FaArchive
+    FaArchive,
+    FaWallet
   } from 'react-icons/fa';
 import { SystemConfigRoutes } from './systemConfigRoutes';
 import { ExhibitionRoutes } from './exhibitionRoutes';
@@ -35,6 +36,7 @@ import { FarmRoutes } from './farmRoutes';
 import { ExpensesRoutes } from './expensesRoutes';
 import { ManufacturingRoutes } from './manufacturingRoutes';
 import { ArchiveRoutes } from './archiveRoutes';
+import { WalletRoutes } from './walletRoutes';
   
   export const Routes = [
     {
@@ -99,6 +101,12 @@ import { ArchiveRoutes } from './archiveRoutes';
         icon: FaReceipt,
         routes: ExpensesRoutes,
         requiredPermission: "access_sales_module"
+      },
+      {
+        name: "Wallets",
+        icon: FaWallet,
+        routes: WalletRoutes,
+        requiredPermission: "access_wallets_module"
       },
       {
         name: "Farm",

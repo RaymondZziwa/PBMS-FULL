@@ -31,6 +31,12 @@ export class CreateEventDto {
   @IsString()
   @IsOptional()
   location?: string;
+
+  @IsNumber()
+  @IsOptional()
+  capacity?: number;
+
+  walletId: number;
 }
 
 export class UpdateEventDto extends PartialType(CreateEventDto) {}
@@ -52,6 +58,10 @@ export class CreateEventParticipantDto {
   @IsOptional()
   tel2?: string;
 
+  @IsString()
+  @IsOptional()
+  email?: string;
+
   @IsNumber()
   @IsPositive()
   amountPaid: number;
@@ -59,6 +69,10 @@ export class CreateEventParticipantDto {
   @IsEnum(EventPaymentStatus)
   @IsOptional()
   paymentStatus?: EventPaymentStatus;
+
+  @IsString()
+  @IsOptional()
+  paymentMethod?: string;
 
   @IsString()
   @IsNotEmpty()
@@ -72,4 +86,14 @@ export class UpdateParticipantDto extends PartialType(
 export class UpdatePaymentStatusDto {
   participantId: number;
   eventId: number;
+}
+
+export class CompleteTicketPaymentDto {
+  @IsNumber()
+  @IsPositive()
+  amountPaid: number;
+
+  @IsString()
+  @IsOptional()
+  paymentMethod?: string;
 }

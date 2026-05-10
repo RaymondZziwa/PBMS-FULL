@@ -140,7 +140,7 @@ export class ClientService {
   async uploadPrescriptionImages(
     clientId: number,
     files: Express.Multer.File[],
-    dto: { notes: string; prescribedBy: string },
+    dto: { notes: string; prescribedBy: number },
   ) {
     if (!files || files.length === 0) {
       throw new NotFoundException('No files uploaded');
@@ -166,7 +166,7 @@ export class ClientService {
         clientId,
         images: imagePaths,
         notes: dto.notes,
-        prescribedBy: parseInt(dto.prescribedBy),
+        prescribedBy: parseInt(dto.prescribedBy.toString()),
       },
     });
 

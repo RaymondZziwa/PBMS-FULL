@@ -32,7 +32,7 @@
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.1.5",
     "@nestjs/platform-socket.io": "^11.1.5",
-    "@nestjs/schedule": "^6.0.0",
+    "@nestjs/schedule": "^6.1.1",
     "@nestjs/serve-static": "^5.0.3",
     "@nestjs/websockets": "^11.1.5",
     "@prisma/client": "^6.15.0",
@@ -54,6 +54,7 @@
     "pdfkit": "^0.17.2",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "twilio": "^5.13.1",
     "uuidv7": "^1.0.2",
     "web-push": "^3.6.7"
   },

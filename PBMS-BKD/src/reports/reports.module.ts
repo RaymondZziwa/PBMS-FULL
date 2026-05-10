@@ -6,6 +6,8 @@ import { ReportsController } from './reports.controller';
 import { ReportService } from './reports.service';
 import { PdfService } from 'src/utils/pdfGenerator/generator.service';
 import { CompanyService } from 'src/company-profile/profile.service';
+import { ReportStorageService } from './reportPdfGeneration.service';
+//import { WhatsAppService } from './whatsapp.service';
 
 @Module({
   controllers: [DashboardController, ReportsController],
@@ -15,6 +17,8 @@ import { CompanyService } from 'src/company-profile/profile.service';
     ReportService,
     PdfService,
     CompanyService,
+    ReportStorageService,
+    //WhatsAppService,
   ],
 })
 export class ReportsModule {}
