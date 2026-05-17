@@ -39,6 +39,11 @@ export const permissions = [
   //   module: 'Human Resource',
   // },
 
+  {
+    name: 'Access Finance Module',
+    value: 'access_finance_module',
+    module: 'Finance',
+  },
   // Sales
   {
     name: 'Access Sales Module',

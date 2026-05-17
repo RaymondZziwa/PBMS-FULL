@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { ChannelService } from './channel.service';
 import { CreateChannelDto, UpdateChannelDto } from './dto';
+import { ValidateBankAccountDto } from './dto/validateBankAccount.dto';
 
 @Controller('api/channels')
 export class ChannelController {
@@ -25,12 +26,44 @@ export class ChannelController {
   }
 
   @Patch('modify/:id')
-  update(@Param('id') id: number, @Body() updateChannelDto: UpdateChannelDto) {
-    return this.channelService.update(id, updateChannelDto);
+  update(@Param('id') id: string, @Body() updateChannelDto: UpdateChannelDto) {
+    return this.channelService.update(parseInt(id), updateChannelDto);
   }
 
   @Delete('delete/:id')
-  remove(@Param('id') id: number) {
-    return this.channelService.remove(id);
+  remove(@Param('id') id: string) {
+    return this.channelService.remove(parseInt(id));
+  }
+
+  //validate bank account details
+  @Post('bank-account/validation/:id')
+  validateBankAccount(
+    @Param('id') id: string,
+    @Body() validateBankAccountDto: ValidateBankAccountDto,
+  ) {
+    return this.channelService.validateBankAccountDetails(
+      id, validateBankAccountDto
+    );
+  }
+
+  //get supported banks
+  @Get('supported-banks')
+  getSupportedBanks() {
+    return this.channelService.getSupportedBanks();
+  }
+
+  //send mobile verification code
+  @Get(':id/mobile-money/send-code')
+  sendMobileMoneyVerificationCode(@Param('id') id: string) {
+    return this.channelService.sendMobileMoneyVerificationCode(parseInt(id));
+  }
+
+  //verify mobile money code
+  @Post(':id/mobile-money/verify')
+  verifyMobileMoneyCode(@Param('id') id: string, @Body('code') code: string) {
+    return this.channelService.validateMobileMoneyVerificationCode(
+      parseInt(id),
+      code,
+    );
   }
 }

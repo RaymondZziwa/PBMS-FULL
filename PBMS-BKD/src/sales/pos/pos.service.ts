@@ -206,8 +206,12 @@ export class SalesService {
                 saleId: sale.id,
                 amount: method.amount,
                 paymentMethod: method.type,
-                referenceId: paymentResult ? paymentResult.data.transaction.reference : '',
-                notes: paymentResult ? `Transaction Ref: ${paymentResult.data.transaction.reference}` : notes,
+                referenceId: paymentResult
+                  ? paymentResult.data.transaction.reference
+                  : '',
+                notes: paymentResult
+                  ? `Transaction Ref: ${paymentResult.data.transaction.reference}`
+                  : notes,
                 cashierId: servedBy,
               },
             }),
@@ -218,7 +222,9 @@ export class SalesService {
       // 6️⃣ For async payments, wallet balance will be updated via callback
       // Don't update wallet here - wait for callback confirmation
       if (paymentResult) {
-        console.log(`Payment initiated. Transaction Reference: ${paymentResult.data.transaction.reference}`);
+        console.log(
+          `Payment initiated. Transaction Reference: ${paymentResult.data.transaction.reference}`,
+        );
         console.log('Waiting for callback to confirm payment status...');
       }
 
@@ -227,9 +233,11 @@ export class SalesService {
         data: {
           ...sale,
           paymentInitiated: !!paymentResult,
-          transactionReference: paymentResult ? paymentResult.data.transaction.reference : null,
+          transactionReference: paymentResult
+            ? paymentResult.data.transaction.reference
+            : null,
           amountProcessed: amountToProcess,
-          message: paymentResult 
+          message: paymentResult
             ? `Payment initiated. Transaction Reference: ${paymentResult.data.transaction.reference}. Waiting for payment confirmation...`
             : 'No payment processing required',
         },

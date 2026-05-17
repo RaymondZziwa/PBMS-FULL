@@ -58,6 +58,8 @@ import SeedlingBatchesManagement from './pages/farm/batches';
 import ManufacturingManagement from './pages/manufacturing';
 import ArchiveSalesRecords from './pages/archives/sales';
 import ArchiveExpenseRecords from './pages/archives/expenses';
+import ChannelTable from './pages/finance/channels';
+import WalletTable from './pages/finance/wallets';
 
 // Protected Route Component
 interface ProtectedRouteProps {
@@ -585,6 +587,24 @@ function App() {
         element={
           <ProtectedRoute>
             <ArchiveExpenseRecords />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Finance */}
+      <Route
+        path="/wallets/withdraw-channels"
+        element={
+          <ProtectedRoute>
+            <ChannelTable />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/wallets"
+        element={
+          <ProtectedRoute>
+            <WalletTable />
           </ProtectedRoute>
         }
       />

@@ -30,6 +30,7 @@ enum ChannelType {
 
 enum WithdrawStatus {
   PENDING
+  PROCESSING
   COMPLETED
   FAILED
 }
@@ -608,15 +609,15 @@ model TicketScan {
 }
 
 model TicketPayments {
-  id            Int      @id @default(autoincrement())
-  ticketId      Int      @db.Int
-  ticket        Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  paymentStatus  EventPaymentStatus @default(UNPAID)
-  amount        Decimal  @db.Decimal(10, 2)
+  id            Int                @id @default(autoincrement())
+  ticketId      Int                @db.Int
+  ticket        Ticket             @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  paymentStatus EventPaymentStatus @default(UNPAID)
+  amount        Decimal            @db.Decimal(10, 2)
   paymentMethod String
   paymentDate   DateTime
-  updatedAt     DateTime @updatedAt
-  createdAt     DateTime @default(now())
+  updatedAt     DateTime           @updatedAt
+  createdAt     DateTime           @default(now())
 
   @@index([ticketId])
   @@map("ticket_payments")
@@ -633,29 +634,55 @@ model Withdraw {
 }
 
 model WithdrawChannel {
-  id            Int         @id @default(autoincrement())
-  type          ChannelType
-  name          String
-  phoneNumber   String?
-  bank          String?
-  accountNumber String?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  Wallet        Wallet[]
+  id                      Int                       @id @default(autoincrement())
+  type                    ChannelType
+  name                    String
+  phoneNumber             String?
+  bank                    String?
+  accountNumber           String?
+  isVerified              Boolean                   @default(false)
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+  WithdrawHistory         WithdrawHistory[]
+  ChannelVerificationCode ChannelVerificationCode[]
+}
+
+model ChannelVerificationCode {
+  id        Int             @id @default(autoincrement())
+  channelId Int
+  channel   WithdrawChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  code      String
+  expiresAt DateTime
+  createdAt DateTime        @default(now())
+
+  @@index([channelId, createdAt])
+}
+
+model WithdrawHistory {
+  id          Int             @id @default(autoincrement())
+  amount      Decimal         @db.Decimal(10, 2)
+  channelId   Int
+  channel     WithdrawChannel @relation(fields: [channelId], references: [id])
+  status      WithdrawStatus
+  description String?         @db.Text
+  reference   String          @unique
+  currency    String
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
 }
 
 model Wallet {
-  id        Int             @id @default(autoincrement())
-  channelId Int
-  channel   WithdrawChannel @relation(fields: [channelId], references: [id])
-  name      String
-  purpose   String?
-  balance   Decimal         @default(0) @db.Decimal(10, 2)
-  createdAt DateTime        @default(now())
+  id         Int             @id @default(autoincrement())
+  name       String
+  purpose    String?
+  balance    Decimal         @default(0) @db.Decimal(10, 2)
+  createdAt  DateTime        @default(now())
   isForSales Boolean         @default(false)
-  updatedAt DateTime        @updatedAt
-  Withdraw  Withdraw[]
-  Event     Event[]
+  isForTickets Boolean         @default(false)
+  canBeDeleted Boolean         @default(false)
+  updatedAt  DateTime        @updatedAt
+  Withdraw   Withdraw[]
+  Event      Event[]
 }
 
 // Exhibition optimized

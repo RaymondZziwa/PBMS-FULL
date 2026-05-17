@@ -1,4 +1,4 @@
-export const WalletRoutes = [
+export const FinanceRoutes = [
   {
     name: "Wallets",
     path: "/wallets",

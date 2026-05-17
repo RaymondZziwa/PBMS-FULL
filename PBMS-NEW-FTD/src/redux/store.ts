@@ -44,6 +44,9 @@ import seedlingDeathReducer from './slices/farm/deathSlice';
 import seedlingGrowthReducer from './slices/farm/growthSlice';
 import seedlingStageReducer from './slices/farm/stageSlice';
 import ManufacturingReducer from './slices/manufacturing/manufacturingSlice';
+import channelReducer from './slices/finance/channelSlice';
+import supportedBanksReducer from './slices/finance/supportedBanksSlice';
+import walletReducer from './slices/finance/walletSlice';
 
 // Persist config for userAuth
 const userAuthPersistConfig = {
@@ -90,6 +93,9 @@ export const store = configureStore({
     deliveryNotes: DeliveryNoteReducer,
     supplier: SupplierReducer,
     manufacturing: ManufacturingReducer,
+    channel: channelReducer,
+    supportedBanks: supportedBanksReducer,
+    wallet: walletReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

@@ -36,7 +36,7 @@ import { FarmRoutes } from './farmRoutes';
 import { ExpensesRoutes } from './expensesRoutes';
 import { ManufacturingRoutes } from './manufacturingRoutes';
 import { ArchiveRoutes } from './archiveRoutes';
-import { WalletRoutes } from './walletRoutes';
+import { FinanceRoutes } from './financeRoutes';
   
   export const Routes = [
     {
@@ -103,10 +103,10 @@ import { WalletRoutes } from './walletRoutes';
         requiredPermission: "access_sales_module"
       },
       {
-        name: "Wallets",
+        name: "Finance",
         icon: FaWallet,
-        routes: WalletRoutes,
-        requiredPermission: "access_wallets_module"
+        routes: FinanceRoutes,
+        //requiredPermission: "access_finance_module"
       },
       {
         name: "Farm",
