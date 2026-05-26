@@ -3,9 +3,9 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { SaleStatus } from '@prisma/client';
 import {
   ExhibitionCreateSaleDto,
+  PaymentStatus,
   UpdateExhibitionSaleDto,
 } from 'src/dto/pos.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -121,7 +121,7 @@ export class ExhibitionSalesService {
 
   async update(id: number, updateSaleDto: UpdateExhibitionSaleDto) {
     // 1️⃣ Check if sale exists
-    const existingSale = await this.prisma.sale.findUnique({
+    const existingSale = await this.prisma.exhibitionSales.findUnique({
       where: { id },
     });
 
@@ -132,7 +132,7 @@ export class ExhibitionSalesService {
     // 2️⃣ Optional: Validate SaleStatus if provided
     if (
       updateSaleDto.status &&
-      !Object.values(SaleStatus).includes(updateSaleDto.status)
+      !Object.values(PaymentStatus).includes(updateSaleDto.status)
     ) {
       throw new Error(`Invalid sale status: ${updateSaleDto.status}`);
     }

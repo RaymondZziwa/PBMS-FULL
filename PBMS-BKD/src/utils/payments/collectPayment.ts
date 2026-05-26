@@ -27,7 +27,7 @@ export async function collectPayment(
     //   phone_number: body.phone_number,
     // }),
 
-    callback_url: configService.get<string>('MARZ_CALLBACK_URL'),
+    callback_url: configService.getOrThrow<string>('MARZ_CALLBACK_URL'),
   };
 
   console.log('py', payload);

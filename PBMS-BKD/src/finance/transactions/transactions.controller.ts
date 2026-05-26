@@ -21,6 +21,20 @@ export class TransactionsController {
   //get all transactions
   @Get('all')
   findAllTransactions() {
-    console.log('Fetching all transactions');
+    return this.transactionService.allTransactions();
+  }
+
+  //Transaction status callback endpoint for marz to call and update the transaction status in the database
+  @Post('marz-callback')
+  marzCallback(@Body() data: any) {
+    console.log('Marz callback data received:', data);
+    return this.transactionService.marzCallback(data);
+  }
+
+  //check transfer status, the id is the reference id of the transfer transaction
+  @Get('payment-status/:reference')
+  checkPaymentStatus(@Param() reference: { reference: string }) {
+    //console.log('Data received in controller:', reference);
+    return this.transactionService.checkPaymentStatus(reference);
   }
 }

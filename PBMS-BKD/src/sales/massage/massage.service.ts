@@ -3,10 +3,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { SaleStatus } from '@prisma/client';
 import {
   CollectCreditPaymentDto,
   CreateSaleDto,
+  PaymentStatus,
   UpdateSaleDto,
 } from 'src/dto/pos.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -146,7 +146,7 @@ export class MassageSalesService {
     // Validate SaleStatus if provided
     if (
       updateSaleDto.status &&
-      !Object.values(SaleStatus).includes(updateSaleDto.status)
+      !Object.values(PaymentStatus).includes(updateSaleDto.status)
     ) {
       throw new BadRequestException(
         `Invalid sale status: ${updateSaleDto.status}`,
@@ -188,8 +188,7 @@ export class MassageSalesService {
 
     // Update sale balance and status
     const newBalance = Number(sale.balance) - dto.amountPaid;
-    const newStatus =
-      newBalance === 0 ? SaleStatus.FULLY_PAID : SaleStatus.PARTIALLY_PAID;
+    const newStatus = newBalance === 0 ? 'FULLY_PAID' : 'PARTIALLY_PAID';
 
     const updatedSale = await this.prisma.massageSales.update({
       where: { id: dto.saleId },

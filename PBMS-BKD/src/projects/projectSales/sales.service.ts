@@ -4,7 +4,7 @@ import {
   BadRequestException,
   InternalServerErrorException,
 } from '@nestjs/common';
-import { SaleStatus, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import {
   CreateProjectSaleDto,
   UpdateProjectSaleDto,
@@ -13,6 +13,7 @@ import {
 import { PrismaService } from 'src/prisma/prisma.service';
 import { join } from 'path';
 import { unlink } from 'fs/promises';
+import { PaymentStatus } from 'src/dto/pos.dto';
 @Injectable()
 export class ProjectSalesService {
   constructor(private prisma: PrismaService) {}
@@ -621,10 +622,10 @@ export class ProjectSalesService {
   private calculateInitialStatus(
     downPayment: number,
     saleTotal: number,
-  ): SaleStatus {
-    if (downPayment === 0) return SaleStatus.UNPAID;
-    if (downPayment >= saleTotal) return SaleStatus.FULLY_PAID;
-    return SaleStatus.PARTIALLY_PAID;
+  ): PaymentStatus {
+    if (downPayment === 0) return PaymentStatus.UNPAID;
+    if (downPayment >= saleTotal) return PaymentStatus.FULLY_PAID;
+    return PaymentStatus.PARTIALLY_PAID;
   }
 
   private async calculateTotalPaid(
@@ -645,14 +646,14 @@ export class ProjectSalesService {
     prisma: any = this.prisma,
   ) {
     const totalPaidNum = parseFloat(totalPaid.toString());
-    let status: SaleStatus;
+    let status: PaymentStatus;
 
     if (totalPaidNum >= saleTotal) {
-      status = SaleStatus.FULLY_PAID;
+      status = PaymentStatus.FULLY_PAID;
     } else if (totalPaidNum > 0) {
-      status = SaleStatus.PARTIALLY_PAID;
+      status = PaymentStatus.PARTIALLY_PAID;
     } else {
-      status = SaleStatus.UNPAID;
+      status = PaymentStatus.UNPAID;
     }
 
     await prisma.projectSale.update({
