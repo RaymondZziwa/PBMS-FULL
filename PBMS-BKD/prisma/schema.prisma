@@ -48,6 +48,11 @@ enum PaymentType {
   BARTER_PAYMENT
 }
 
+enum UtilityType {
+  LIGHT
+  NWSC
+}
+
 enum ExpenseCategory {
   RENT
   UTILITIES
@@ -1233,4 +1238,18 @@ model Manufacturing {
   @@index([status, createdAt])
   @@index([createdAt])
   @@map("manufacturing")
+}
+
+model BillingChannel {
+  id        Int      @id @default(autoincrement())
+  utility  UtilityType
+  name      String?
+  meterNumber  String
+  isVerified  Boolean   @default(false)
+  area String?
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@index([name])
+  @@map("billing_channels")
 }

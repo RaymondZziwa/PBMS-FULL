@@ -105,12 +105,6 @@ export class SalesService {
       totalWithCharges > total;
 
     if (isMobileMoneyPayment) {
-      const response = await this.initiateMobileMoneyCollection(
-        totalWithCharges,
-        phoneNumber,
-      );
-      console.log('Mobile money collection response:', response);
-
       const inventories = await this.prisma.productInventory.findMany({
         where: {
           storeId,
@@ -137,7 +131,12 @@ export class SalesService {
           );
         }
       }
-      // 3️⃣ Dont reduce inventory quantities
+      const response = await this.initiateMobileMoneyCollection(
+        totalWithCharges,
+        phoneNumber,
+      );
+      console.log('Mobile money collection response:', response);
+
       // 4️⃣ Create sale record and payment records inside a transaction
       const sale = await this.prisma.$transaction(async (tx) => {
         const createdSale = await tx.sale.create({
@@ -340,6 +339,9 @@ export class SalesService {
           gt: 0,
         },
         storeId: id,
+        status: {
+          in: ['PARTIALLY_PAID', 'UNPAID'],
+        },
       },
       include: {
         client: true,

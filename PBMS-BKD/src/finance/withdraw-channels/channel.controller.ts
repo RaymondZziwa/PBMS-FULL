@@ -36,14 +36,9 @@ export class ChannelController {
   }
 
   //validate bank account details
-  @Post('bank-account/validation/:id')
-  validateBankAccount(
-    @Param('id') id: string,
-    @Body() validateBankAccountDto: ValidateBankAccountDto,
-  ) {
-    return this.channelService.validateBankAccountDetails(
-      id, validateBankAccountDto
-    );
+  @Get('bank-account/validation/:id')
+  validateBankAccount(@Param('id') id: string) {
+    return this.channelService.validateBankAccountDetails(id);
   }
 
   //get supported banks

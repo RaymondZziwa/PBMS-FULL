@@ -200,63 +200,108 @@ export class ChannelService {
   }
 
   //validate bank account details
-  async validateBankAccountDetails(
-    id: string,
-    validateBankAccountDto: ValidateBankAccountDto,
-  ): Promise<GenericResponse> {
-    const authHeader = this.configService.get<string>('MARZ_AUTH_HEADER');
+  //validate bank account details
+  //validate bank account details
+  async validateBankAccountDetails(id: string): Promise<GenericResponse> {
+    try {
+      const authHeader = this.configService.get<string>('MARZ_AUTH_HEADER');
 
-    const channel = await this.prismaService.withdrawChannel.findUnique({
-      where: { id: parseInt(id) },
-    });
-
-    if (!channel) {
-      return {
-        status: 404,
-        data: null,
-        message: 'Channel not found',
-      };
-    }
-
-    if (channel.type !== 'BANK_TRANSFER') {
-      return {
-        status: 400,
-        data: null,
-        message: 'Channel is not a bank transfer channel',
-      };
-    }
-
-    const response = await firstValueFrom(
-      this.httpService.post(
-        this.configService.getOrThrow<string>(
-          'MARZ_GET_VALIDATE_BANK_ACCOUNT_URL',
-        ),
-        validateBankAccountDto,
-        {
-          headers: {
-            Authorization: `Basic ${authHeader}`,
-            'Content-Type': 'application/json',
-          },
-        },
-      ),
-    );
-
-    if (response.data.status.toLowerCase() === 'success') {
-      await this.prismaService.withdrawChannel.update({
+      const channel = await this.prismaService.withdrawChannel.findUnique({
         where: { id: parseInt(id) },
-        data: { isVerified: true },
       });
+
+      if (!channel) {
+        return {
+          status: 404,
+          data: null,
+          message: 'Channel not found',
+        };
+      }
+
+      if (channel.type !== 'BANK_TRANSFER') {
+        return {
+          status: 400,
+          data: null,
+          message: 'Channel is not a bank transfer channel',
+        };
+      }
+
+      const response = await firstValueFrom(
+        this.httpService.post(
+          this.configService.getOrThrow<string>(
+            'MARZ_GET_VALIDATE_BANK_ACCOUNT_URL',
+          ),
+          {
+            account_number: channel.accountNumber,
+            bank_name: channel.bank,
+          },
+          {
+            headers: {
+              Authorization: `Basic ${authHeader}`,
+              'Content-Type': 'application/json',
+            },
+          },
+        ),
+      );
+
+      // Check if validation was successful based on response data
+      const isValid =
+        response.data?.status?.toLowerCase() === 'success' ||
+        response.data?.data?.isValid === true ||
+        response.data?.verified === true;
+
+      if (isValid) {
+        await this.prismaService.withdrawChannel.update({
+          where: { id: parseInt(id) },
+          data: { isVerified: true },
+        });
+
+        // Return 200 for successful validation
+        return {
+          status: 200,
+          data: response.data,
+          message: 'Bank account details have been verified successfully',
+        };
+      } else {
+        // Return 400 for validation failure - THIS IS THE KEY CHANGE
+        return {
+          status: 400,
+          data: response.data,
+          message:
+            response.data?.message ||
+            'Bank account details validation failed. Check the provided details and try again',
+        };
+      }
+    } catch (error) {
+      console.error('Bank account validation error:', error);
+
+      if (error.response) {
+        // Check if it's a validation error from external API
+        const isValidationError =
+          error.response.status === 400 || error.response.status === 422;
+
+        if (isValidationError) {
+          return {
+            status: 400,
+            data: error.response.data,
+            message:
+              error.response.data?.message || 'Bank account validation failed',
+          };
+        }
+
+        return {
+          status: error.response.status || 500,
+          data: error.response.data,
+          message:
+            error.response.data?.message || 'External API error occurred',
+        };
+      }
+
       return {
-        status: 200,
-        data: response.data,
-        message: 'Bank account details have been verified successfully',
+        status: 500,
+        data: null,
+        message: error.message || 'Internal server error',
       };
     }
-
-    return {
-      status: 400,
-      data: response.data,
-      message: 'Bank account details validation failed. Check and try again',
-    };
   }
 }

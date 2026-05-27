@@ -211,6 +211,7 @@ export class TransactionService {
       where: { transaction_reference: reference },
       data: {
         status: newStatus,
+        transaction_completed_at: new Date(),
       },
     });
     if (paymentStatus.toLowerCase() === 'completed') {
@@ -265,6 +266,15 @@ export class TransactionService {
       await this.prismaService.salePaymentTransactionHistory.findMany({
         orderBy: {
           created_at: 'desc',
+        },
+        include: {
+          employee: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
         },
       });
     return {
