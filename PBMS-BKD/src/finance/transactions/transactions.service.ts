@@ -6,6 +6,7 @@ import { GenericResponse } from 'src/utils/genericResponse';
 import { WithdrawToBankDto } from './dtos/transferToBank.dto';
 import { firstValueFrom } from 'rxjs';
 import { IWebhookCallback } from './types';
+import { MobileMoneyPaymentDto } from './dtos/sendMomo.dto';
 
 @Injectable()
 export class TransactionService {
@@ -110,22 +111,32 @@ export class TransactionService {
         },
       ),
     );
-    //console.log('Marz transfer response:', response.data.data);
+
+    //complete the transfer , deduct the amount from the wallet balance --move to the check status function before deployment
+    await this.prismaService.wallet.update({
+      where: { id: data.internalWalletId },
+      data: {
+        balance: {
+          decrement: Number(data.amount) || 0,
+        },
+      },
+    });
+    console.log('Marz transfer response:', response.data);
+
     //create the transfer transaction record in the database with status pending
-    // const transaction = await this.prismaService.withdrawHistory.create({
-    //   data: {
-    //     amount: data.amount,
-    //     description: data.description,
-    //     channelId: data.channelId,
-    //     status: 'PENDING',
-    //     reference: reference,
-    //     currency: 'UGX',
-    //   },
-    // });
+    const transaction = await this.prismaService.withdrawHistory.create({
+      data: {
+        amount: data.amount,
+        walletId: data.internalWalletId,
+        description: data.description,
+        channelId: data.channelId,
+        status: 'PENDING',
+        reference: response.data.data.bank_transfer.reference,
+      },
+    });
     return {
       status: 200,
-      data: null,
-      //data: transaction,
+      data: transaction,
       message: 'Transaction created successfully',
     };
   }
@@ -212,6 +223,7 @@ export class TransactionService {
       data: {
         status: newStatus,
         transaction_completed_at: new Date(),
+        provider_transaction_id: data?.collection?.provider_transaction_id,
       },
     });
     if (paymentStatus.toLowerCase() === 'completed') {
@@ -281,6 +293,96 @@ export class TransactionService {
       status: 200,
       data: transactions,
       message: 'Transactions fetched successfully',
+    };
+  }
+
+  async checkBankTransferStatus(reference: { reference: string }) {
+    const transfer = await this.prismaService.withdrawHistory.findUnique({
+      where: { reference: reference.reference },
+    });
+    if (!transfer) {
+      return {
+        status: 404,
+        data: null,
+        message: 'Transfer transaction not found',
+      };
+    }
+
+    const authHeader = this.configService.get<string>('MARZ_AUTH_HEADER');
+
+    //get them from the withdraw request response
+    const response = await firstValueFrom(
+      this.httpService.get(
+        `https://wallet.wearemarz.com/api/bank-transfer/${reference.reference}`,
+        {
+          headers: {
+            Authorization: `Basic ${authHeader}`,
+            'Content-Type': 'application/json',
+          },
+        },
+      ),
+    );
+
+    console.log('Marz bank transfer status response:', response.data);
+
+    if (response.data.status.toLowerCase() === 'success') {
+      await this.prismaService.withdrawHistory.update({
+        where: { reference: reference.reference },
+        data: {
+          status: 'COMPLETED',
+          transaction_completed_at: new Date(),
+        },
+      });
+
+      await this.prismaService.wallet.update({
+        where: { id: transfer.walletId },
+        data: {
+          balance: {
+            decrement: Number(transfer.amount) || 0,
+          },
+        },
+      });
+    }
+    return {
+      status: 200,
+      data: {
+        status: transfer.status,
+      },
+      message: 'Transfer status fetched successfully',
+    };
+  }
+
+  async sendMoneyToPersonViaMomo(data: MobileMoneyPaymentDto) {
+    const authHeader = this.configService.get<string>('MARZ_AUTH_HEADER');
+
+    const payload = {
+      amount: data.amount,
+      phone_number: data.phone_number,
+      country: data.country,
+      reference: data.reference,
+      description: data.description,
+      callback_url: this.configService.getOrThrow<string>('MARZ_CALLBACK_URL'),
+    };
+
+    const response = await firstValueFrom(
+      this.httpService.post(
+        this.configService.getOrThrow<string>('MARZ_MOMO_PAYMENT_URL'),
+        payload,
+        {
+          headers: {
+            Authorization: `Basic ${authHeader}`,
+            'Content-Type': 'application/json',
+          },
+        },
+      ),
+    );
+
+    console.log('Marz mobile money payment response:', response.data);
+
+    return {
+      status: 200,
+      data: response.data,
+      message: 'Mobile money payment initiated successfully',
     };
   }
 }

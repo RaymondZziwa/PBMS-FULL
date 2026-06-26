@@ -25,6 +25,9 @@ export class ClientService {
   async findAll() {
     const clients = await this.prisma.client.findMany({
       orderBy: { createdAt: 'desc' },
+      include: {
+        PatientAccount: true,
+      },
     });
 
     return {

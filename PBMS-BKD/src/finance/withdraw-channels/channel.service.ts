@@ -253,7 +253,7 @@ export class ChannelService {
       if (isValid) {
         await this.prismaService.withdrawChannel.update({
           where: { id: parseInt(id) },
-          data: { isVerified: true },
+          data: { isVerified: true, name: response.data.data.account_name },
         });
 
         // Return 200 for successful validation

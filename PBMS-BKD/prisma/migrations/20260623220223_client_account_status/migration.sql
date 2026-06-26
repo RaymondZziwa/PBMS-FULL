@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE `PatientAccount` ADD COLUMN `status` ENUM('INACTIVE', 'ACTIVE') NOT NULL DEFAULT 'ACTIVE';

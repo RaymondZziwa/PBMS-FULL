@@ -19,5 +19,13 @@ export const BranchExpenseEndpoints = {
   const query = params.toString();
   return `/api/reports/expenses/expenses-report${query ? `?${query}` : ''}`;
 },
-
 }
+
+export const BILLING_CHANNELS = {
+    CREATE: "/api/billing-channels/create",
+    MODIFY: (id: number) => `/api/billing-channels/update/${id}`,
+    DELETE: (id: number) => `/api/billing-channels/delete/${id}`,
+    FETCH_ALL: "/api/billing-channels/all",
+  VERIFY: "/api/billing-channels/verify",
+    NWSC_AREAS:"/api/billing-channels/nwsc-areas"
+    }

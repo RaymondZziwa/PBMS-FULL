@@ -47,6 +47,9 @@ import ManufacturingReducer from './slices/manufacturing/manufacturingSlice';
 import channelReducer from './slices/finance/channelSlice';
 import supportedBanksReducer from './slices/finance/supportedBanksSlice';
 import walletReducer from './slices/finance/walletSlice';
+import transactionReducer from './slices/finance/transactionSlice';
+import billingChannelReducer from './slices/settings/billingChannelSlice';
+import clientAccountReducer from './slices/sales/clientAccountSlice';
 
 // Persist config for userAuth
 const userAuthPersistConfig = {
@@ -96,6 +99,9 @@ export const store = configureStore({
     channel: channelReducer,
     supportedBanks: supportedBanksReducer,
     wallet: walletReducer,
+    transaction: transactionReducer,
+    billingChannel: billingChannelReducer,
+    clientAccount: clientAccountReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

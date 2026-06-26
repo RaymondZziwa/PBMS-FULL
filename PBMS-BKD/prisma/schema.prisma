@@ -89,6 +89,11 @@ enum ChequeStatus {
   BOUNCED
 }
 
+enum PatientAcountTransactionType {
+  DEPOSIT
+  PURCHASE_PAYMENT
+}
+
 enum Status {
   APPROVED
   PENDING
@@ -111,6 +116,7 @@ enum PaymentStatus {
   PARTIALLY_PAID
   UNPAID
 }
+
 enum SaleStatus {
   PENDING
   FAILED
@@ -123,6 +129,7 @@ enum PaymentMethodType {
   AIRTEL_MOMO
   CARD
   PROF_MOMO
+  PATIENT_ACCOUNT
 }
 
 enum SeedlingGrowthStatus {
@@ -475,27 +482,30 @@ model Sale {
   id             Int            @id @default(autoincrement())
   clientId       Int?
   client         Client?        @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  items          Json // Array of CartItemDto - consider normalized table for large systems
+  items          Json
   servedBy       Int
   employee       Employee       @relation(fields: [servedBy], references: [id], onDelete: Cascade)
   storeId        Int
   store          Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  saleStatus  SaleStatus  @default(SUCCESSFUL)
-  status         PaymentStatus 
+  saleStatus     SaleStatus     @default(SUCCESSFUL)
+  status         PaymentStatus
   total          Decimal        @db.Decimal(10, 2)
   balance        Decimal        @db.Decimal(10, 2)
-  paymentMethods Json // Array of PaymentMethodDto
+  paymentMethods Json
   notes          String?
   updatedAt      DateTime       @updatedAt
   createdAt      DateTime       @default(now())
   SalePayments   SalePayments[]
+
+  // One-to-One relationship with PatientAccountTransaction using same ID
+  patientAccountTransaction PatientAccountTransaction?
 
   // Comprehensive indexing for fast queries
   @@index([storeId, createdAt])
   @@index([servedBy, createdAt])
   @@index([status, createdAt])
   @@index([clientId, createdAt])
-  @@index([createdAt]) // For date range queries
+  @@index([createdAt])
   @@index([total])
   @@map("sales")
 }
@@ -577,24 +587,60 @@ model SalePaymentTransactionHistory {
 
 // Clientele optimized
 model Client {
-  id        Int      @id @default(autoincrement())
-  firstName String
-  lastName  String
-  phone     String?  @unique
-  address   String?
-  updatedAt DateTime @updatedAt
-  createdAt DateTime @default(now())
+  id         Int      @id @default(autoincrement())
+  firstName  String
+  lastName   String
+  phone      String?  @unique
+  address    String?
+  hasAccount Boolean  @default(false)
+  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now())
 
   Sales              Sale[]
   ExhibitionSales    ExhibitionSales[]
   ProjectSales       ProjectSales[]
   MassageSales       MassageSales[]
   ClientPrescription ClientPrescription[]
+  PatientAccount     PatientAccount[]
 
   @@index([firstName, lastName])
   @@index([phone])
   @@index([createdAt])
   @@map("clients")
+}
+
+enum AccountStatus {
+  INACTIVE
+  ACTIVE
+}
+
+model PatientAccount {
+  id                        Int                         @id @default(autoincrement())
+  clientId                  Int
+  client                    Client                      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  balance                   Float                       @default(0.00)
+  status                    AccountStatus               @default(ACTIVE)
+  updatedAt                 DateTime                    @updatedAt
+  createdAt                 DateTime                    @default(now())
+  PatientAccountTransaction PatientAccountTransaction[]
+}
+
+model PatientAccountTransaction {
+  id        Int                          @id @default(autoincrement())
+  saleId    Int?                  @unique
+  sale      Sale?                        @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  accountId Int
+  account   PatientAccount               @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  type      PatientAcountTransactionType
+  amount    Float                        @default(0.00)
+  notes     String?
+  updatedAt DateTime                     @updatedAt
+  createdAt DateTime                     @default(now())
+
+  // Indexes for performance
+  @@index([accountId, createdAt])
+  @@index([type])
+  @@map("patient_account_transactions")
 }
 
 // Event system optimized
@@ -723,6 +769,7 @@ model WithdrawChannel {
   updatedAt               DateTime                  @updatedAt
   ChannelVerificationCode ChannelVerificationCode[]
   TransactionHistory      TransactionHistory[]
+  WithdrawHistory         WithdrawHistory[]
 }
 
 model ChannelVerificationCode {
@@ -755,17 +802,33 @@ model TransactionHistory {
 }
 
 model Wallet {
-  id           Int        @id @default(autoincrement())
-  name         String
-  purpose      String?
-  balance      Decimal    @default(0) @db.Decimal(10, 2)
-  createdAt    DateTime   @default(now())
-  isForSales   Boolean    @default(false)
-  isForTickets Boolean    @default(false)
-  canBeDeleted Boolean    @default(false)
-  updatedAt    DateTime   @updatedAt
-  Withdraw     Withdraw[]
-  Event        Event[]
+  id              Int               @id @default(autoincrement())
+  name            String
+  purpose         String?
+  balance         Decimal           @default(0) @db.Decimal(10, 2)
+  createdAt       DateTime          @default(now())
+  isForSales      Boolean           @default(false)
+  isForTickets    Boolean           @default(false)
+  canBeDeleted    Boolean           @default(false)
+  updatedAt       DateTime          @updatedAt
+  Withdraw        Withdraw[]
+  Event           Event[]
+  WithdrawHistory WithdrawHistory[]
+}
+
+model WithdrawHistory {
+  id                       Int             @id @default(autoincrement())
+  amount                   Decimal         @db.Decimal(10, 2)
+  walletId                 Int
+  wallet                   Wallet          @relation(fields: [walletId], references: [id])
+  channelId                Int
+  channel                  WithdrawChannel @relation(fields: [channelId], references: [id])
+  description              String?         @db.Text
+  reference                String          @unique
+  status                   WithdrawStatus
+  transaction_completed_at DateTime?
+  createdAt                DateTime        @default(now())
+  updatedAt                DateTime        @updatedAt
 }
 
 // Exhibition optimized
@@ -895,21 +958,21 @@ model Project {
 }
 
 model ProjectSales {
-  id                   Int        @id @default(autoincrement())
+  id                   Int           @id @default(autoincrement())
   clientId             Int
-  client               Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client               Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
   projectId            Int
-  project              Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project              Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
   status               PaymentStatus
-  saleTotal            Decimal    @db.Decimal(10, 2)
-  downPayment          Decimal    @db.Decimal(10, 2)
+  saleTotal            Decimal       @db.Decimal(10, 2)
+  downPayment          Decimal       @db.Decimal(10, 2)
   numberOfInstallments Int
-  installmentAmount    Decimal    @db.Decimal(10, 2)
+  installmentAmount    Decimal       @db.Decimal(10, 2)
   deliveryNoteImage    String?
   cashierId            Int
-  employee             Employee   @relation(fields: [cashierId], references: [id], onDelete: Cascade)
-  updatedAt            DateTime   @updatedAt
-  createdAt            DateTime   @default(now())
+  employee             Employee      @relation(fields: [cashierId], references: [id], onDelete: Cascade)
+  updatedAt            DateTime      @updatedAt
+  createdAt            DateTime      @default(now())
 
   ProjectPayments ProjectPayments[]
 
@@ -1005,8 +1068,8 @@ model MassageSales {
   client                 Client                   @relation(fields: [clientId], references: [id], onDelete: Cascade)
   items                  Json
   total                  Decimal                  @db.Decimal(10, 2)
-  saleStatus  SaleStatus  @default(SUCCESSFUL)
-  status         PaymentStatus 
+  saleStatus             SaleStatus               @default(SUCCESSFUL)
+  status                 PaymentStatus
   balance                Decimal                  @db.Decimal(10, 2)
   paymentMethods         Json
   notes                  String?
@@ -1241,14 +1304,14 @@ model Manufacturing {
 }
 
 model BillingChannel {
-  id        Int      @id @default(autoincrement())
-  utility  UtilityType
-  name      String?
-  meterNumber  String
-  isVerified  Boolean   @default(false)
-  area String?
-  updatedAt DateTime @updatedAt
-  createdAt DateTime @default(now())
+  id          Int         @id @default(autoincrement())
+  utility     UtilityType
+  name        String?
+  meterNumber String
+  isVerified  Boolean     @default(false)
+  area        String?
+  updatedAt   DateTime    @updatedAt
+  createdAt   DateTime    @default(now())
 
   @@index([name])
   @@map("billing_channels")

@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Put,
   Query,
@@ -19,10 +20,15 @@ import { ClientService } from './customer.service';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { join, extname } from 'path';
+import { CreateClientAccountDto, DepositDto } from 'src/dto/patientAccount.dto';
+import { ClientAccountService } from './customerAccounts.service';
 
 @Controller('api/clients')
 export class ClientController {
-  constructor(private readonly clientService: ClientService) {}
+  constructor(
+    private readonly clientService: ClientService,
+    private readonly clientAccountService: ClientAccountService,
+  ) {}
 
   @Post('create')
   create(@Body() dto: CreateClientDto) {
@@ -118,5 +124,30 @@ export class ClientController {
   @Get('fetch-all-prescriptions')
   findAllClientPrescriptions() {
     return this.clientService.allPrescriptionHistory();
+  }
+
+  @Post('account/create')
+  createAccount(@Body() data: CreateClientAccountDto) {
+    return this.clientAccountService.create(data);
+  }
+
+  @Get('accounts/all')
+  getAllAccounts() {
+    return this.clientAccountService.findAll();
+  }
+
+  @Patch('account/deactivate/:id')
+  deactivateAccount(@Param('id') id: string) {
+    return this.clientAccountService.remove(parseInt(id));
+  }
+
+  @Patch('account/activate/:id')
+  activateAccount(@Param('id') id: string) {
+    return this.clientAccountService.activate(parseInt(id));
+  }
+
+  @Post('account/deposit')
+  accountDeposit(@Body() data: DepositDto) {
+    return this.clientAccountService.deposit(data);
   }
 }

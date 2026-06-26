@@ -15,17 +15,19 @@ const useCreditSale = (id: string) => {
     dispatch(fetchDataStart()); // Dispatch action to indicate data fetching has started
 
     try {
-      const response = await apiRequest(
+      if (id) {
+        const response = await apiRequest(
           SALESENDPOINTS.POS.get_credit_sales(id),
           "GET",
             '',
-      );
-      //console.log(response)
-      if (response.status == 200) {
-        //console.log('subs data', response.data)
-        dispatch(fetchDataSuccess(response.data)); // Dispatch action with fetched data
-      } else {
-        throw new Error("Failed to fetch credit sales.");
+        );
+        //console.log(response)
+        if (response.status == 200) {
+          //console.log('subs data', response.data)
+          dispatch(fetchDataSuccess(response.data)); // Dispatch action with fetched data
+        } else {
+          throw new Error("Failed to fetch credit sales.");
+        }
       }
     } catch (error) {
       console.error("Failed to fetch credit sales:", error);

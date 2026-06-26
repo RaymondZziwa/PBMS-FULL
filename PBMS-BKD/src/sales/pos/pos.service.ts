@@ -89,12 +89,35 @@ export class SalesService {
       phoneNumber,
     } = createSaleDto;
 
+    let usePatientAcc = false;
+    let accId = 0;
     const mobileMoneyMethods = paymentMethods?.filter(
       (method) => method.type === 'MTN_MOMO' || method.type === 'AIRTEL_MOMO',
     );
     const hasCashOrProfMomo = paymentMethods?.some(
       (method) => method.type === 'CASH' || method.type === 'PROF_MOMO',
     );
+
+    const hasPatientAccount = paymentMethods?.some(
+      (method) => method.type === 'PATIENT_ACCOUNT',
+    );
+
+    if (hasPatientAccount) {
+      const acc = await this.prisma.patientAccount.findFirst({
+        where: {
+          clientId: customerId,
+        },
+      });
+
+      if (!acc)
+        return new NotFoundException(
+          'This user has no patient account. Try other payment methods',
+        );
+
+      accId = acc.id;
+      usePatientAcc = true;
+    }
+
     const finalSaleStatus = hasCashOrProfMomo
       ? PaymentStatus.PARTIALLY_PAID
       : status;
@@ -310,6 +333,28 @@ export class SalesService {
           );
         }
 
+        console.log(sale.id);
+        if (usePatientAcc && sale) {
+          await tx.patientAccount.update({
+            where: {
+              id: accId,
+            },
+            data: {
+              balance: {
+                decrement: Number(total),
+              },
+            },
+          });
+
+          await tx.patientAccountTransaction.create({
+            data: {
+              accountId: accId,
+              type: 'PURCHASE_PAYMENT',
+              amount: total,
+              saleId: sale.id,
+            },
+          });
+        }
         return {
           message: 'Sale created successfully',
           data: sale,

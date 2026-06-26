@@ -25,4 +25,6 @@ export const ChannelEndpoints = {
     createTransaction: "/api/transactions/create",
     getTransaction: (id: string) => `/api/transactions/${id}`,
     withdrawFromWallet: "/api/transactions/withdraw",
+    checkBankTransferStatus: (reference: string) => `/api/transactions/bank-transfer-status/${reference}`,
+    sendMoney: "/api/transactions/send-mobile-money",
   };

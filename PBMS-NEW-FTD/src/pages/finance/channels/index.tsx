@@ -34,7 +34,7 @@ const ChannelTable: React.FC = () => {
     try {
       await apiRequest(ChannelEndpoints.deleteChannel(modalProps.channel?.id), "DELETE", '');
       refresh();
-      toast.success('Channel deleted successfully');
+      //toast.success('Channel deleted successfully');
       setModalProps({ isOpen: false, mode: null, channel: null });
     } catch (error) {
       toast.error(error?.response?.data?.message || 'Failed to delete channel');
@@ -93,9 +93,9 @@ const ChannelTable: React.FC = () => {
       label: "Status",
       render: (value: boolean) => (
         <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-          value ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+          value ? 'bg-green-100 text-green-800' : 'bg-red-500 text-white'
         }`}>
-          {value ? 'Verified' : 'Pending Verification'}
+          {value ? 'Verified' : 'Not Verified'}
         </span>
       )
     },

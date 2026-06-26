@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { FaPlus, FaEdit, FaTrash } from 'react-icons/fa';
+import { FaPlus, FaEdit, FaTrash, FaWallet, FaCheckCircle } from 'react-icons/fa';
 import CustomTable from '../../../custom/table/customTable';
 import CustomDeleteModal from '../../../custom/modals/customDeleteModal';
 import { toast } from 'sonner';
@@ -8,6 +8,7 @@ import AddOrModifyClient from './AddorModify';
 import useClients from '../../../hooks/sales/useClients';
 import type { IClient } from '../../../redux/types/sales';
 import { SALESENDPOINTS } from '../../../endpoints/sales/salesEndpoints';
+import CreateAccountModal from './createAccountModal';
 
 const ClientsManagement = () => {
   const { data, refresh } = useClients();
@@ -28,6 +29,9 @@ const ClientsManagement = () => {
   });
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isCreateAccountModalOpen, setIsCreateAccountModalOpen] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<IClient | null>(null);
+  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
 
   const deleteClient = async () => {
     try {
@@ -45,12 +49,38 @@ const ClientsManagement = () => {
     }
   };
 
+  const handleCreateAccount = async () => {
+    if (!selectedClient) return;
+
+    setIsCreatingAccount(true);
+    try {
+      await apiRequest(
+        SALESENDPOINTS.CLIENT_ACCOUNTS.create,
+        'POST',
+        '',
+        {
+          clientId: selectedClient.id
+        }
+      );
+      
+      refresh();
+      setIsCreateAccountModalOpen(false);
+      setSelectedClient(null);
+      //toast.success(`Account created successfully for ${selectedClient.firstName} ${selectedClient.lastName}`);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to create account');
+    } finally {
+      setIsCreatingAccount(false);
+    }
+  };
+
   // Table columns configuration
   const columns = [
     { key: 'firstName', label: 'First Name', sortable: true, filterable: true },
     { key: 'lastName', label: 'Last Name', sortable: true, filterable: true },
     { key: 'phone', label: 'Contact', sortable: true, filterable: true },
     { key: 'address', label: 'Address', sortable: true, filterable: true },
+    { key: 'hasAccount', label: 'Account Status', sortable: true, filterable: true },
     { key: 'createdAt', label: 'Created At', sortable: true, filterable: false },
     { key: 'actions', label: 'Actions', sortable: false, filterable: false },
   ];
@@ -63,11 +93,26 @@ const ClientsManagement = () => {
     });
   };
 
+  const getAccountStatusBadge = (hasAccount: boolean) => {
+    return hasAccount ? (
+      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+        <FaCheckCircle className="mr-1" size={12} />
+        Has Account
+      </span>
+    ) : (
+      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+        No Account
+      </span>
+    );
+  };
+
   const tableData = clients.map(client => ({
     ...client,
     createdAt: formatDate(client.createdAt),
+    hasAccount: getAccountStatusBadge(client.hasAccount || false),
     actions: (
       <div className="flex gap-3">
+        {/* Edit Action */}
         <div className="relative group">
           <button
             className="text-blue-600 hover:text-blue-800 transition-colors"
@@ -80,6 +125,25 @@ const ClientsManagement = () => {
           </span>
         </div>
 
+        {/* Create Account Action - Only shown when client has no account */}
+        {!client.hasAccount && (
+          <div className="relative group">
+            <button
+              className="text-purple-600 hover:text-purple-800 transition-colors"
+              onClick={() => {
+                setSelectedClient(client);
+                setIsCreateAccountModalOpen(true);
+              }}
+            >
+              <FaWallet />
+            </button>
+            <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+              Create Account
+            </span>
+          </div>
+        )}
+
+        {/* Delete Action */}
         <div className="relative group">
           <button
             className="text-red-600 hover:text-red-800 transition-colors"
@@ -117,6 +181,17 @@ const ClientsManagement = () => {
         visible={modalProps.isOpen}
         client={modalProps.client}
         onCancel={() => setModalProps({ isOpen: false, mode: 'create', client: null })}
+      />
+
+      <CreateAccountModal
+        visible={isCreateAccountModalOpen}
+        client={selectedClient}
+        isCreating={isCreatingAccount}
+        onConfirm={handleCreateAccount}
+        onCancel={() => {
+          setIsCreateAccountModalOpen(false);
+          setSelectedClient(null);
+        }}
       />
 
       <CustomDeleteModal

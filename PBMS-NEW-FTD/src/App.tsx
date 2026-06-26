@@ -60,6 +60,9 @@ import ArchiveSalesRecords from './pages/archives/sales';
 import ArchiveExpenseRecords from './pages/archives/expenses';
 import ChannelTable from './pages/finance/channels';
 import WalletTable from './pages/finance/wallets';
+import TransactionsTable from './pages/finance/transactions';
+import BillingChannelsManagement from './pages/settings/billingChannels';
+import ClientAccountsManagement from './pages/sales/customerAccounts';
 
 // Protected Route Component
 interface ProtectedRouteProps {
@@ -605,6 +608,31 @@ function App() {
         element={
           <ProtectedRoute>
             <WalletTable />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/transactions"
+        element={
+          <ProtectedRoute>
+            <TransactionsTable />
+          </ProtectedRoute>
+        }
+      />
+       <Route
+        path="/settings/billing-channels"
+        element={
+          <ProtectedRoute>
+            <BillingChannelsManagement />
+          </ProtectedRoute>
+        }
+      />
+
+       <Route
+        path="/sales/customers/accounts"
+        element={
+          <ProtectedRoute>
+            <ClientAccountsManagement />
           </ProtectedRoute>
         }
       />

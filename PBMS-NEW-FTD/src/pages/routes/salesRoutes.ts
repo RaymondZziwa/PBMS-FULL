@@ -10,4 +10,5 @@ export const SalesRoutes = [
     { name: "Credit Sales", path: "/sales/credit-sales" },
      { name: "Client Purchases", path: "/sales/client-purchases" },
     { name: "Customers", path: "/sales/customers" },
+    { name: "Customer Accounts", path: "/sales/customers/accounts" },
 ]
