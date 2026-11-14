@@ -100,4 +100,10 @@ export class PayrollController {
   ) {
     return this.payrollService.upsertPayrolls(payrollPeriodId, payrolls);
   }
+
+  /** DELETE payroll period */
+  @Post('delete-payroll/:id')
+  async deletePayrollPeriod(@Param('id') id: string) {
+    return this.payrollService.deletePayrollPeriod(Number(id));
+  }
 }

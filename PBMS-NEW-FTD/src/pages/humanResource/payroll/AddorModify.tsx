@@ -71,6 +71,8 @@ const AddOrModifyPayrollPeriod: React.FC<AddOrModifyPayrollPeriodProps> = ({
   const [generalDeductions, setGeneralDeductions] = useState<DeductionAllowance[]>([]);
   const [generalAllowances, setGeneralAllowances] = useState<DeductionAllowance[]>([]);
   const [payrollEmployees, setPayrollEmployees] = useState<IPayrollEmployee[]>([]);
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<Set<string>>(new Set());
+  const [employeeSearch, setEmployeeSearch] = useState('');
   const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [fetchingData, setFetchingData] = useState(false);
@@ -130,17 +132,22 @@ const AddOrModifyPayrollPeriod: React.FC<AddOrModifyPayrollPeriodProps> = ({
         });
         
         setPayrollEmployees(transformedEmployees);
+        setSelectedEmployeeIds(new Set(transformedEmployees.map(employee => String(employee.id))));
         setDataFetched(true);
         toast.success(`Loaded payroll data for ${transformedEmployees.length} employees`);
       } else {
         toast.error('No payroll data found for the selected period');
         setPayrollEmployees([]);
+        setSelectedEmployeeIds(new Set());
+        setDataFetched(false);
         setAttendanceSummary(null);
       }
     } catch (error: any) {
       console.error('Error fetching payroll data:', error);
       toast.error(error?.response?.data?.message || 'Failed to fetch payroll data');
       setPayrollEmployees([]);
+      setSelectedEmployeeIds(new Set());
+      setDataFetched(false);
       setAttendanceSummary(null);
     } finally {
       setFetchingData(false);
@@ -207,6 +214,7 @@ const AddOrModifyPayrollPeriod: React.FC<AddOrModifyPayrollPeriodProps> = ({
         // For editing, we assume employees data is already available in payrollPeriod
         if (payrollPeriod.payrollDetails) {
           setPayrollEmployees(payrollPeriod.payrollDetails);
+          setSelectedEmployeeIds(new Set(payrollPeriod.payrollDetails.map(employee => String(employee.id))));
         }
       } else {
         setFormData({
@@ -218,6 +226,8 @@ const AddOrModifyPayrollPeriod: React.FC<AddOrModifyPayrollPeriodProps> = ({
         setGeneralDeductions([]);
         setGeneralAllowances([]);
         setPayrollEmployees([]);
+        setSelectedEmployeeIds(new Set());
+        setEmployeeSearch('');
         setExpandedEmployees(new Set());
         setDataFetched(false);
         setAttendanceSummary(null);
@@ -296,8 +306,8 @@ const handleSubmit = async (e: React.FormEvent) => {
     return;
   }
 
-  if (payrollEmployees.length === 0) {
-    toast.error('No employees available for payroll');
+  if (selectedPayrollEmployees.length === 0) {
+    toast.error('Select at least one employee for this payroll');
     return;
   }
 
@@ -310,7 +320,7 @@ const handleSubmit = async (e: React.FormEvent) => {
 
   try {
     // Construct the paymentStructure array with all employee details
-    const paymentStructure = payrollEmployees.map(employee => {
+    const paymentStructure = selectedPayrollEmployees.map(employee => {
       const attendance = employee.attendanceData;
       
       return {
@@ -388,7 +398,7 @@ const handleSubmit = async (e: React.FormEvent) => {
     });
 
     // Calculate total spent for the payroll period
-    const totalSpent = payrollEmployees.reduce((total, employee) => {
+    const totalSpent = selectedPayrollEmployees.reduce((total, employee) => {
       return total + parseFloat(employee.netPay);
     }, 0);
 
@@ -415,7 +425,7 @@ const handleSubmit = async (e: React.FormEvent) => {
       
       // Additional metadata for reporting
       metadata: {
-        totalEmployees: payrollEmployees.length,
+        totalEmployees: selectedPayrollEmployees.length,
         periodWorkHours: attendanceSummary?.company.workHours,
         generatedAt: new Date().toISOString(),
         generalDeductions: generalDeductions,
@@ -443,7 +453,28 @@ const handleSubmit = async (e: React.FormEvent) => {
     if (['periodStart', 'periodEnd'].includes(field)) {
       setDataFetched(false);
       setAttendanceSummary(null);
+      setSelectedEmployeeIds(new Set());
     }
+  };
+
+  const toggleEmployeeSelection = (employeeId: string) => {
+    setSelectedEmployeeIds(previous => {
+      const next = new Set(previous);
+      if (next.has(employeeId)) {
+        next.delete(employeeId);
+      } else {
+        next.add(employeeId);
+      }
+      return next;
+    });
+  };
+
+  const selectAllEmployees = () => {
+    setSelectedEmployeeIds(new Set(payrollEmployees.map(employee => String(employee.id))));
+  };
+
+  const clearEmployeeSelection = () => {
+    setSelectedEmployeeIds(new Set());
   };
 
   // General Deductions Management
@@ -531,22 +562,39 @@ const handleSubmit = async (e: React.FormEvent) => {
 
   // Calculate total payroll amount
   const totalPayrollAmount = payrollEmployees.reduce((total, employee) => {
-    return total + parseFloat(employee.netPay);
+    return selectedEmployeeIds.has(String(employee.id)) ? total + parseFloat(employee.netPay) : total;
   }, 0);
 
   // Calculate total fines amount
   const totalFinesAmount = payrollEmployees.reduce((total, employee) => {
+    if (!selectedEmployeeIds.has(String(employee.id))) return total;
     const missedHoursFine = employee.deductions.find(d => d.name === 'Missed Hours Fine');
     return total + (missedHoursFine ? parseFloat(missedHoursFine.value) : 0);
   }, 0);
 
   // Calculate total gross salary
   const totalGrossSalary = payrollEmployees.reduce((total, employee) => {
-    return total + parseFloat(employee.baseSalary);
+    return selectedEmployeeIds.has(String(employee.id)) ? total + parseFloat(employee.baseSalary) : total;
   }, 0);
 
   const expandedCount = expandedEmployees.size;
   const totalCount = payrollEmployees.length;
+  const selectedPayrollEmployees = payrollEmployees.filter(employee => selectedEmployeeIds.has(String(employee.id)));
+  const normalizedEmployeeSearch = employeeSearch.trim().toLowerCase();
+  const filteredPayrollEmployees = payrollEmployees
+    .map((employee, index) => ({ employee, index }))
+    .filter(({ employee }) => {
+      const searchableDetails = [
+        employee.firstName,
+        employee.lastName,
+        `${employee.firstName} ${employee.lastName}`,
+        employee.role,
+        employee.department,
+        employee.branch,
+        String(employee.id),
+      ];
+      return searchableDetails.some(detail => detail.toLowerCase().includes(normalizedEmployeeSearch));
+    });
 
   if (!visible) return null;
 
@@ -670,7 +718,7 @@ const handleSubmit = async (e: React.FormEvent) => {
               {/* General Deductions Section */}
               <div className="border border-gray-200 rounded-lg p-4">
                 <label className="block text-sm font-medium text-gray-700 mb-3">
-                  General Deductions (Applied to all employees)
+                  General Deductions (Applied to all selected employees)
                 </label>
                 {generalDeductions.map((deduction, index) => (
                   <div key={index} className="flex gap-2 mb-2 items-center">
@@ -710,7 +758,7 @@ const handleSubmit = async (e: React.FormEvent) => {
               {/* General Allowances Section */}
               <div className="border border-gray-200 rounded-lg p-4">
                 <label className="block text-sm font-medium text-gray-700 mb-3">
-                  General Allowances (Applied to all employees)
+                  General Allowances (Applied to all selected employees)
                 </label>
                 {generalAllowances.map((allowance, index) => (
                   <div key={index} className="flex gap-2 mb-2 items-center">
@@ -751,9 +799,23 @@ const handleSubmit = async (e: React.FormEvent) => {
               <div>
                 <div className="flex justify-between items-center mb-3">
                   <label className="block text-sm font-medium text-gray-700">
-                    Employees Payroll Details ({totalCount} employees)
+                    Employees for {formData.payDate} ({selectedPayrollEmployees.length} of {totalCount} selected)
                   </label>
                   <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={selectAllEmployees}
+                      className="px-3 py-1 text-xs text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Select All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={clearEmployeeSelection}
+                      className="px-3 py-1 text-xs text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Clear Selection
+                    </button>
                     <button
                       type="button"
                       onClick={expandAllEmployees}
@@ -770,9 +832,33 @@ const handleSubmit = async (e: React.FormEvent) => {
                     </button>
                   </div>
                 </div>
+                {selectedPayrollEmployees.length === 0 && (
+                  <p className="mb-3 text-sm text-amber-700">
+                    Select at least one employee to generate this payroll.
+                  </p>
+                )}
+
+                <div className="mb-3">
+                  <label htmlFor="payroll-employee-search" className="sr-only">
+                    Search employees
+                  </label>
+                  <input
+                    id="payroll-employee-search"
+                    type="search"
+                    value={employeeSearch}
+                    onChange={(event) => setEmployeeSearch(event.target.value)}
+                    placeholder="Search by name, role, department, branch, or ID..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
+                  />
+                  {normalizedEmployeeSearch && (
+                    <p className="mt-1 text-xs text-gray-500" aria-live="polite">
+                      Showing {filteredPayrollEmployees.length} of {totalCount} employees
+                    </p>
+                  )}
+                </div>
                 
                 <div className="space-y-2">
-                  {payrollEmployees.map((employee, empIndex) => {
+                  {filteredPayrollEmployees.map(({ employee, index: empIndex }) => {
                     const isExpanded = expandedEmployees.has(employee.id);
                     const attendance = employee.attendanceData;
                     const missedHoursFine = employee.deductions.find(d => d.name === 'Missed Hours Fine');
@@ -785,6 +871,14 @@ const handleSubmit = async (e: React.FormEvent) => {
                           onClick={() => toggleEmployeeExpansion(employee.id)}
                         >
                           <div className="flex items-center gap-3">
+                            <input
+                              type="checkbox"
+                              checked={selectedEmployeeIds.has(String(employee.id))}
+                              onChange={() => toggleEmployeeSelection(String(employee.id))}
+                              onClick={(event) => event.stopPropagation()}
+                              aria-label={`Include ${employee.firstName} ${employee.lastName} in this payroll`}
+                              className="h-4 w-4 rounded border-gray-300 text-gray-600 focus:ring-gray-500"
+                            />
                             {isExpanded ? (
                               <FaChevronDown className="w-4 h-4 text-gray-400" />
                             ) : (
@@ -980,6 +1074,11 @@ const handleSubmit = async (e: React.FormEvent) => {
                       </div>
                     );
                   })}
+                  {filteredPayrollEmployees.length === 0 && (
+                    <p className="py-6 text-center text-sm text-gray-500">
+                      No employees match “{employeeSearch.trim()}”.
+                    </p>
+                  )}
                 </div>
 
                 {/* Expand/Collapse Status */}
@@ -994,7 +1093,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                   <div>
                     <h4 className="font-medium text-gray-900">Total Payroll Summary</h4>
                     <div className="text-sm text-gray-600 space-y-1">
-                      <p>Total amount to be paid to {payrollEmployees.length} employees</p>
+                      <p>Total amount to be paid to {selectedPayrollEmployees.length} employees</p>
                       <p>Total Gross Salary: UGX {totalGrossSalary.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
                       {totalFinesAmount > 0 && (
                         <p className="text-red-600">Total fines: UGX {totalFinesAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
@@ -1022,7 +1121,7 @@ const handleSubmit = async (e: React.FormEvent) => {
             </button>
             <button
               type="submit"
-              disabled={loading || payrollEmployees.length === 0 || !dataFetched}
+              disabled={loading || selectedPayrollEmployees.length === 0 || !dataFetched}
               className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? 'Processing...' : payrollPeriod ? 'Update Payroll' : 'Generate Payroll'}

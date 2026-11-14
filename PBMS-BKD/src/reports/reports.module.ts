@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
 import { DashboardService } from './dashboard/dashboard.service';
 import { DashboardController } from './dashboard/dashboard.controller';
 import { ReportsController } from './reports.controller';
@@ -13,7 +12,6 @@ import { ReportStorageService } from './reportPdfGeneration.service';
   controllers: [DashboardController, ReportsController],
   providers: [
     DashboardService,
-    PrismaService,
     ReportService,
     PdfService,
     CompanyService,

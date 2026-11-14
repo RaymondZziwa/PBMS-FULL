@@ -6,7 +6,6 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { PrismaModule } from '../prisma/prisma.module';
-import { PrismaService } from 'src/prisma/prisma.service';
 import { MailService } from 'src/mail/mail.service';
 import { JwtRefreshStrategy } from 'src/guards/jwt-refresh.strategy';
 import { JwtStrategy } from 'src/guards/jwt.strategy';
@@ -30,7 +29,6 @@ import { JwtStrategy } from 'src/guards/jwt.strategy';
     AuthService,
     JwtStrategy,
     JwtRefreshStrategy,
-    PrismaService,
     MailService,
   ],
   exports: [AuthService],

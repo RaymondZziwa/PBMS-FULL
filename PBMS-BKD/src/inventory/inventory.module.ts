@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
 import { ItemCategoryController } from './itemCategories/itemCategories.controller';
 import { ItemCategoryService } from './itemCategories/itemCateogries.service';
 import { ItemController } from './items/items.controller';
@@ -30,7 +29,6 @@ import { CompanyService } from 'src/company-profile/profile.service';
   ],
   providers: [
     ItemCategoryService,
-    PrismaService,
     ItemService,
     StockMovementService,
     MservicesService,

@@ -35,7 +35,7 @@ const PayrollManagement = () => {
   const deletePayrollPeriod = async () => {
     try {
       if (modalProps.payrollPeriod) {
-        await apiRequest(PayrollEndpoints.delete(modalProps?.payrollPeriod?.id), "DELETE", '');
+        await apiRequest(PayrollEndpoints.PAYROLL.delete(modalProps?.payrollPeriod?.id), "DELETE", '');
         refresh();
         setIsDeleteModalOpen(false);
         toast.success('Payroll period deleted successfully');

@@ -7,6 +7,8 @@ import 'dotenv/config';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.use(cookieParser());
+  // Close DB connections cleanly when PM2 restarts/stops the process
+  app.enableShutdownHooks();
 
   app.enableCors({
     origin: [

@@ -80,20 +80,33 @@ const Cart: React.FC<CartProps> = ({
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-600">Quantity:</span>
                   <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => onQuantityChange(item.id, item.unitId, item.quantity - 1)}
-                      className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center"
-                    >
-                      -
-                    </button>
-                    <span className="w-8 text-center">{item.quantity}</span>
-                    <button
-                      onClick={() => onQuantityChange(item.id, item.unitId, item.quantity + 1)}
-                      className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center"
-                    >
-                      +
-                    </button>
-                  </div>
+  <button
+    onClick={() => onQuantityChange(item.id, item.unitId, item.quantity - 1)}
+    className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center"
+  >
+    -
+  </button>
+
+  <input
+    type="number"
+    min={1}
+    value={item.quantity}
+    onChange={(e) => {
+      const val = parseInt(e.target.value, 10);
+      if (!Number.isNaN(val) && val >= 1) {
+        onQuantityChange(item.id, item.unitId, val);
+      }
+    }}
+    className="w-10 text-center bg-transparent border-none outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+  />
+
+  <button
+    onClick={() => onQuantityChange(item.id, item.unitId, item.quantity + 1)}
+    className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center"
+  >
+    +
+  </button>
+</div>
                 </div>
 
                 {/* Discount Input */}

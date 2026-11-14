@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
 import { DepartmentController } from './departments/department.controller';
 import { DepartmentService } from './departments/department.service';
 import { EmployeeController } from './employees/employee.controller';
@@ -11,7 +10,6 @@ import { PayrollService } from './payroll/payroll.service';
   controllers: [DepartmentController, EmployeeController, PayrollController],
   providers: [
     DepartmentService,
-    PrismaService,
     EmployeeService,
     PayrollService,
   ],

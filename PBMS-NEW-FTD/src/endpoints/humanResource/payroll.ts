@@ -7,6 +7,7 @@ export const PayrollEndpoints = {
     PAYROLL: {
         create: '/api/employees/save-payroll',
         fetch_all: '/api/employees/payroll-history',
+        delete: (id: string) => `/api/employees/delete-payroll/${id}`,
         get_employees: (startDate: string, endDate: string) => `/api/employees/summary?startDate=${startDate}&endDate=${endDate}`,
     }
 }

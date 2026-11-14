@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
 import { ProjectsController } from './projects.controller';
 import { ProjectsService } from './projects.service';
 import { ProjectSalesController } from './projectSales/sales.controller';
@@ -15,7 +14,6 @@ import { ProjectPaymentsService } from './projectPayments/payments.service';
   ],
   providers: [
     ProjectsService,
-    PrismaService,
     ProjectSalesService,
     ProjectPaymentsService,
   ],
