@@ -72,6 +72,8 @@ import ClubMembers from './pages/loyalty/members';
 import ClubMemberDetail from './pages/loyalty/memberDetail';
 import ClubTracker from './pages/loyalty/tracker';
 import ClubWallet from './pages/loyalty/wallet';
+import ClubOrders from './pages/loyalty/orders';
+import ClubSettings from './pages/loyalty/settings';
 import RunPayroll from './pages/humanResource/payroll/RunPayroll';
 
 // Protected Route Component
@@ -676,7 +678,7 @@ function App() {
         }
       />
 
-      {/* Monk Loyalty Club (sub-modules are added under /loyalty/...) */}
+      {/* Amatugunda Monk Club (Monk Loyalty Club) */}
       <Route
         path="/loyalty"
         element={
@@ -714,6 +716,22 @@ function App() {
         element={
           <ProtectedRoute>
             <ClubWallet />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/loyalty/orders"
+        element={
+          <ProtectedRoute>
+            <ClubOrders />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/loyalty/settings"
+        element={
+          <ProtectedRoute>
+            <ClubSettings />
           </ProtectedRoute>
         }
       />

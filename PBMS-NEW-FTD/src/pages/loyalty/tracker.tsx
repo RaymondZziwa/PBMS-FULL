@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { FiMinus, FiPlus, FiRotateCcw, FiSave, FiSearch, FiX } from "react-icons/fi";
+import { FiLock, FiMinus, FiPlus, FiRotateCcw, FiSave, FiSearch, FiX } from "react-icons/fi";
 import { apiRequest } from "../../libs/apiConfig";
 import Button from "../../ui/Button";
 import { Card, EmptyState, PageHeader, SkeletonRows } from "../../ui/Page";
@@ -155,7 +155,7 @@ const ClubTracker = () => {
   };
 
   const removeLot = async () => {
-    const hasData = Array.from({ length: 12 }, (_, i) => cells[key(i + 1, lots)]).some((c) => c && (c.q || c.r));
+    const hasData = Array.from({ length: 12 }, (_, i) => cells[key(i + 1, lots)]).some((c) => c && (c.q || c.r)); // only open months can have data here (closed ones block removal)
     if (hasData && !(await confirm({ title: `Remove lot ${lots}?`, message: "It has values in some months. They'll be removed when you save.", tone: "danger", confirmLabel: "Remove lot" }))) return;
     setLots((n) => Math.max(1, n - 1));
   };
@@ -185,6 +185,14 @@ const ClubTracker = () => {
     const filled = Array.from({ length: lots }, (_, j) => Number(cells[key(i + 1, j + 1)]?.q) > 0).filter(Boolean).length;
     return monthStatus(filled, lots, year, i + 1);
   });
+  // Past months (and past years) are closed: shown, not editable. The API enforces this too.
+  const now = new Date();
+  const locked = (m: number) => year < now.getFullYear() || (year === now.getFullYear() && m < now.getMonth() + 1);
+  const pastYear = year < now.getFullYear();
+  const lockedLots = Array.from({ length: 12 }, (_, i) => i + 1).filter(locked).reduce((mx, m) => {
+    for (let l = 20; l >= 1; l--) { const c = cells[key(m, l)]; if (c && (c.q || c.r)) return Math.max(mx, l); }
+    return mx;
+  }, 0);
   const totals = Array.from({ length: lots }, (_, j) => Array.from({ length: 12 }, (_, i) => Number(cells[key(i + 1, j + 1)]?.q) || 0).reduce((a, b) => a + b, 0));
 
   return (
@@ -224,9 +232,9 @@ const ClubTracker = () => {
             </div>
             <div className="flex items-center gap-2 sm:ml-auto">
               <span className="text-sm text-brand-muted">Lots</span>
-              <Button size="sm" variant="secondary" aria-label="Remove a lot" icon={<FiMinus aria-hidden="true" />} onClick={removeLot} disabled={lots <= 1} />
+              <Button size="sm" variant="secondary" aria-label="Remove a lot" icon={<FiMinus aria-hidden="true" />} onClick={removeLot} disabled={lots <= 1 || pastYear || lots <= lockedLots} />
               <span className="w-6 text-center text-sm font-semibold tabular-nums text-brand-ink">{lots}</span>
-              <Button size="sm" variant="secondary" aria-label="Add a lot" icon={<FiPlus aria-hidden="true" />} onClick={() => setLots((n) => Math.min(20, n + 1))} disabled={lots >= 20} />
+              <Button size="sm" variant="secondary" aria-label="Add a lot" icon={<FiPlus aria-hidden="true" />} onClick={() => setLots((n) => Math.min(20, n + 1))} disabled={lots >= 20 || pastYear} />
             </div>
           </div>
 
@@ -250,15 +258,17 @@ const ClubTracker = () => {
                   const st = TRACKER_TONE[live[i]];
                   return (
                     <tr key={name} className="border-t border-line">
-                      <th scope="row" className="sticky left-0 z-10 bg-surface px-3 py-1.5 text-left font-medium text-brand-ink">{name}</th>
+                      <th scope="row" className={`sticky left-0 z-10 px-3 py-1.5 text-left font-medium ${locked(m) ? "bg-surface-2 text-brand-muted" : "bg-surface text-brand-ink"}`}>
+                        <span className="inline-flex items-center gap-1.5">{name}{locked(m) && <FiLock aria-label="closed" className="h-3 w-3" />}</span>
+                      </th>
                       {Array.from({ length: lots }, (_, j) => {
                         const c = cells[key(m, j + 1)] ?? { q: "", r: "" };
-                        const missingReceipt = Number(c.q) > 0 && !c.r.trim();
+                        const missingReceipt = !locked(m) && Number(c.q) > 0 && !c.r.trim();
                         return (
-                          <td key={j} className="border-l border-line px-2 py-1.5">
+                          <td key={j} className={`border-l border-line px-2 py-1.5 ${locked(m) ? "bg-surface-2" : ""}`}>
                             <div className="flex gap-1">
-                              <input inputMode="decimal" aria-label={`${name} lot ${j + 1} quantity`} value={c.q} onChange={(e) => setCell(m, j + 1, "q", e.target.value)} placeholder="0" className="themed h-9 w-[64px] rounded-md border border-line bg-surface px-2 text-right tabular-nums text-brand-ink outline-none focus:border-brand" />
-                              <input aria-label={`${name} lot ${j + 1} receipt number`} value={c.r} onChange={(e) => setCell(m, j + 1, "r", e.target.value)} placeholder="Receipt" className={`themed h-9 w-full min-w-[90px] rounded-md border bg-surface px-2 text-brand-ink outline-none focus:border-brand ${missingReceipt ? "border-[#D92D20]" : "border-line"}`} />
+                              <input inputMode="decimal" aria-label={`${name} lot ${j + 1} quantity`} value={c.q} onChange={(e) => setCell(m, j + 1, "q", e.target.value)} readOnly={locked(m)} tabIndex={locked(m) ? -1 : undefined} placeholder={locked(m) ? "—" : "0"} className="themed read-only:cursor-default read-only:border-transparent read-only:bg-transparent h-9 w-[64px] rounded-md border border-line bg-surface px-2 text-right tabular-nums text-brand-ink outline-none focus:border-brand" />
+                              <input aria-label={`${name} lot ${j + 1} receipt number`} value={c.r} onChange={(e) => setCell(m, j + 1, "r", e.target.value)} readOnly={locked(m)} tabIndex={locked(m) ? -1 : undefined} placeholder={locked(m) ? "" : "Receipt"} className={`themed read-only:cursor-default read-only:border-transparent read-only:bg-transparent h-9 w-full min-w-[90px] rounded-md border bg-surface px-2 text-brand-ink outline-none focus:border-brand ${missingReceipt ? "border-[#D92D20]" : "border-line"}`} />
                             </div>
                           </td>
                         );
@@ -284,10 +294,10 @@ const ClubTracker = () => {
 
           <div className="sticky bottom-0 z-20 flex flex-wrap items-center gap-3 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur">
             <p className="m-0 min-w-0 flex-1 text-xs text-brand-muted">
-              {error ? <span className="text-sm text-[#C0362C]">{error}</span> : <>A month is <b className="text-[#1B7A3D]">active</b> when at least half its lots have a quantity, <b className="text-[#C0362C]">defective</b> when fewer do (or none once the month is over), and <b>default</b> until then.</>}
+              {error ? <span className="text-sm text-[#C0362C]">{error}</span> : pastYear ? <>{year} is closed. You can view it but not change it.</> : <><FiLock aria-hidden="true" className="mr-1 inline h-3 w-3" />Past months are closed and can't be changed. A month is <b className="text-[#1B7A3D]">active</b> when at least half its lots have a quantity, <b className="text-[#C0362C]">defective</b> when fewer do (or none once the month is over), and <b>default</b> until then.</>}
             </p>
-            <Button variant="secondary" icon={<FiRotateCcw aria-hidden="true" />} disabled={!dirty || saving} onClick={() => saved && fromTracker(saved)}>Discard</Button>
-            <Button icon={<FiSave aria-hidden="true" />} loading={saving} disabled={!dirty} onClick={save}>Save {year}</Button>
+            {!pastYear && <><Button variant="secondary" icon={<FiRotateCcw aria-hidden="true" />} disabled={!dirty || saving} onClick={() => saved && fromTracker(saved)}>Discard</Button>
+            <Button icon={<FiSave aria-hidden="true" />} loading={saving} disabled={!dirty} onClick={save}>Save {year}</Button></>}
           </div>
         </Card>
       )}

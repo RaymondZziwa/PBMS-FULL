@@ -1374,6 +1374,11 @@ model ClubMember {
   status             ClubMemberStatus @default(PENDING)
   statusNote         String?          @db.Text
   cardNumber         String?          @unique @db.VarChar(20)
+  /// Bumped by "Reissue card": older QR codes for this card stop working.
+  cardVersion        Int              @default(1)
+  /// Last time the card's QR code was checked, and how often.
+  cardCheckedAt      DateTime?
+  cardChecks         Int              @default(0)
   password           String?          @db.VarChar(100)
   mustChangePassword Boolean          @default(true)
   /// Bumped on password change, suspension etc. to sign the member out everywhere.
@@ -1390,6 +1395,7 @@ model ClubMember {
   payments    ClubPayment[]
   trackerRows ClubTrackerEntry[]
   trackerYears ClubTrackerYear[]
+  orders       ClubOrder[]
 
   @@index([status, createdAt])
   @@index([surname, firstName])
@@ -1431,7 +1437,8 @@ model ClubPayment {
   memberId     Int?
   member       ClubMember?       @relation(fields: [memberId], references: [id], onDelete: SetNull)
   memberName   String            @db.VarChar(200) // kept if the member is deleted
-  purpose      String            @db.VarChar(30) // REGISTRATION (orders later)
+  purpose      String            @db.VarChar(30) // REGISTRATION | ORDER
+  orderId      Int?              // set when purpose = ORDER
   baseAmount   Decimal           @db.Decimal(12, 2) // what the wallet receives
   marzFee      Decimal           @db.Decimal(12, 2)
   serviceFee   Decimal           @db.Decimal(12, 2)
@@ -1448,6 +1455,7 @@ model ClubPayment {
 
   @@index([memberId, createdAt])
   @@index([status, createdAt])
+  @@index([orderId])
   @@map("club_payments")
 }
 
@@ -1495,4 +1503,77 @@ model ClubTrackerEntry {
   @@unique([memberId, year, month, lot])
   @@index([memberId, year])
   @@map("club_tracker_entries")
+}
+
+/// Club-wide settings (one row, id = 1), changed in PBMS → Monk Loyalty Club → Settings.
+model ClubSetting {
+  id              Int      @id @default(1)
+  /// Discount members get in the marketplace, in percent (0–90).
+  discountPercent Int      @default(0)
+  /// Store whose stock is shown in the marketplace (null = don't check stock).
+  storeId         Int?
+  updatedById     Int?
+  updatedAt       DateTime @updatedAt
+
+  @@map("club_settings")
+}
+
+enum ClubOrderStatus {
+  AWAITING_PAYMENT // mobile money not confirmed yet
+  PLACED
+  PROCESSING
+  DISPATCHED
+  DELIVERED
+  CANCELLED
+}
+
+enum ClubPaymentMethod {
+  CASH
+  ON_DELIVERY
+  MOBILE_MONEY
+}
+
+model ClubOrder {
+  id              Int               @id @default(autoincrement())
+  orderNumber     String            @unique @db.VarChar(24)
+  memberId        Int?
+  member          ClubMember?       @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  memberName      String            @db.VarChar(200)
+  cardNumber      String?           @db.VarChar(20)
+  recipientName   String            @db.VarChar(160)
+  deliveryPhone   String            @db.VarChar(20)
+  deliveryAddress String            @db.VarChar(500)
+  usedDefaultAddress Boolean        @default(true)
+  paymentMethod   ClubPaymentMethod
+  status          ClubOrderStatus   @default(PLACED)
+  paid            Boolean           @default(false)
+  subtotal        Decimal           @db.Decimal(12, 2)
+  discountPercent Int               @default(0)
+  discountAmount  Decimal           @db.Decimal(12, 2)
+  total           Decimal           @db.Decimal(12, 2)
+  notes           String?           @db.VarChar(500)
+  statusNote      String?           @db.VarChar(500)
+  updatedById     Int?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  items ClubOrderItem[]
+
+  @@index([memberId, createdAt])
+  @@index([status, createdAt])
+  @@map("club_orders")
+}
+
+model ClubOrderItem {
+  id        Int       @id @default(autoincrement())
+  orderId   Int
+  order     ClubOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  itemId    Int?
+  name      String    @db.VarChar(191)
+  unitPrice Decimal   @db.Decimal(12, 2) // price before the club discount
+  qty       Int
+  lineTotal Decimal   @db.Decimal(12, 2)
+
+  @@index([orderId])
+  @@map("club_order_items")
 }

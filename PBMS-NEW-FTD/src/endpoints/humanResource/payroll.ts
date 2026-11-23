@@ -4,7 +4,8 @@ export const PayrollEndpoints = {
     Attendance: {
         create: '/api/employees/record-attendance',
         modify: (id: Id) => `/api/employees/modify-attendance/${id}`,
-        get_attendance: (date: string) => `/api/employees/attendance/daily-sheet?date=${date}`
+        get_attendance: (date: string) => `/api/employees/attendance/daily-sheet?date=${date}`,
+        remove: (id: string | number) => `/api/employees/attendance/${id}`
     },
     PAYROLL: {
         create: '/api/employees/save-payroll',

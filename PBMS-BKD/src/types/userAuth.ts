@@ -10,10 +10,11 @@ export interface IUserAuth {
   firstName: string;
   lastName: string;
   gender: string;
-  email: string;
+  /** Null for staff who don't sign in to the system. */
+  email: string | null;
   tel: string;
   salary: any;
-  password: string;
+  password: string | null;
   hasAccess: boolean;
   hasPrescriptionAccess: boolean;
   isActive: boolean;

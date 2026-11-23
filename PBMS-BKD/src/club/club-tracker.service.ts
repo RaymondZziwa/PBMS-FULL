@@ -7,6 +7,10 @@ const MIN_LOTS = 1;
 const MAX_LOTS = 20;
 const DEFAULT_LOTS = 4;
 
+/** Months before the current one (and every month of past years) are locked. */
+export const isLockedMonth = (year: number, month: number, today = new Date()) =>
+  year < today.getFullYear() || (year === today.getFullYear() && month < today.getMonth() + 1);
+
 type CellInput = { month?: unknown; lot?: unknown; quantity?: unknown; receiptNo?: unknown };
 
 /**
@@ -38,7 +42,7 @@ export class ClubTrackerService {
         return { lot: j + 1, quantity: c?.quantity != null ? Number(c.quantity) : null, receiptNo: c?.receiptNo ?? null };
       });
       const filled = row.filter((c) => (c.quantity ?? 0) > 0).length;
-      return { month, name, cells: row, filled, status: monthStatus(filled, lots, year, month) };
+      return { month, name, cells: row, filled, status: monthStatus(filled, lots, year, month), locked: isLockedMonth(year, month) };
     });
 
     const totals = Array.from({ length: lots }, (_, j) => months.reduce((a, m) => a + (m.cells[j].quantity ?? 0), 0));
@@ -73,6 +77,13 @@ export class ClubTrackerService {
     const member = await this.prisma.clubMember.findUnique({ where: { id: memberId }, select: { id: true, status: true } });
     if (!member) throw new NotFoundException('Member not found');
 
+    // Past months are locked: what's saved for them can't change.
+    const existing = await this.prisma.clubTrackerEntry.findMany({ where: { memberId, year } });
+    const setting = await this.prisma.clubTrackerYear.findUnique({ where: { memberId_year: { memberId, year } } });
+    const lockedLots = existing.filter((e) => isLockedMonth(year, e.month)).reduce((m, e) => Math.max(m, e.lot), 0);
+    if (lots < lockedLots) throw new BadRequestException(`Lot ${lockedLots} has entries in past months, so it can't be removed`);
+    if (year < new Date().getFullYear() && setting && setting.lots !== lots) throw new BadRequestException(`${year} is over: its lots can't be changed`);
+
     const keep: Array<{ month: number; lot: number; quantity: number | null; receiptNo: string | null }> = [];
     const seen = new Set<string>();
     for (const raw of body.cells as CellInput[]) {
@@ -88,13 +99,24 @@ export class ClubTrackerService {
       }
       const receiptNo = cleanText(raw.receiptNo, 60);
       if (qRaw && qRaw > 0 && !receiptNo) throw new BadRequestException(`Add the receipt number for ${MONTHS[month - 1]}, lot ${lot}`);
+      if (isLockedMonth(year, month)) {
+        const was = existing.find((e) => e.month === month && e.lot === lot);
+        const wasQ = was?.quantity != null ? Number(was.quantity) : null;
+        if (wasQ !== qRaw || (was?.receiptNo ?? null) !== receiptNo) {
+          throw new BadRequestException(`${MONTHS[month - 1]} ${year} is closed and can't be changed`);
+        }
+        continue; // kept as it is below
+      }
       if (qRaw === null && !receiptNo) continue;
       keep.push({ month, lot, quantity: qRaw, receiptNo });
     }
+    // Locked months aren't deleted below, so their entries stay exactly as they were.
 
     await this.prisma.$transaction(async (tx) => {
       await tx.clubTrackerYear.upsert({ where: { memberId_year: { memberId, year } }, create: { memberId, year, lots }, update: { lots } });
-      await tx.clubTrackerEntry.deleteMany({ where: { memberId, year } });
+      // Only open (current and future) months are replaced.
+      const open = Array.from({ length: 12 }, (_, i) => i + 1).filter((m) => !isLockedMonth(year, m));
+      await tx.clubTrackerEntry.deleteMany({ where: { memberId, year, month: { in: open } } });
       if (keep.length) {
         await tx.clubTrackerEntry.createMany({ data: keep.map((c) => ({ ...c, memberId, year, updatedById: staffId })) });
       }

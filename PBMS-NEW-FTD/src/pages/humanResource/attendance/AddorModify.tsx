@@ -1,259 +1,140 @@
-import { useState, useEffect } from 'react';
-import { FaTimes } from 'react-icons/fa';
-import { toast } from 'sonner';
-import { apiRequest } from '../../../libs/apiConfig';
-import CustomDateInput from '../../../custom/inputs/customDateSelector';
-import useEmployees from '../../../hooks/humanResource/useEmployees';
-import CustomDropdown from '../../../custom/inputs/customDropdown';
-import type { IEmployee } from '../../../redux/types/hr';
-import { PayrollEndpoints } from '../../../endpoints/humanResource/payroll';
-import { createISOStringInEAT } from '../../../libs/timetoEAT';
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { FiLogIn, FiLogOut } from "react-icons/fi";
+import Modal from "../../../ui/Modal";
+import Button from "../../../ui/Button";
+import Combobox from "../../../ui/Combobox";
+import { CONTROL, FieldShell, TextField } from "../../../ui/Field";
+import { apiRequest } from "../../../libs/apiConfig";
+import { PayrollEndpoints } from "../../../endpoints/humanResource/payroll";
+import type { IAttendance, IEmployee } from "../../../redux/types/hr";
 
-// ... your interfaces remain the same
+/** "HH:MM" now. */
+export const nowHHMM = () => new Date().toTimeString().slice(0, 5);
+/** "2026-11-23" + "08:30" → ISO time in East Africa Time (UTC+3). */
+export const toEAT = (date: string, hhmm: string) => new Date(`${date}T${hhmm}:00+03:00`).toISOString();
+/** ISO → "HH:MM" in EAT. */
+export const hhmmEAT = (iso?: string | null) =>
+  iso ? new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Africa/Kampala" }) : "";
 
-const AddOrModifyAttendance: React.FC<AddOrModifyAttendanceProps> = ({
-  visible,
-  attendance,
-  onCancel,
-  onSuccess,
-}) => {
-  const getCurrentTime = () => {
-    const now = new Date();
-    console.log('Current time:', now);
-    return now.toTimeString().slice(0, 5); // Returns "HH:MM" format
-  };
+type Props = {
+  open: boolean;
+  /** The day being recorded (YYYY-MM-DD). */
+  date: string;
+  /** Set to record a time out for an existing record; empty to clock someone in. */
+  record: IAttendance | null;
+  /** Preselect someone when clocking in from the "not in yet" list. */
+  employeeId?: string;
+  employees: IEmployee[];
+  /** Employees who already have a record that day (can't be clocked in twice). */
+  takenIds: Set<string>;
+  onClose: () => void;
+  onSaved: () => void;
+};
 
-  const { data: employees } = useEmployees();
-  const [formData, setFormData] = useState({
-    employeeId: '',
-    date: new Date().toISOString().split('T')[0],
-    timeIn: getCurrentTime(),
-    timeOut: '',
-    notes: '',
-  });
-  const [loading, setLoading] = useState(false);
-
-  // Function to create proper ISO string (NO timezone conversion needed)
-  const createISOString = (dateStr: string, timeStr: string): string => {
-    const [hours, minutes] = timeStr.split(':').map(Number);
-    const date = new Date(dateStr);
-    date.setHours(hours, minutes, 0, 0);
-    
-    // Return as ISO string - let the backend handle timezone conversion
-    return date.toISOString();
-  };
-
-  // Function to format time for display (NO timezone conversion needed)
-  const formatTimeForDisplay = (isoString: string): string => {
-    if (!isoString) return '';
-    const date = new Date(isoString);
-    return date.toTimeString().slice(0, 5);
-  };
+/** Clock someone in (with an optional time out), or clock them out. */
+const AddOrModifyAttendance = ({ open, date, record, employeeId, employees, takenIds, onClose, onSaved }: Props) => {
+  const isToday = date === new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Kampala" });
+  const [emp, setEmp] = useState("");
+  const [timeIn, setTimeIn] = useState("");
+  const [timeOut, setTimeOut] = useState("");
+  const [notes, setNotes] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (attendance) {
-      // Edit mode - use the time directly
-      setFormData({
-        employeeId: attendance.employeeId,
-        date: attendance.date,
-        timeIn: formatTimeForDisplay(attendance.timeIn),
-        timeOut: attendance.timeOut ? formatTimeForDisplay(attendance.timeOut) : '',
-        notes: (attendance as any).notes || '',
-      });
+    if (!open) return;
+    setErrors({});
+    if (record) {
+      setEmp(String(record.employeeId));
+      setTimeIn(hhmmEAT(record.timeIn));
+      setTimeOut(record.timeOut ? hhmmEAT(record.timeOut) : isToday ? nowHHMM() : "");
+      setNotes(record.notes ?? "");
     } else {
-      // Create mode - reset form with current time
-      setFormData({
-        employeeId: '',
-        date: new Date().toISOString().split('T')[0],
-        timeIn: getCurrentTime(),
-        timeOut: '',
-        notes: '',
-      });
+      setEmp(employeeId ?? "");
+      setTimeIn(isToday ? nowHHMM() : "08:00");
+      setTimeOut("");
+      setNotes("");
     }
-  }, [attendance, visible]);
+  }, [open, record, employeeId, isToday]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const options = useMemo(
+    () =>
+      employees
+        .filter((e) => e.isActive !== false && (!takenIds.has(String(e.id)) || String(e.id) === emp))
+        .map((e) => ({ value: String(e.id), label: `${e.firstName} ${e.lastName}`, hint: e.dept?.name ?? undefined })),
+    [employees, takenIds, emp],
+  );
+
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
-    
-    if (!formData.employeeId || !formData.date || !formData.timeIn) {
-      toast.error('Please fill in all required fields');
-      return;
-    }
+    const er: Record<string, string> = {};
+    if (!record && !emp) er.emp = "Choose who is clocking in.";
+    if (!timeIn) er.timeIn = "Enter the time in.";
+    if (record && !timeOut) er.timeOut = "Enter the time out.";
+    if (timeOut && timeIn && timeOut <= timeIn) er.timeOut = "Time out must be after time in.";
+    if (isToday && !record && timeIn > nowHHMM()) er.timeIn = "Time in can't be later than now.";
+    setErrors(er);
+    if (Object.keys(er).length) return;
 
-    setLoading(true);
-
+    setSaving(true);
     try {
-      const payload = {
-        employeeId: formData.employeeId,
-        date: formData.date,
-        timeIn: createISOStringInEAT(formData.date, formData.timeIn),
-        timeOut: formData.timeOut ? createISOStringInEAT(formData.date, formData.timeOut) : undefined,
-        notes: formData.notes || undefined,
-      };
-      console.log(payload)
-
-      if (attendance) {
-        // Update existing attendance
-        await apiRequest(PayrollEndpoints.Attendance.modify(attendance.id), 'PUT', '', payload);
+      if (record) {
+        await apiRequest(PayrollEndpoints.Attendance.modify(record.id), "PUT", "", { timeOut: toEAT(date, timeOut), notes });
       } else {
-        // Create new attendance
-        await apiRequest(PayrollEndpoints.Attendance.create, 'POST', '', payload);
+        await apiRequest(PayrollEndpoints.Attendance.create, "POST", "", {
+          employeeId: emp,
+          date,
+          timeIn: toEAT(date, timeIn),
+          timeOut: timeOut ? toEAT(date, timeOut) : undefined,
+          notes: notes.trim() || undefined,
+        });
       }
-
-      onSuccess();
-      onCancel();
-    } catch (error: any) {
-      console.error('Error:', error);
+      onSaved();
+      onClose();
+    } catch {
+      // toast shown
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  // Update timeIn to current time when modal opens for create mode
-  useEffect(() => {
-    if (visible && !attendance) {
-      const timer = setInterval(() => {
-        setFormData(prev => ({
-          ...prev,
-          timeIn: getCurrentTime()
-        }));
-      }, 60000); // Update every minute
-      
-      return () => clearInterval(timer);
-    }
-  }, [visible, attendance]);
-
-  if (!visible) return null;
+  const name = record ? `${record.employee.firstName} ${record.employee.lastName}` : "";
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-        {/* Header */}
-        <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">
-            {attendance ? 'Edit Attendance' : 'Clock In Employee'}
-          </h3>
-          <button
-            onClick={onCancel}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <FaTimes className="w-5 h-5" />
-          </button>
+    <Modal
+      open={open}
+      onClose={onClose}
+      locked={saving}
+      size="sm"
+      title={record ? (record.timeOut ? `Edit time out · ${name}` : `Clock out ${name}`) : "Clock in"}
+      description={new Date(`${date}T12:00:00`).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button type="submit" form="attendance-form" loading={saving} icon={record ? <FiLogOut aria-hidden="true" /> : <FiLogIn aria-hidden="true" />}>
+            {record ? "Save time out" : "Clock in"}
+          </Button>
+        </>
+      }
+    >
+      <form id="attendance-form" onSubmit={submit} noValidate className="space-y-4">
+        {!record && (
+          <Combobox label="Employee" required value={emp} onChange={(v) => { setEmp(v); setErrors((x) => ({ ...x, emp: "" })); }} options={options} placeholder="Choose an employee" searchPlaceholder="Search employees" error={errors.emp} />
+        )}
+        <div className="grid grid-cols-2 gap-3">
+          <TextField label="Time in" type="time" required value={timeIn} onChange={setTimeIn} error={errors.timeIn} disabled={!!record} data-autofocus={!record || undefined} />
+          <TextField label="Time out" type="time" required={!!record} value={timeOut} onChange={setTimeOut} error={errors.timeOut} hint={record ? undefined : "Leave empty if still at work"} data-autofocus={record ? true : undefined} />
         </div>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Employee Selection */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Employee *
-            </label>
-            <CustomDropdown
-              options={
-                employees?.map((employee: IEmployee) => ({
-                  value: employee.id,
-                  label: `${employee.firstName} ${employee.lastName}`,
-                })) || []
-              }
-              value={formData.employeeId ? [formData.employeeId] : []}
-              onChange={(selectedValues) => handleInputChange('employeeId', selectedValues[0] || '')}
-              placeholder="Select Employee"
-              disabled={!!attendance}
-              singleSelect={true}
-            />
+        {isToday && (
+          <div className="flex gap-2">
+            <Button size="sm" variant="secondary" onClick={() => (record ? setTimeOut(nowHHMM()) : setTimeIn(nowHHMM()))}>Use current time ({nowHHMM()})</Button>
           </div>
-
-          {/* Date */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Date *
-            </label>
-            <CustomDateInput
-              value={formData.date}
-              onChange={(value) => handleInputChange('date', value)}
-              max={new Date().toISOString().split('T')[0]}
-              label=""
-              disabled={!!attendance}
-            />
-          </div>
-
-          {/* Time In */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Time In *
-            </label>
-            <input
-              type="time"
-              value={formData.timeIn}
-              onChange={(e) => handleInputChange('timeIn', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
-              disabled={!!attendance}
-            />
-            {!attendance && (
-              <p className="text-xs text-gray-500 mt-1">
-                Current time: {getCurrentTime()}
-              </p>
-            )}
-          </div>
-
-          {/* Time Out */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Time Out
-            </label>
-            <input
-              type="time"
-              value={formData.timeOut}
-              onChange={(e) => handleInputChange('timeOut', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
-              min={formData.timeIn}
-            />
-          </div>
-
-          {/* Notes */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Notes
-            </label>
-            <textarea
-              value={formData.notes}
-              onChange={(e) => handleInputChange('notes', e.target.value)}
-              placeholder="Add any notes about this attendance record (optional)"
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-500 focus:border-gray-500 resize-none"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Optional: Add notes about late arrival, early departure, or other relevant information
-            </p>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex justify-end space-x-3 pt-4">
-            <button
-              type="button"
-              onClick={onCancel}
-              className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 transition-colors"
-            >
-              {loading ? 'Saving...' : attendance ? 'Update' : 'Clock In'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        )}
+        <FieldShell label="Notes" id="att-notes" hint="e.g. late because of a clinic visit">
+          <textarea id="att-notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} className={`${CONTROL} h-auto border-line py-2.5`} />
+        </FieldShell>
+      </form>
+    </Modal>
   );
 };
 

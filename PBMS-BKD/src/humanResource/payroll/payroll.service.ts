@@ -22,6 +22,13 @@ export class PayrollService {
   async createAttendance(createAttendanceDto: CreateAttendanceDto) {
     const { date, employeeId, timeIn, timeOut, notes } = createAttendanceDto;
 
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date ?? ''))) throw new BadRequestException('Choose a valid date');
+    const tIn = new Date(timeIn);
+    const tOut = timeOut ? new Date(timeOut) : null;
+    if (Number.isNaN(tIn.getTime())) throw new BadRequestException('Enter the time in');
+    if (tIn.getTime() > Date.now() + 5 * 60_000) throw new BadRequestException("Time in can't be in the future");
+    if (tOut && (Number.isNaN(tOut.getTime()) || tOut <= tIn)) throw new BadRequestException('Time out must be after time in');
+
     // Check if employee exists
     const employee = await this.prisma.employee.findUnique({
       where: { id: employeeId },
@@ -49,9 +56,11 @@ export class PayrollService {
       data: {
         date,
         employeeId,
-        timeIn: new Date(timeIn),
-        timeOut: timeOut ? new Date(timeOut) : null,
+        timeIn: tIn,
+        timeOut: tOut,
         notes: notes || null,
+        // Same rule as clocking out later: hours short of the company's working day.
+        ...(tOut ? { missedHours: Math.max(((await this.prisma.company.findFirst())?.workHours || 8) - (tOut.getTime() - tIn.getTime()) / 3_600_000, 0) } : {}),
       },
       include: {
         employee: {
@@ -257,6 +266,9 @@ export class PayrollService {
 
     const timeIn = attendance.timeIn;
     const timeOut = new Date(updateAttendanceDto.timeOut);
+    if (Number.isNaN(timeOut.getTime()) || timeOut <= timeIn) {
+      throw new BadRequestException('Time out must be after time in');
+    }
 
     // Calculate hours worked
     const hoursWorked =

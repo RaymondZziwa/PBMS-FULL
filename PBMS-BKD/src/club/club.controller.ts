@@ -20,14 +20,16 @@ import {
 import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { createReadStream, existsSync } from 'fs';
-import { ClubMember } from '@prisma/client';
+import type { ClubMember } from '@prisma/client';
 import { CurrentUser, Public, RequirePermissions } from 'src/auth/decorators';
-import { AuthenticatedUser, PERMISSIONS } from 'src/auth/permissions';
+import { PERMISSIONS } from 'src/auth/permissions';
+import type { AuthenticatedUser } from 'src/auth/permissions';
 import { AllowBeforePasswordChange, ClubAuthGuard, CurrentMember } from './club-auth';
 import { clubUpload } from './club-files';
 import { ClubMembersService } from './club-members.service';
 import { ClubPaymentsService } from './club-payments.service';
 import { ClubTrackerService } from './club-tracker.service';
+import { ClubShopService } from './club-shop.service';
 import { CLUB_TITLES, MAX_ATTACHMENTS } from './club.constants';
 
 /**
@@ -40,6 +42,7 @@ export class ClubPublicController {
   constructor(
     private readonly members: ClubMembersService,
     private readonly payments: ClubPaymentsService,
+    private readonly shop: ClubShopService,
   ) {}
 
   @Get('info')
@@ -51,6 +54,12 @@ export class ClubPublicController {
   @UseInterceptors(FileFieldsInterceptor([{ name: 'photo', maxCount: 1 }, { name: 'attachments', maxCount: MAX_ATTACHMENTS }], clubUpload))
   register(@Body('data') data: string, @UploadedFiles() files: { photo?: Express.Multer.File[]; attachments?: Express.Multer.File[] }) {
     return this.members.register(data, files);
+  }
+
+  /** Scanning the QR code on a membership card opens this (through the member app). */
+  @Get('verify')
+  verify(@Query('c') code: string) {
+    return this.shop.verifyCard(code);
   }
 
   @Post('auth/login')
@@ -81,7 +90,40 @@ export class ClubMemberController {
     private readonly members: ClubMembersService,
     private readonly payments: ClubPaymentsService,
     private readonly tracker: ClubTrackerService,
+    private readonly shop: ClubShopService,
   ) {}
+
+  @Get('shop')
+  catalog(@CurrentMember() m: ClubMember) {
+    return this.shop.catalog(m);
+  }
+
+  @Get('orders')
+  myOrders(@CurrentMember() m: ClubMember) {
+    return this.shop.myOrders(m);
+  }
+
+  @Post('orders')
+  placeOrder(@CurrentMember() m: ClubMember, @Body() body: Record<string, unknown>) {
+    return this.shop.placeOrder(m, body);
+  }
+
+  @Post('orders/:id/pay')
+  @HttpCode(200)
+  payOrder(@CurrentMember() m: ClubMember, @Param('id', ParseIntPipe) id: number, @Body() body: { phone?: unknown }) {
+    return this.shop.payOrder(m, id, body?.phone);
+  }
+
+  @Post('orders/:id/cancel')
+  @HttpCode(200)
+  cancelOrder(@CurrentMember() m: ClubMember, @Param('id', ParseIntPipe) id: number) {
+    return this.shop.cancelMine(m, id);
+  }
+
+  @Get('leaderboard')
+  leaderboard(@CurrentMember() m: ClubMember, @Query() q: { period?: string; year?: string; month?: string }) {
+    return this.shop.leaderboard(m, q);
+  }
 
   @Get()
   @AllowBeforePasswordChange()
@@ -137,7 +179,33 @@ export class ClubAdminController {
     private readonly members: ClubMembersService,
     private readonly payments: ClubPaymentsService,
     private readonly tracker: ClubTrackerService,
+    private readonly shop: ClubShopService,
   ) {}
+
+  @Get('settings')
+  settings() {
+    return this.shop.getSettings();
+  }
+
+  @Put('settings')
+  saveSettings(@Body() body: { discountPercent?: unknown; storeId?: unknown }, @CurrentUser() user: AuthenticatedUser) {
+    return this.shop.saveSettings(body, user.id);
+  }
+
+  @Get('orders')
+  orders(@Query() q: { status?: string; search?: string; page?: string }) {
+    return this.shop.adminOrders(q);
+  }
+
+  @Patch('orders/:id')
+  updateOrder(@Param('id', ParseIntPipe) id: number, @Body() body: { status?: unknown; note?: unknown; paid?: unknown }, @CurrentUser() user: AuthenticatedUser) {
+    return this.shop.setOrderStatus(id, body, user.id);
+  }
+
+  @Get('leaderboard')
+  leaderboard(@Query() q: { period?: string; year?: string; month?: string }) {
+    return this.shop.leaderboard(null, q);
+  }
 
   @Get('members')
   list(@Query() q: { status?: string; search?: string; page?: string; pageSize?: string }) {
@@ -199,6 +267,12 @@ export class ClubAdminController {
   @HttpCode(200)
   deactivate(@Param('id', ParseIntPipe) id: number, @Body() body: { reason?: unknown }) {
     return this.members.setStatus(id, 'deactivate', body?.reason);
+  }
+
+  @Post('members/:id/reissue-card')
+  @HttpCode(200)
+  reissueCard(@Param('id', ParseIntPipe) id: number) {
+    return this.members.reissueCard(id);
   }
 
   @Post('members/:id/reset-password')

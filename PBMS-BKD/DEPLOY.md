@@ -13,6 +13,9 @@ Do this in a quiet hour (evening or weekend). Budget 30–45 minutes.
 |---|---|---|
 | `20261122090000_hr_indexes` | Adds indexes on `Attendance` and `PayrollPeriods` so HR screens load fast | Safe. Adds no columns, deletes nothing. Takes a few seconds on large tables. |
 | `20261123100000_employee_optional_login` | Makes `employees.email` and `employees.password` optional (for staff who don't use the system) | Safe. Existing values are kept. |
+| `20261124090000_monk_club` | Adds the Monk Loyalty Club tables and a `isForClub` flag on wallets | Safe. New tables only; one new column with a default. |
+| `20261125090000_club_marketplace` | Adds the club shop: settings (discount, store), orders and order items; links club payments to orders | Safe. New tables; one new empty column. |
+| `20261125100000_club_card_signing` | Card version and scan count on club members (signed QR codes) | Safe. Three new columns with defaults. |
 
 No table is dropped and no data is rewritten.
 
@@ -35,7 +38,7 @@ tail -1 ~/backups/pbms_*.sql | grep "Dump completed"
 Also copy the uploaded files (logos, prescriptions, receipts):
 
 ```bash
-tar -czf ~/backups/pbms_uploads_$(date +%Y%m%d).tgz -C /path/to/PBMS-BKD uploads
+tar -czf ~/backups/pbms_uploads_$(date +%Y%m%d).tgz -C /path/to/PBMS-BKD uploads $( [ -d /path/to/PBMS-BKD/private ] && echo private )
 ```
 
 Download both files to your own computer as well. A backup that only lives on
@@ -118,6 +121,50 @@ RESEND_FROM="PBMS <no-reply@yourdomain.com>"
 ```
 
 Changing either JWT secret signs everyone out once. That's expected.
+
+**Monk Loyalty Club** (add when you deploy the club):
+
+```bash
+# Where the member app runs (CORS) and the link used in emails
+CLUB_APP_ORIGINS=https://club.your-domain.com
+CLUB_APP_URL=https://club.your-domain.com
+# Public address of this API, used for MarzPay callbacks
+CLUB_API_PUBLIC_URL=https://pbmsapi.megaerpug.com
+
+# MarzPay (same account as the shop). Already set if the POS takes mobile money.
+MARZ_COLLECTION_BASE_URL=...
+MARZ_AUTH_HEADER=...
+MARZ_TRANSFER_BASE_URL=...
+MARZ_WALLET_SRC=...
+# Optional but recommended: lets the API double-check each payment with MarzPay
+MARZ_COLLECTION_STATUS_URL=https://.../collect-money/{reference}
+
+# SMS for members without email (same gateway as password resets)
+SMS_URL=...
+SMS_SECRET=...
+
+# Key that signs the QR codes on membership cards (32+ random characters).
+# Set it once and keep it: changing it makes every member's QR code invalid.
+# If missing, a key derived from JWT_SECRET is used (then changing JWT_SECRET also invalidates cards).
+CLUB_CARD_SECRET=...
+
+# Test mode for club payments: never set this on the live server
+# (it is ignored when NODE_ENV=production anyway).
+# CLUB_SIMULATE_PAYMENTS=success
+
+# Fees (defaults shown)
+CLUB_REGISTRATION_FEE=50000
+CLUB_MARZ_FEE_PERCENT=3
+CLUB_SERVICE_FEE=1000
+```
+
+Members' ID copies are stored in `PBMS-BKD/private/club/` (never served publicly).
+Include that folder in your backups, next to `uploads/`, and keep it out of git.
+
+**The member app (`MONK-CLUB`)** is a separate website. Build it with
+`npm install && npm run build` (set `VITE_API_URL` in `MONK-CLUB/.env` to this API's
+public address first) and upload `MONK-CLUB/dist/` to its host. Its address must be in
+`CLUB_APP_ORIGINS` above. See `MONK-CLUB/README.md`.
 
 ---
 

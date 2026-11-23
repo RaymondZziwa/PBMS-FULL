@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { ClubMember, ClubPayment, Prisma } from '@prisma/client';
@@ -32,7 +32,7 @@ const FAILED = ['failed', 'cancelled', 'canceled', 'rejected', 'expired'];
  *   CLUB_API_PUBLIC_URL                              e.g. https://pbmsapi.megaerpug.com (for callbacks)
  */
 @Injectable()
-export class ClubPaymentsService {
+export class ClubPaymentsService implements OnModuleInit {
   private readonly logger = new Logger(ClubPaymentsService.name);
 
   constructor(
@@ -41,6 +41,26 @@ export class ClubPaymentsService {
     private readonly config: ConfigService,
     private readonly notifier: ClubNotifyService,
   ) {}
+
+  /**
+   * Test mode: CLUB_SIMULATE_PAYMENTS=success (or =fail) in .env makes registration
+   * payments complete by themselves a few seconds after the member taps Pay,
+   * without contacting MarzPay or charging anyone. Ignored when NODE_ENV=production.
+   */
+  private simulation(): 'success' | 'failed' | null {
+    if (process.env.NODE_ENV === 'production') return null;
+    const v = String(this.config.get('CLUB_SIMULATE_PAYMENTS') ?? process.env.CLUB_SIMULATE_PAYMENTS ?? '').trim().toLowerCase();
+    return v === 'success' || v === 'true' ? 'success' : v === 'fail' || v === 'failed' ? 'failed' : null;
+  }
+
+  /** Says at start-up whether club payments are real or simulated (and why). */
+  onModuleInit() {
+    const asked = String(this.config.get('CLUB_SIMULATE_PAYMENTS') ?? process.env.CLUB_SIMULATE_PAYMENTS ?? '').trim();
+    const mode = this.simulation();
+    if (mode) this.logger.warn(`Club payments are SIMULATED (CLUB_SIMULATE_PAYMENTS=${asked}): nothing is charged, payments ${mode === 'success' ? 'succeed' : 'fail'} after ~5 s.`);
+    else if (asked) this.logger.warn(`CLUB_SIMULATE_PAYMENTS=${asked} is ignored because NODE_ENV=production. Club payments go to MarzPay.`);
+    else this.logger.log(this.marzConfigured() ? 'Club payments use MarzPay.' : 'Club payments are off: MarzPay keys are not set (set CLUB_SIMULATE_PAYMENTS=success to test).');
+  }
 
   private marzConfigured() {
     return !!(this.config.get('MARZ_COLLECTION_BASE_URL') && this.config.get('MARZ_AUTH_HEADER'));
@@ -59,7 +79,7 @@ export class ClubPaymentsService {
   /** The club wallet, created the first time it's needed. */
   async wallet(tx: Prisma.TransactionClient | PrismaService = this.prisma) {
     const found = await tx.wallet.findFirst({ where: { isForClub: true } });
-    return found ?? tx.wallet.create({ data: { name: 'Monk Loyalty Club', purpose: 'Monk Club registration fees and payments', isForClub: true, canBeDeleted: false } });
+    return found ?? tx.wallet.create({ data: { name: 'Amatugunda Monk Club', purpose: 'Club registration fees and marketplace payments', isForClub: true, canBeDeleted: false } });
   }
 
   quote() {
@@ -70,27 +90,41 @@ export class ClubPaymentsService {
 
   async startRegistration(m: ClubMember, phoneInput: unknown) {
     if (m.status !== 'AWAITING_PAYMENT') throw new ConflictException(m.status === 'ACTIVE' ? 'Your membership is already active' : 'Your membership cannot be paid for right now');
-    if (!this.marzConfigured()) throw new ServiceUnavailableException('Mobile money payments are not available yet. Please try again later.');
-    const phone = normalisePhone(phoneInput ?? m.phone1);
+    return this.startCollection(m, { purpose: 'REGISTRATION', base: clubFees().registration, phoneInput, description: `Amatugunda Monk Club registration ${m.cardNumber ?? ''}`.trim() });
+  }
+
+  /**
+   * Asks MarzPay to collect `base` + charges from the member's phone (or simulates it).
+   * Used for the registration fee and for marketplace orders.
+   */
+  async startCollection(m: ClubMember, opts: { purpose: 'REGISTRATION' | 'ORDER'; base: number; phoneInput: unknown; description: string; orderId?: number }) {
+    const simulate = this.simulation();
+    if (!simulate && !this.marzConfigured()) throw new ServiceUnavailableException('Mobile money payments are not available yet. Please try again later.');
+    const phone = normalisePhone(opts.phoneInput ?? m.phone1);
     if (!phone || !phone.startsWith('+256')) throw new BadRequestException({ statusCode: 400, message: 'Enter an MTN or Airtel Uganda number', field: 'phone' });
 
     // One payment at a time: reuse a recent pending one instead of prompting twice.
     const recent = await this.prisma.clubPayment.findFirst({
-      where: { memberId: m.id, purpose: 'REGISTRATION', status: 'PENDING', createdAt: { gt: new Date(Date.now() - 2 * 60_000) } },
+      where: { memberId: m.id, purpose: opts.purpose, orderId: opts.orderId ?? null, status: 'PENDING', createdAt: { gt: new Date(Date.now() - 2 * 60_000) } },
     });
     if (recent) return { status: 200, data: this.publicPayment(recent), message: 'A payment request is already on your phone. Approve it to continue.' };
 
-    const c = chargeFor(clubFees().registration);
+    const c = chargeFor(opts.base);
     const reference = randomUUID();
     const payment = await this.prisma.clubPayment.create({
-      data: { memberId: m.id, memberName: fullName(m), purpose: 'REGISTRATION', baseAmount: c.base, marzFee: c.marzFee, serviceFee: c.serviceFee, totalCharged: c.total, phone, reference },
+      data: { memberId: m.id, memberName: fullName(m), purpose: opts.purpose, orderId: opts.orderId ?? null, baseAmount: c.base, marzFee: c.marzFee, serviceFee: c.serviceFee, totalCharged: c.total, phone, reference },
     });
+
+    if (simulate) {
+      this.logger.warn(`Club payment ${payment.id} is SIMULATED (CLUB_SIMULATE_PAYMENTS=${simulate}). No money is collected.`);
+      return { status: 200, data: this.publicPayment(payment), message: 'Test mode: this payment will complete by itself in a few seconds.' };
+    }
 
     try {
       await firstValueFrom(
         this.http.post(
           this.config.getOrThrow<string>('MARZ_COLLECTION_BASE_URL'),
-          { amount: c.total, country: 'UG', reference, description: `Monk Club registration ${m.cardNumber ?? ''}`.trim(), phone_number: phone, callback_url: this.callbackUrl('collection') },
+          { amount: c.total, country: 'UG', reference, description: opts.description, phone_number: phone, callback_url: this.callbackUrl('collection') },
           { headers: this.headers(), timeout: 20000 },
         ),
       );
@@ -105,7 +139,7 @@ export class ClubPaymentsService {
 
   /** What the member's app sees: no MarzPay reference (it's what proves a callback is genuine). */
   private publicPayment(p: ClubPayment) {
-    return { id: p.id, status: p.status, totalCharged: Number(p.totalCharged), baseAmount: Number(p.baseAmount), marzFee: Number(p.marzFee), serviceFee: Number(p.serviceFee), phone: p.phone, createdAt: p.createdAt, completedAt: p.completedAt, failureNote: p.failureNote };
+    return { id: p.id, purpose: p.purpose, orderId: p.orderId, status: p.status, totalCharged: Number(p.totalCharged), baseAmount: Number(p.baseAmount), marzFee: Number(p.marzFee), serviceFee: Number(p.serviceFee), phone: p.phone, createdAt: p.createdAt, completedAt: p.completedAt, failureNote: p.failureNote };
   }
 
   async paymentStatus(m: ClubMember, id: number) {
@@ -113,8 +147,10 @@ export class ClubPaymentsService {
     if (!p) throw new NotFoundException('Payment not found');
     // If no callback came yet, ask MarzPay directly (when a status URL is set).
     if (p.status === 'PENDING') {
-      const status = await this.lookup(p.reference);
-      if (status) await this.settle(p.reference, status, null, 'status check');
+      // Test mode: settle a few seconds after the request, as if the member approved it.
+      const simulate = this.simulation();
+      const status = simulate ? (Date.now() - p.createdAt.getTime() > 5000 ? simulate : null) : await this.lookup(p.reference);
+      if (status) await this.settle(p.reference, status, simulate ? 'SIMULATED' : null, simulate ? 'simulation' : 'status check');
       p = await this.prisma.clubPayment.findUniqueOrThrow({ where: { id } });
       // Give up after 15 minutes without an answer.
       if (p.status === 'PENDING' && Date.now() - p.createdAt.getTime() > 15 * 60_000) {
@@ -184,6 +220,12 @@ export class ClubPaymentsService {
       if (claimed.count !== 1) return null;
       const wallet = await this.wallet(tx);
       await tx.wallet.update({ where: { id: wallet.id }, data: { balance: { increment: p.baseAmount } } });
+      // Marketplace order paid by mobile money: mark it paid and place it.
+      if (p.purpose === 'ORDER' && p.orderId) {
+        await tx.clubOrder.updateMany({ where: { id: p.orderId }, data: { paid: true } });
+        await tx.clubOrder.updateMany({ where: { id: p.orderId, status: 'AWAITING_PAYMENT' }, data: { status: 'PLACED' } });
+        return null;
+      }
       if (p.memberId && p.purpose === 'REGISTRATION') {
         const m = await tx.clubMember.findUnique({ where: { id: p.memberId } });
         if (m && m.status === 'AWAITING_PAYMENT') {
@@ -196,7 +238,7 @@ export class ClubPaymentsService {
     if (result) {
       forgetMember(result.id);
       await this.notifier.notify(result, {
-        subject: 'Welcome to the Monk Loyalty Club',
+        subject: 'Welcome to Amatugunda Monk Club',
         lines: ['We received your registration fee. Your membership is now active.'],
         facts: { 'Card number': result.cardNumber ?? '' },
       });

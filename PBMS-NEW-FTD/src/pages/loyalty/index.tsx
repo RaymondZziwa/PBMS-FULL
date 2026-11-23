@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { FiAward, FiChevronRight, FiCreditCard, FiGrid, FiUsers } from "react-icons/fi";
+import { FiAward, FiChevronRight, FiCreditCard, FiGrid, FiSettings, FiShoppingBag, FiUsers } from "react-icons/fi";
 import { apiRequest } from "../../libs/apiConfig";
 import { Card, PageHeader, StatTile } from "../../ui/Page";
 import { CLUB, fmtPhone, type MemberRow, type MemberStatus } from "./clubApi";
@@ -12,7 +12,9 @@ const money = (n: number) => `UGX ${Math.round(n).toLocaleString("en-US")}`;
 const LINKS = [
   { to: "/loyalty/members", icon: FiUsers, title: "Club members", text: "Approve applications, view and edit profiles, suspend or deactivate accounts." },
   { to: "/loyalty/tracker", icon: FiGrid, title: "Performance tracker", text: "Fill in each member's quantities and receipts per lot, month by month." },
-  { to: "/loyalty/wallet", icon: FiCreditCard, title: "Club wallet", text: "Registration fees received, and transfers to the company bank." },
+  { to: "/loyalty/orders", icon: FiShoppingBag, title: "Club orders", text: "Orders from the members' shop: prepare, dispatch, deliver." },
+  { to: "/loyalty/wallet", icon: FiCreditCard, title: "Club wallet", text: "Registration fees and shop payments, and transfers to the company bank." },
+  { to: "/loyalty/settings", icon: FiSettings, title: "Club settings", text: "Member discount in the shop and the store it sells from." },
 ];
 
 /** Monk Loyalty Club at a glance. */
@@ -34,7 +36,7 @@ const LoyaltyClub = () => {
 
   return (
     <div className="mx-auto max-w-6xl font-inter">
-      <PageHeader title="Monk Loyalty Club" description="Members apply in the Monk Club app; you approve them, track their performance and manage the club wallet here." />
+      <PageHeader title="Amatugunda Monk Club" description="Members apply in the Monk Club app; you approve them, track their performance and manage the club wallet here." />
 
       <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile label="Active members" value={n("ACTIVE")} />
@@ -43,7 +45,7 @@ const LoyaltyClub = () => {
         <StatTile label="Wallet balance" value={balance === null ? "—" : money(balance)} />
       </div>
 
-      <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-3">
+      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {LINKS.map(({ to, icon: Icon, title, text }) => (
           <Link key={to} to={to} className="group flex items-start gap-3 rounded-xl border border-line bg-surface p-4 no-underline shadow-card hover:border-brand/50">
             <span aria-hidden="true" className="flex h-10 w-10 flex-none items-center justify-center rounded-lg bg-subtle text-brand-text"><Icon className="h-5 w-5" /></span>

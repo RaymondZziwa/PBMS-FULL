@@ -200,18 +200,20 @@ export const NAVIGATION: NavSection[] = [
   },
   {
     id: "loyalty",
-    label: "Monk Loyalty Club",
+    label: "Amatugunda Monk Club",
     items: [
       {
         id: "loyalty-club",
-        label: "Monk Loyalty Club",
+        label: "Amatugunda Monk Club",
         icon: FiAward,
         permission: "access_loyalty_club_module",
         children: [
           { label: "Overview", path: "/loyalty" },
           { label: "Club Members", path: "/loyalty/members" },
           { label: "Performance Tracker", path: "/loyalty/tracker" },
+          { label: "Club Orders", path: "/loyalty/orders" },
           { label: "Club Wallet", path: "/loyalty/wallet" },
+          { label: "Club Settings", path: "/loyalty/settings" },
         ],
       },
     ],

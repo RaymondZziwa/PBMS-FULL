@@ -31,6 +31,7 @@ const LIMITED_ROUTES: Array<{ match: RegExp; max: number; windowMs: number }> = 
   { match: /^\/api\/auth\/forgot-password/, max: 8, windowMs: 15 * 60_000 },
   { match: /^\/api\/club\/auth\/login$/, max: 10, windowMs: 15 * 60_000 },
   { match: /^\/api\/club\/register$/, max: 5, windowMs: 60 * 60_000 },
+  { match: /^\/api\/club\/verify/, max: 60, windowMs: 15 * 60_000 },
 ];
 const hits = new Map<string, { count: number; resetAt: number }>();
 setInterval(() => {

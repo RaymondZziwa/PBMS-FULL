@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { FiArrowLeft, FiCheck, FiCopy, FiEdit2, FiFileText, FiKey, FiPauseCircle, FiPlayCircle, FiSlash, FiTrash2, FiX, FiGrid } from "react-icons/fi";
+import { FiArrowLeft, FiCheck, FiCopy, FiEdit2, FiFileText, FiKey, FiPauseCircle, FiPlayCircle, FiSlash, FiTrash2, FiX, FiGrid, FiRefreshCw } from "react-icons/fi";
 import { toast } from "sonner";
 import { apiRequest } from "../../libs/apiConfig";
 import Button from "../../ui/Button";
@@ -78,6 +78,18 @@ const ClubMemberDetail = () => {
       },
     });
 
+  const reissueCard = () =>
+    confirm({
+      title: `Issue a new card code for ${m.firstName}?`,
+      message: "Use this if the card was lost, copied or shared. The card number stays the same, but every older QR code (screenshots, printouts, other phones) stops working at once. The member's app shows the new code next time it opens.",
+      tone: "danger",
+      confirmLabel: "Issue new code",
+      onConfirm: async () => {
+        const r = await apiRequest<{ data: Member }>(CLUB.action(m.id, "reissue-card"), "POST");
+        setM({ ...m, ...r.data });
+      },
+    });
+
   const reactivate = () =>
     confirm({
       title: `Reactivate ${m.name}?`,
@@ -126,6 +138,7 @@ const ClubMemberDetail = () => {
   if (m.status === "ACTIVE" || m.status === "AWAITING_PAYMENT") {
     actions.push(<Button key="s" variant="secondary" icon={<FiPauseCircle aria-hidden="true" />} onClick={() => setReason({ action: "suspend", text: "" })}>Suspend</Button>);
     actions.push(<Button key="p" variant="secondary" icon={<FiKey aria-hidden="true" />} onClick={resetPassword}>Reset password</Button>);
+    if (m.cardNumber) actions.push(<Button key="c" variant="secondary" icon={<FiRefreshCw aria-hidden="true" />} onClick={reissueCard}>Reissue card</Button>);
   }
   if (m.status === "SUSPENDED" || m.status === "DEACTIVATED") actions.push(<Button key="re" icon={<FiPlayCircle aria-hidden="true" />} onClick={reactivate}>Reactivate</Button>);
   if (!["PENDING", "REJECTED", "DEACTIVATED"].includes(m.status)) actions.push(<Button key="d" variant="secondary" icon={<FiSlash aria-hidden="true" />} onClick={() => setReason({ action: "deactivate", text: "" })}>Deactivate</Button>);
@@ -180,6 +193,7 @@ const ClubMemberDetail = () => {
             <Row label="Activated">{date(m.activatedAt)}</Row>
             <Row label="Last sign-in">{date(m.lastLoginAt)}</Row>
             <Row label="Signs in with">{signIn}</Row>
+            {m.cardNumber && <Row label="Card QR checks">{m.cardChecks ? `${m.cardChecks} · last ${date(m.cardCheckedAt)}` : "Never scanned"}{(m.cardVersion ?? 1) > 1 ? ` · code reissued ${(m.cardVersion ?? 1) - 1}×` : ""}</Row>}
             {(m.status === "ACTIVE" || m.status === "AWAITING_PAYMENT") && <Row label="Password">{m.mustChangePassword ? "Temporary (not changed yet)" : "Set by the member"}</Row>}
           </dl>
         </Card>

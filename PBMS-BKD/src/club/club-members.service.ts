@@ -7,6 +7,7 @@ import { join } from 'path';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CLUB_AUDIENCE, CLUB_TOKEN_TTL, clubSecret, forgetMember } from './club-auth';
 import { CLUB_PHOTO_DIR, CLUB_PRIVATE_DIR, clubPhotoUrl } from './club-files';
+import { cardCode } from './club-card';
 import { ClubNotifyService } from './club-notify.service';
 import {
   CLUB_ID_TYPES,
@@ -77,6 +78,8 @@ export class ClubMembersService {
       ...rest,
       name: fullName(m),
       photoUrl: clubPhotoUrl(photo),
+      // Signed code for the card's QR (verified by the server when scanned).
+      cardCode: cardCode(m),
       hasPassword: !!password,
       attachments: m.attachments?.map((a) => ({ id: a.id, label: a.label, mimeType: a.mimeType, size: a.size, createdAt: a.createdAt })),
     };
@@ -494,6 +497,19 @@ export class ClubMembersService {
       lines: [`Your Monk Loyalty Club membership has been ${words[status]}.`, ...(note ? [`Note: ${note}`] : [])],
     });
     return { status: 200, data: this.shape(updated), message: `Member ${words[status]}` };
+  }
+
+  /**
+   * Issues a new card code (same card number). Every older QR code for this
+   * member, including screenshots and printed copies, stops being accepted.
+   */
+  async reissueCard(id: number) {
+    const m = await this.prisma.clubMember.findUnique({ where: { id }, select: { id: true, cardNumber: true } });
+    if (!m) throw new NotFoundException('Member not found');
+    if (!m.cardNumber) throw new ConflictException('This member has no card yet');
+    const updated = await this.prisma.clubMember.update({ where: { id }, data: { cardVersion: { increment: 1 } }, include: FULL_INCLUDE });
+    forgetMember(id);
+    return { status: 200, data: this.shape(updated), message: 'New card code issued. Older copies no longer work.' };
   }
 
   async resetPassword(id: number) {

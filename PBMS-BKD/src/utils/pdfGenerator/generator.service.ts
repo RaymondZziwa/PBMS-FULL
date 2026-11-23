@@ -160,7 +160,7 @@ export class PdfService {
     const logo = this.logoPath(company);
     if (logo) {
       try {
-        doc.image(fs.readFileSync(logo), this.M, top, { fit: [96, 48], align: 'left', valign: 'center' });
+        doc.image(fs.readFileSync(logo), this.M, top, { fit: [96, 48], valign: 'center' });
         textX = this.M + 108;
       } catch (e) {
         this.logger.warn(`Logo could not be drawn: ${(e as Error).message}`);

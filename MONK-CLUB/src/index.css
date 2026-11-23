@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Theme tokens (RGB). Light by default; <html class="dark"> switches. */
+:root {
+  --canvas: 245 246 250;
+  --surface: 255 255 255;
+  --surface-2: 247 248 251;
+  --line: 226 230 239;
+  --ink: 20 24 31;
+  --ink-soft: 43 50 64;
+  --muted: 88 97 116;
+  --subtle: 233 238 249;
+  --brand-text: 57 89 165;
+  color-scheme: light;
+}
+html.dark {
+  --canvas: 11 15 23;
+  --surface: 20 25 35;
+  --surface-2: 26 32 44;
+  --line: 43 51 67;
+  --ink: 234 237 243;
+  --ink-soft: 205 211 222;
+  --muted: 152 162 181;
+  --subtle: 31 42 70;
+  --brand-text: 143 168 232;
+  color-scheme: dark;
+}
+
+@layer base {
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    @apply bg-canvas font-sans text-ink antialiased;
+    min-height: 100dvh;
+  }
+  :focus-visible { outline: 2px solid #3959A5; outline-offset: 2px; }
+  input, select, textarea, button { font: inherit; }
+}
+
+@layer components {
+  .control {
+    @apply h-12 w-full rounded-xl border border-line bg-surface px-3.5 text-[15px] text-ink outline-none transition placeholder:text-ink-muted/70;
+    @apply focus:border-brand focus:ring-4 focus:ring-brand/15;
+  }
+  .control[aria-invalid="true"] { @apply border-bad focus:ring-bad/15; }
+  .card { @apply rounded-2xl border border-line bg-surface shadow-card; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}

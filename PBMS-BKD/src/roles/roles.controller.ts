@@ -11,7 +11,8 @@ import {
 import { RoleService } from './roles.service';
 import { CreateRoleDto, UpdateRoleDto } from 'src/dto/roles.dto';
 import { CurrentUser, RequirePermissions } from 'src/auth/decorators';
-import { AuthenticatedUser, PERMISSIONS } from 'src/auth/permissions';
+import { PERMISSIONS } from 'src/auth/permissions';
+import type { AuthenticatedUser } from 'src/auth/permissions';
 
 @Controller('api/roles')
 @RequirePermissions(PERMISSIONS.ROLES, PERMISSIONS.ASSIGN_PERMISSIONS)

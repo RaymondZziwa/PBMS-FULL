@@ -28,6 +28,11 @@ export type Member = {
   status: MemberStatus;
   statusNote?: string | null;
   cardNumber?: string | null;
+  /** Bumped by "Reissue card"; older QR codes stop working. */
+  cardVersion?: number;
+  /** How often the card's QR code was checked, and when last. */
+  cardChecks?: number;
+  cardCheckedAt?: string | null;
   mustChangePassword: boolean;
   approvedAt?: string | null;
   activatedAt?: string | null;
@@ -74,6 +79,53 @@ export const CLUB = {
   saveTracker: (id: number | string) => `/api/club/admin/members/${id}/tracker`,
   wallet: "/api/club/admin/wallet",
   payout: "/api/club/admin/wallet/payout",
+  settings: "/api/club/admin/settings",
+  orders: "/api/club/admin/orders",
+  order: (id: number | string) => `/api/club/admin/orders/${id}`,
+};
+
+export type OrderStatus = "AWAITING_PAYMENT" | "PLACED" | "PROCESSING" | "DISPATCHED" | "DELIVERED" | "CANCELLED";
+export type ClubOrder = {
+  id: number;
+  orderNumber: string;
+  memberId: number | null;
+  memberName: string;
+  cardNumber: string | null;
+  recipientName: string;
+  deliveryPhone: string;
+  deliveryAddress: string;
+  usedDefaultAddress: boolean;
+  paymentMethod: "CASH" | "ON_DELIVERY" | "MOBILE_MONEY";
+  status: OrderStatus;
+  paid: boolean;
+  subtotal: number;
+  discountPercent: number;
+  discountAmount: number;
+  total: number;
+  notes: string | null;
+  statusNote: string | null;
+  createdAt: string;
+  updatedAt: string;
+  items: Array<{ id: number; itemId: number | null; name: string; unitPrice: number; qty: number; lineTotal: number }>;
+};
+
+export const ORDER_STATUS: Record<OrderStatus, { label: string; cls: string }> = {
+  AWAITING_PAYMENT: { label: "Awaiting payment", cls: "bg-[#FFF4E0] text-[#8A5300] dark:bg-[#33240A] dark:text-[#F5C26B]" },
+  PLACED: { label: "New", cls: "bg-[#EAF0FB] text-[#2E4A8C] dark:bg-[#1A2647] dark:text-[#9DB4EE]" },
+  PROCESSING: { label: "Preparing", cls: "bg-[#EAF0FB] text-[#2E4A8C] dark:bg-[#1A2647] dark:text-[#9DB4EE]" },
+  DISPATCHED: { label: "Dispatched", cls: "bg-[#F1EAFB] text-[#5B2E8C] dark:bg-[#2A1A47] dark:text-[#C4A5EE]" },
+  DELIVERED: { label: "Delivered", cls: "bg-[#E7F6EC] text-[#1B7A3D] dark:bg-[#12301D] dark:text-[#7FD89E]" },
+  CANCELLED: { label: "Cancelled", cls: "bg-subtle text-brand-muted" },
+};
+export const PAY_METHOD: Record<ClubOrder["paymentMethod"], string> = { MOBILE_MONEY: "Mobile money", ON_DELIVERY: "Pay on delivery", CASH: "Cash" };
+/** Same as the API: where an order can go next. */
+export const NEXT_STATUS: Record<OrderStatus, OrderStatus[]> = {
+  AWAITING_PAYMENT: ["CANCELLED"],
+  PLACED: ["PROCESSING", "DISPATCHED", "DELIVERED", "CANCELLED"],
+  PROCESSING: ["DISPATCHED", "DELIVERED", "CANCELLED"],
+  DISPATCHED: ["DELIVERED", "CANCELLED"],
+  DELIVERED: [],
+  CANCELLED: [],
 };
 
 export const STATUS: Record<MemberStatus, { label: string; cls: string; hint: string }> = {

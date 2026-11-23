@@ -10,11 +10,12 @@ import { ClubMembersService } from './club-members.service';
 import { ClubNotifyService } from './club-notify.service';
 import { ClubPaymentsService } from './club-payments.service';
 import { ClubTrackerService } from './club-tracker.service';
+import { ClubShopService } from './club-shop.service';
 
-/** Monk Loyalty Club: member applications, sign-in, tracker, payments and wallet. */
+/** Amatugunda Monk Club (Monk Loyalty Club): member applications, sign-in, tracker, payments and wallet. */
 @Module({
   imports: [ConfigModule, HttpModule, PrismaModule, MailModule, JwtModule.register({})],
   controllers: [ClubPublicController, ClubMemberController, ClubAdminController],
-  providers: [ClubMembersService, ClubTrackerService, ClubPaymentsService, ClubNotifyService, ClubAuthGuard],
+  providers: [ClubMembersService, ClubTrackerService, ClubPaymentsService, ClubNotifyService, ClubShopService, ClubAuthGuard],
 })
 export class ClubModule {}
