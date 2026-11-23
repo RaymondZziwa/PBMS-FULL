@@ -11,6 +11,7 @@ const PRODUCTION_ORIGINS = [
   'https://kingserp.netlify.app',
   'https://pbms.megaerpug.com',
   'https://pbdp.megaerpug.com',
+  'https://monkclub.netlify.app',
 ];
 /** The Monk Club member app, e.g. CLUB_APP_ORIGINS=https://club.profbioresearch.net (comma-separated). */
 const CLUB_ORIGINS = (process.env.CLUB_APP_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
@@ -99,6 +100,6 @@ async function bootstrap() {
     allowedHeaders: 'Content-Type, Authorization, X-Requested-With',
   });
 
-  await app.listen(3500);
+  await app.listen(3005);
 }
 bootstrap();
