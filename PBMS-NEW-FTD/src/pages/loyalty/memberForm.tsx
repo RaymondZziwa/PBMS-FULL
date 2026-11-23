@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { FiPlus, FiTrash2 } from "react-icons/fi";
+import { FiImage, FiPaperclip, FiPlus, FiTrash2 } from "react-icons/fi";
 import Modal from "../../ui/Modal";
 import Button from "../../ui/Button";
 import Combobox from "../../ui/Combobox";
-import { Segmented, TextField } from "../../ui/Field";
+import { Segmented, TextField, Toggle } from "../../ui/Field";
+import { DatePicker } from "../../ui/DateFields";
 import { useConfirm } from "../../ui/ConfirmDialog";
 import { apiRequest } from "../../libs/apiConfig";
 import { COUNTRIES } from "../../data/countries";
@@ -18,18 +19,46 @@ const LABELS: Record<string, string> = {
   phone2: "Phone 2", email: "Email", profession: "Profession",
 };
 
-type Props = { open: boolean; member: Member | null; onClose: () => void; onSaved: (m: Member) => void };
+export type CreatedMember = { member: Member; temporaryPassword: string; notified: { channel: string; sent: boolean } };
+type Props = {
+  open: boolean;
+  /** The member to edit; null to add a new (already approved) member. */
+  member: Member | null;
+  onClose: () => void;
+  onSaved: (m: Member) => void;
+  onCreated?: (r: CreatedMember) => void;
+};
+const today = () => new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Kampala" });
+const MAX_FILE = 5 * 1024 * 1024;
 
-/** Staff edit of a member's profile and next of kin. */
-const MemberForm = ({ open, member, onClose, onSaved }: Props) => {
+/** Staff add a member (approved at once) or edit a member's profile and next of kin. */
+const MemberForm = ({ open, member, onClose, onSaved, onCreated }: Props) => {
+  const creating = !member;
   const confirm = useConfirm();
   const [f, setF] = useState<Record<string, string>>({});
   const [kin, setKin] = useState<Kin[]>([EMPTY_KIN]);
   const [error, setError] = useState<{ field?: string; message: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  // Only when adding a member
+  const [feePaid, setFeePaid] = useState(true);
+  const [memberSince, setMemberSince] = useState("");
+  const [cardNumber, setCardNumber] = useState("");
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [docs, setDocs] = useState<File[]>([]);
 
   useEffect(() => {
-    if (!open || !member) return;
+    if (!open) return;
+    setError(null);
+    if (!member) {
+      setF({ title: "", surname: "", firstName: "", otherName: "", idType: "NATIONAL_ID", idNumber: "", country: "Uganda", district: "", county: "", subCounty: "", address: "", phone1: "", phone2: "", email: "", profession: "" });
+      setKin([EMPTY_KIN]);
+      setFeePaid(true);
+      setMemberSince("");
+      setCardNumber("");
+      setPhoto(null);
+      setDocs([]);
+      return;
+    }
     const s = (v?: string | null) => v ?? "";
     setF({
       title: member.title, surname: member.surname, firstName: member.firstName, otherName: s(member.otherName), idType: member.idType, idNumber: member.idNumber,
@@ -51,9 +80,47 @@ const MemberForm = ({ open, member, onClose, onSaved }: Props) => {
   const countries = useMemo(() => COUNTRIES.map((c) => ({ value: c, label: c })), []);
   const err = (field: string) => (error?.field === field ? error.message : null);
 
+  const pickFiles = (list: FileList | null, image: boolean) => {
+    const files = [...(list ?? [])];
+    const bad = files.find((x) => x.size > MAX_FILE || !(image ? /^image\/(jpeg|png|webp)$/ : /^(image\/(jpeg|png|webp)|application\/pdf)$/).test(x.type));
+    if (bad) return setError({ field: image ? "photo" : "attachments", message: image ? "The photo must be a JPG, PNG or WebP under 5 MB" : "Attach images or PDFs under 5 MB" });
+    setError(null);
+    if (image) setPhoto(files[0] ?? null);
+    else setDocs((d) => [...d, ...files].slice(0, 6));
+  };
+
+  const create = async () => {
+    const need: Array<[string, string]> = [["title", "Choose a title"], ["surname", "Enter the surname"], ["firstName", "Enter the first name"], ["idNumber", "Enter the ID or passport number"], ["phone1", "Enter a phone number"]];
+    const missing = need.find(([k]) => !(f[k] ?? "").trim());
+    if (missing) return setError({ field: missing[0], message: missing[1] });
+    const ok = await confirm({
+      title: `Add ${f.firstName} ${f.surname} to the club?`,
+      message: feePaid
+        ? "They're approved and active straight away, get a card number, and receive a temporary password to sign in to the club app."
+        : "They're approved straight away and get a card number and temporary password. They pay the registration fee in the club app to activate.",
+      confirmLabel: "Add member",
+    });
+    if (!ok) return;
+    setSaving(true);
+    try {
+      const form = new FormData();
+      form.append("data", JSON.stringify({ ...f, nextOfKin: kin, feePaid, memberSince: memberSince || undefined, cardNumber: cardNumber.trim() || undefined }));
+      if (photo) form.append("photo", photo);
+      docs.forEach((d) => form.append("attachments", d));
+      const res = await apiRequest<{ data: CreatedMember }>(CLUB.members, "POST", form);
+      onCreated?.(res.data);
+      onClose();
+    } catch (e2) {
+      const data = (e2 as { response?: { data?: { field?: string; message?: string } } })?.response?.data;
+      if (data?.message) setError({ field: data.field, message: data.message });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!member) return;
+    if (!member) return create();
     const changed = Object.keys(LABELS).filter((k) => (f[k] ?? "") !== String((member as unknown as Record<string, unknown>)[k] ?? "")).map((k) => LABELS[k]);
     const kinChanged = JSON.stringify(kin.map((k) => [k.fullName, k.relationship, k.address, k.phone, k.email, k.profession])) !==
       JSON.stringify((member.nextOfKin ?? []).map((k) => [k.fullName, k.relationship, k.address ?? "", k.phone, k.email ?? "", k.profession ?? ""]));
@@ -80,15 +147,55 @@ const MemberForm = ({ open, member, onClose, onSaved }: Props) => {
       onClose={onClose}
       locked={saving}
       size="xl"
-      title={member ? `Edit ${member.name}` : "Edit member"}
+      title={member ? `Edit ${member.name}` : "Add club member"}
+      description={creating ? "For people who are already members: they're approved at once, no application needed." : undefined}
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button type="submit" form="club-member-form" loading={saving}>Save</Button>
+          <Button type="submit" form="club-member-form" loading={saving}>{creating ? "Add member" : "Save"}</Button>
         </>
       }
     >
       <form id="club-member-form" onSubmit={submit} noValidate className="space-y-6">
+        {error && !error.field && <p role="alert" className="m-0 rounded-lg bg-[#FDECEA] px-3 py-2 text-sm text-[#B42318] dark:bg-[#3A1512] dark:text-[#F29A92]">{error.message}</p>}
+        {creating && (
+          <section>
+            <h3 className="m-0 mb-3 text-sm font-semibold text-brand-ink">Membership</h3>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="sm:col-span-2 lg:col-span-3">
+                <Toggle label="Registration fee already paid" description={feePaid ? "The membership is active immediately." : "They'll pay the fee in the club app to activate."} checked={feePaid} onChange={setFeePaid} />
+              </div>
+              {feePaid && <DatePicker label="Member since" value={memberSince} max={today()} onChange={setMemberSince} hint="Leave empty for today" error={err("memberSince")} />}
+              <TextField label="Existing card number" value={cardNumber} onChange={(v) => { setCardNumber(v.toUpperCase()); setError(null); }} hint="Leave empty to give a new PBMC number" error={err("cardNumber")} maxLength={20} />
+              <div>
+                <span className="mb-1.5 block text-[13px] font-medium text-ink-soft">Photo</span>
+                <label className="flex h-11 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-line px-3 text-sm text-brand-muted hover:border-brand">
+                  <FiImage aria-hidden="true" /> <span className="truncate">{photo ? photo.name : "Choose a photo (optional)"}</span>
+                  <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(e) => { pickFiles(e.target.files, true); e.target.value = ""; }} />
+                </label>
+                {err("photo") && <p className="m-0 mt-1 text-xs text-[#C0362C]">{err("photo")}</p>}
+              </div>
+              <div className="sm:col-span-2 lg:col-span-3">
+                <span className="mb-1.5 block text-[13px] font-medium text-ink-soft">ID / passport copies <span className="font-normal text-brand-muted">(optional)</span></span>
+                <div className="flex flex-wrap gap-2">
+                  {docs.map((d, i) => (
+                    <span key={i} className="inline-flex items-center gap-1.5 rounded-full bg-subtle px-3 py-1 text-xs text-brand-text">
+                      {d.name}
+                      <button type="button" aria-label={`Remove ${d.name}`} onClick={() => setDocs((x) => x.filter((_, j) => j !== i))} className="text-brand-muted hover:text-[#C0362C]"><FiTrash2 aria-hidden="true" /></button>
+                    </span>
+                  ))}
+                  {docs.length < 6 && (
+                    <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full border border-dashed border-line px-3 text-xs text-brand-muted hover:border-brand">
+                      <FiPaperclip aria-hidden="true" /> Attach
+                      <input type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf" className="sr-only" onChange={(e) => { pickFiles(e.target.files, false); e.target.value = ""; }} />
+                    </label>
+                  )}
+                </div>
+                {err("attachments") && <p className="m-0 mt-1 text-xs text-[#C0362C]">{err("attachments")}</p>}
+              </div>
+            </div>
+          </section>
+        )}
         <section>
           <h3 className="m-0 mb-3 text-sm font-semibold text-brand-ink">Bio data</h3>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -125,7 +232,7 @@ const MemberForm = ({ open, member, onClose, onSaved }: Props) => {
         <section>
           <div className="mb-3 flex items-center gap-2">
             <h3 className="m-0 text-sm font-semibold text-brand-ink">Next of kin</h3>
-            <span className="text-xs text-brand-muted">The first is required; up to four.</span>
+            <span className="text-xs text-brand-muted">{creating ? "Optional now; up to four." : "The first is required; up to four."}</span>
             {kin.length < 4 && (
               <Button size="sm" variant="secondary" className="ml-auto" icon={<FiPlus aria-hidden="true" />} onClick={() => setKin((k) => [...k, EMPTY_KIN])}>Add</Button>
             )}
@@ -139,11 +246,11 @@ const MemberForm = ({ open, member, onClose, onSaved }: Props) => {
               const e = (key: string) => err(`nextOfKin.${i}.${key}`);
               return (
                 <fieldset key={i} className="m-0 rounded-xl border border-line p-3">
-                  <legend className="px-1 text-xs font-semibold text-brand-muted">Next of kin {i + 1}{i === 0 ? " (required)" : ""}</legend>
+                  <legend className="px-1 text-xs font-semibold text-brand-muted">Next of kin {i + 1}{i === 0 && !creating ? " (required)" : ""}</legend>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <TextField label="Full name" required={i === 0} value={k.fullName} onChange={setK("fullName")} error={e("fullName")} />
-                    <TextField label="Relationship" required={i === 0} value={k.relationship} onChange={setK("relationship")} error={e("relationship")} placeholder="e.g. Spouse" />
-                    <TextField label="Telephone" type="tel" required={i === 0} value={k.phone} onChange={setK("phone")} error={e("phone")} />
+                    <TextField label="Full name" required={i === 0 && !creating} value={k.fullName} onChange={setK("fullName")} error={e("fullName")} />
+                    <TextField label="Relationship" required={i === 0 && !creating} value={k.relationship} onChange={setK("relationship")} error={e("relationship")} placeholder="e.g. Spouse" />
+                    <TextField label="Telephone" type="tel" required={i === 0 && !creating} value={k.phone} onChange={setK("phone")} error={e("phone")} />
                     <TextField label="Physical address" value={k.address ?? ""} onChange={setK("address")} />
                     <TextField label="Email" type="email" value={k.email ?? ""} onChange={setK("email")} error={e("email")} />
                     <TextField label="Profession" value={k.profession ?? ""} onChange={setK("profession")} />

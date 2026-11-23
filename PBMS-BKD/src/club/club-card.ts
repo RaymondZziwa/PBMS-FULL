@@ -38,7 +38,8 @@ export const readCardCode = (raw: string) => {
   if (parts.length !== 4 || parts[0] !== PREFIX) return null;
   const [, cardNumber, v, signature] = parts;
   const version = Number(v);
-  if (!/^PBMC-\d{2}-\d{6}$/.test(cardNumber) || !Number.isInteger(version) || version < 1 || !/^[\w-]{22}$/.test(signature)) return null;
+  // PBMC-YY-NNNNNN, or an existing card number entered by staff (letters, numbers, dashes).
+  if (!/^[A-Z0-9][A-Z0-9-]{3,19}$/.test(cardNumber) || !Number.isInteger(version) || version < 1 || !/^[\w-]{22}$/.test(signature)) return null;
   return { cardNumber, version, signature };
 };
 

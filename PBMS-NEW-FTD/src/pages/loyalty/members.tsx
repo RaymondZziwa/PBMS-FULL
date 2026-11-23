@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
-import { FiChevronLeft, FiChevronRight, FiUsers } from "react-icons/fi";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { FiChevronLeft, FiChevronRight, FiCopy, FiUserPlus, FiUsers } from "react-icons/fi";
+import { toast } from "sonner";
+import Modal from "../../ui/Modal";
+import MemberForm, { type CreatedMember } from "./memberForm";
 import { apiRequest } from "../../libs/apiConfig";
 import Button from "../../ui/Button";
 import { SearchBox } from "../../ui/Field";
@@ -41,6 +44,9 @@ const ClubMembers = () => {
   const [search, setSearch] = useState(params.get("q") ?? "");
   const [data, setData] = useState<ListData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [created, setCreated] = useState<CreatedMember | null>(null);
+  const navigate = useNavigate();
 
   // Search as you type, a moment after typing stops.
   useEffect(() => {
@@ -79,7 +85,11 @@ const ClubMembers = () => {
 
   return (
     <div className="mx-auto max-w-6xl font-inter">
-      <PageHeader title="Club members" description="Applications, members and their accounts." />
+      <PageHeader
+        title="Club members"
+        description="Applications, members and their accounts."
+        actions={<Button icon={<FiUserPlus aria-hidden="true" />} onClick={() => setAdding(true)}>Add member</Button>}
+      />
       <Card>
         <div className="flex flex-col gap-3 border-b border-line p-3 sm:p-4">
           <SearchBox value={search} onChange={setSearch} placeholder="Name, phone, card number or NIN" label="Search members" className="sm:max-w-md" />
@@ -135,6 +145,48 @@ const ClubMembers = () => {
           </>
         )}
       </Card>
+      <MemberForm
+        open={adding}
+        member={null}
+        onClose={() => setAdding(false)}
+        onSaved={() => undefined}
+        onCreated={(r) => { setCreated(r); go("status", r.member.status); }}
+      />
+
+      <Modal
+        open={!!created}
+        onClose={() => setCreated(null)}
+        size="sm"
+        title="Member added"
+        description={created ? `${created.member.name} · ${created.member.cardNumber ?? ""}` : undefined}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setCreated(null)}>Done</Button>
+            <Button onClick={() => { const id = created?.member.id; setCreated(null); if (id) navigate(`/loyalty/members/${id}`); }}>Open member</Button>
+          </>
+        }
+      >
+        {created && (
+          <div className="space-y-3 text-sm">
+            <p className="m-0 text-ink-soft">
+              {created.notified.sent
+                ? `Their sign-in details were sent by ${created.notified.channel === "email" ? "email" : "SMS"}.`
+                : "The message couldn't be sent. Give them these details yourself:"}
+            </p>
+            <dl className="m-0 space-y-2 rounded-lg bg-surface-2 p-3">
+              <div className="flex justify-between gap-3"><dt className="text-brand-muted">Sign in with</dt><dd className="m-0 font-medium text-brand-ink">{created.member.email || fmtPhone(created.member.phone1)}</dd></div>
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-brand-muted">Temporary password</dt>
+                <dd className="m-0 flex items-center gap-2 font-mono font-semibold text-brand-ink">
+                  {created.temporaryPassword}
+                  <button type="button" aria-label="Copy password" onClick={() => { void navigator.clipboard?.writeText(created.temporaryPassword); toast.success("Copied"); }} className="text-brand-muted hover:text-brand-ink"><FiCopy aria-hidden="true" /></button>
+                </dd>
+              </div>
+            </dl>
+            <p className="m-0 text-xs text-brand-muted">It's shown only once. They choose their own password at first sign-in.</p>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

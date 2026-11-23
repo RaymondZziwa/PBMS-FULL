@@ -87,7 +87,7 @@ export class ClubMembersService {
 
   // ---------------------------------------------------------------- validation
 
-  private validateProfile(input: ProfileInput, partial = false) {
+  private validateProfile(input: ProfileInput, partial = false, kinOptional = false) {
     const data: Record<string, unknown> = {};
     const need = (key: keyof ProfileInput, label: string, max = 120) => {
       if (partial && input[key] === undefined) return;
@@ -161,7 +161,7 @@ export class ClubMembersService {
       kin = [];
       list.forEach((k, i) => {
         const anything = Object.values(k ?? {}).some((v) => cleanText(v));
-        if (!anything && i > 0) return; // optional, left empty
+        if (!anything && (i > 0 || kinOptional)) return; // optional, left empty
         const name = cleanText(k?.fullName, 160);
         const rel = cleanText(k?.relationship, 60);
         const phone = normalisePhone(k?.phone);
@@ -173,7 +173,7 @@ export class ClubMembersService {
         if (email && !isEmail(email)) throw fail(`nextOfKin.${i}.email`, `Check the ${label}'s email`);
         kin!.push({ position: kin!.length + 1, fullName: name, relationship: rel, address: cleanText(k?.address, 255), phone, email, profession: cleanText(k?.profession, 120) });
       });
-      if (!kin.length) throw fail('nextOfKin.0.fullName', 'Add at least one next of kin');
+      if (!kin.length && !kinOptional) throw fail('nextOfKin.0.fullName', 'Add at least one next of kin');
     }
     return { data, kin };
   }
@@ -223,6 +223,86 @@ export class ClubMembersService {
         },
       });
       return { status: 201, data: { id: member.id, name: fullName(member) }, message: 'Application received. We will let you know once it has been reviewed.' };
+    } catch (e) {
+      await this.discard(files);
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') throw new ConflictException('Some of these details are already registered');
+      throw e;
+    }
+  }
+
+  /**
+   * Staff add an existing club member straight from PBMS: no application step,
+   * approved at once with a card number and a temporary password.
+   * By default the registration fee counts as already paid (status ACTIVE).
+   * ID copies and next of kin are optional here (they can be added later).
+   */
+  async adminCreate(raw: string | undefined, files: Files, staffId: number) {
+    try {
+      let body: ProfileInput & { feePaid?: unknown; memberSince?: unknown; cardNumber?: unknown; attachmentLabels?: unknown };
+      try {
+        body = JSON.parse(raw ?? '{}');
+      } catch {
+        throw new BadRequestException('The form could not be read. Please try again.');
+      }
+      const { data, kin } = this.validateProfile(body, false, true);
+      await this.assertUnique(data);
+
+      // Keep the card number they already have, or give a new one.
+      let cardNumber: string;
+      const given = cleanText(body.cardNumber, 20)?.toUpperCase().replace(/\s+/g, '');
+      if (given) {
+        if (!/^[A-Z0-9][A-Z0-9-]{3,19}$/.test(given)) throw fail('cardNumber', 'Card numbers use letters, numbers and dashes only (4 to 20 characters)');
+        if (await this.prisma.clubMember.findUnique({ where: { cardNumber: given }, select: { id: true } })) {
+          throw new ConflictException({ statusCode: 409, message: 'Another member already has this card number', field: 'cardNumber' });
+        }
+        cardNumber = given;
+      } else cardNumber = await this.uniqueCardNumber();
+
+      const feePaid = body.feePaid !== false;
+      let since = new Date();
+      if (body.memberSince) {
+        since = new Date(`${String(body.memberSince)}T12:00:00+03:00`);
+        if (Number.isNaN(since.getTime()) || since > new Date() || since.getFullYear() < 1990) throw fail('memberSince', 'Enter a valid date, not in the future');
+      }
+
+      const password = tempPassword();
+      const docs = files?.attachments ?? [];
+      const labels = Array.isArray(body.attachmentLabels) ? body.attachmentLabels : [];
+      const member = await this.prisma.clubMember.create({
+        data: {
+          ...(data as Prisma.ClubMemberCreateInput),
+          agreedAt: new Date(),
+          photo: files?.photo?.[0]?.filename ?? null,
+          status: feePaid ? 'ACTIVE' : 'AWAITING_PAYMENT',
+          statusNote: 'Added by staff in PBMS',
+          cardNumber,
+          password: await bcrypt.hash(password, 10),
+          mustChangePassword: true,
+          approvedAt: new Date(),
+          approvedById: staffId,
+          activatedAt: feePaid ? since : null,
+          ...(kin?.length ? { nextOfKin: { create: kin } } : {}),
+          ...(docs.length
+            ? { attachments: { create: docs.map((f, i) => ({ label: cleanText(labels[i], 120) ?? (i === 0 ? 'ID / passport' : `Attachment ${i + 1}`), fileName: f.filename, mimeType: f.mimetype, size: f.size })) } }
+            : {}),
+        },
+        include: FULL_INCLUDE,
+      });
+
+      const sentVia = await this.notifier.notify(member, {
+        subject: 'Welcome to Amatugunda Monk Club',
+        lines: [
+          'Prof Bioresearch has added you to Amatugunda Monk Club. You can now use the club app to see your membership card, your performance tracker and the shop.',
+          `Sign in with your ${member.email ? 'email' : 'phone number'} and the temporary password below. You will be asked to choose your own password.`,
+          ...(feePaid ? [] : [`To activate your membership, pay the registration fee of UGX ${clubFees().registration.toLocaleString('en-US')} in the app.`]),
+        ],
+        facts: { 'Card number': cardNumber, 'Sign in with': member.email ?? member.phone1, 'Temporary password': password },
+      });
+      return {
+        status: 201,
+        data: { member: this.shape(member), temporaryPassword: password, notified: sentVia },
+        message: sentVia.sent ? `Member added. Sign-in details sent by ${sentVia.channel}.` : 'Member added. The message could not be sent: give them the temporary password yourself.',
+      };
     } catch (e) {
       await this.discard(files);
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') throw new ConflictException('Some of these details are already registered');

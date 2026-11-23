@@ -212,6 +212,17 @@ export class ClubAdminController {
     return this.members.list(q);
   }
 
+  /** Add an existing member directly (approved at once). */
+  @Post('members')
+  @UseInterceptors(FileFieldsInterceptor([{ name: 'photo', maxCount: 1 }, { name: 'attachments', maxCount: MAX_ATTACHMENTS }], clubUpload))
+  create(
+    @Body('data') data: string,
+    @UploadedFiles() files: { photo?: Express.Multer.File[]; attachments?: Express.Multer.File[] },
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.members.adminCreate(data, files, user.id);
+  }
+
   @Get('members/:id')
   get(@Param('id', ParseIntPipe) id: number) {
     return this.members.get(id);
