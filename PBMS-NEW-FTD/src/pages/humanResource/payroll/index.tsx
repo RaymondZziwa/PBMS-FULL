@@ -1,168 +1,160 @@
-import { useEffect, useState } from 'react';
-import { FaPlus, FaTrash, FaEye } from 'react-icons/fa';
-import CustomTable from '../../../custom/table/customTable';
-import CustomDeleteModal from '../../../custom/modals/customDeleteModal';
-import { toast } from 'sonner';
-import { apiRequest } from '../../../libs/apiConfig';
-import AddOrModifyPayrollPeriod from './AddorModify';
-import type { IPayrollPeriod } from '../../../redux/types/hr';
-import { PayrollEndpoints } from '../../../endpoints/humanResource/payroll';
-import usePayroll from '../../../hooks/humanResource/usePayroll';
-import PayrollDetailsModal from './modal';
+import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { FiCalendar, FiEye, FiPlus, FiRefreshCw, FiTrash2 } from "react-icons/fi";
+import Button from "../../../ui/Button";
+import { Badge, Card, EmptyState, PageHeader, SkeletonRows, StatTile, ugx } from "../../../ui/Page";
+import { useConfirm } from "../../../ui/ConfirmDialog";
+import { apiRequest } from "../../../libs/apiConfig";
+import { PayrollEndpoints } from "../../../endpoints/humanResource/payroll";
+import usePayroll from "../../../hooks/humanResource/usePayroll";
+import type { IPayrollPeriod } from "../../../redux/types/hr";
+import PayrollDetailsModal from "./modal";
+import { monthLabel, monthsBetween } from "./payrollMath";
+
+const ym = (d: string) => String(d).slice(0, 7);
+const fmt = (d: string) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+
+/** "May – Jul 2026" / "Jul 2026" */
+const periodName = (p: IPayrollPeriod) => {
+  const a = ym(p.periodStart);
+  const b = ym(p.periodEnd);
+  return a === b ? monthLabel(a, "long") : `${monthLabel(a)} – ${monthLabel(b)}`;
+};
+const monthCount = (p: IPayrollPeriod) => monthsBetween(ym(p.periodStart), ym(p.periodEnd)).length;
 
 const PayrollManagement = () => {
-  const { data, refresh } = usePayroll();
-  const [payrollPeriods, setPayrollPeriods] = useState(data);
+  const { data: periods, loading, error, refresh, remove } = usePayroll();
+  const confirm = useConfirm();
+  const navigate = useNavigate();
+  const { search } = useLocation();
+  const [viewing, setViewing] = useState<IPayrollPeriod | null>(null);
+  const run = () => navigate("/hr/payroll/run");
 
+  // Coming back from Run payroll: open the one just saved.
   useEffect(() => {
-    setPayrollPeriods(data);
-  }, [data]);
-  
-  const [modalProps, setModalProps] = useState<{
-    isOpen: boolean;
-    mode: 'create' | 'edit' | '';
-    payrollPeriod: IPayrollPeriod | null;
-  }>({
-    isOpen: false,
-    mode: 'create',
-    payrollPeriod: null
-  });
-  
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
-  const [selectedPayrollPeriod, setSelectedPayrollPeriod] = useState<IPayrollPeriod | null>(null);
-  
-  const deletePayrollPeriod = async () => {
-    try {
-      if (modalProps.payrollPeriod) {
-        await apiRequest(PayrollEndpoints.PAYROLL.delete(modalProps?.payrollPeriod?.id), "DELETE", '');
-        refresh();
-        setIsDeleteModalOpen(false);
-        toast.success('Payroll period deleted successfully');
-      }
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Something went wrong');
+    const id = new URLSearchParams(search).get("view");
+    if (!id) return;
+    const found = (periods ?? []).find((p) => String(p.id) === id);
+    if (found) {
+      setViewing(found);
+      navigate("/hr/payroll", { replace: true });
     }
-  }
+  }, [search, periods, navigate]);
 
-  // Format currency
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'UGX',
-    }).format(amount);
-  };
+  const sorted = useMemo(
+    () => [...(periods ?? [])].sort((a, b) => String(b.periodEnd).localeCompare(String(a.periodEnd)) || b.id - a.id),
+    [periods],
+  );
+  const latest = sorted[0];
+  const year = new Date().getFullYear();
+  const paidThisYear = sorted.filter((p) => new Date(p.payDate).getFullYear() === year).reduce((a, p) => a + Number(p.totalSpent || 0), 0);
 
-  // Format date for display
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
+  const askDelete = (p: IPayrollPeriod) =>
+    confirm({
+      title: `Delete the ${periodName(p)} payroll?`,
+      message: "Everyone's pay record in it is deleted, and those months can be paid again in a new payroll. This can't be undone.",
+      details: (
+        <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
+          <dt className="text-brand-muted">People</dt>
+          <dd className="m-0 text-right font-medium text-brand-ink">{p.payrolls?.length ?? 0}</dd>
+          <dt className="text-brand-muted">Pay date</dt>
+          <dd className="m-0 text-right font-medium text-brand-ink">{fmt(p.payDate)}</dd>
+          <dt className="text-brand-muted">Total</dt>
+          <dd className="m-0 text-right font-semibold tabular-nums text-brand-ink">{ugx(p.totalSpent)}</dd>
+        </dl>
+      ),
+      tone: "danger",
+      confirmLabel: "Delete payroll",
+      onConfirm: async () => {
+        await apiRequest(PayrollEndpoints.PAYROLL.delete(p.id), "DELETE");
+        remove(p.id);
+        if (viewing?.id === p.id) setViewing(null);
+      },
     });
-  };
-
-  // Table columns configuration
-  const columns = [
-    { key: 'period', label: 'Payroll Period', sortable: true, filterable: true },
-    { key: 'payDate', label: 'Pay Date', sortable: true, filterable: false },
-    { key: 'totalSpent', label: 'Total Spent (UGX)', sortable: true, filterable: true },
-    { key: 'createdAt', label: 'Created At', sortable: true, filterable: false },
-    { key: 'actions', label: 'Actions', sortable: false, filterable: false },
-  ];
-
-  // Prepare data for the table
-  const tableData = payrollPeriods.map(payrollPeriod => ({
-    ...payrollPeriod,
-    period: `${formatDate(payrollPeriod.periodStart)} - ${formatDate(payrollPeriod.periodEnd)}`,
-    payDate: formatDate(payrollPeriod.payDate),
-    totalSpent: formatCurrency(payrollPeriod.totalSpent || 0),
-    createdAt: formatDate(payrollPeriod.createdAt),
-    actions: (
-      <div className="flex gap-3">
-        {/* View Details Button */}
-        <div className="relative group">
-          <button
-            className="text-green-600 hover:text-green-800 transition-colors"
-            onClick={() => {
-              setSelectedPayrollPeriod(payrollPeriod);
-              setIsDetailsModalOpen(true);
-            }}
-            title="View Payroll Details"
-          >
-            <FaEye />
-          </button>
-          <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-            View Details
-          </span>
-        </div>
-        
-        {/* Delete Button */}
-        <div className="relative group">
-          <button
-            className="text-red-600 hover:text-red-800 transition-colors"
-            onClick={() => {
-              setModalProps({ isOpen: false, mode: '', payrollPeriod });
-              setIsDeleteModalOpen(true);
-            }}
-            title="Delete Payroll Period"
-          >
-            <FaTrash />
-          </button>
-          <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-            Delete
-          </span>
-        </div>
-      </div>
-    )
-  }));
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">Payroll Management</h2>
-        <button
-          onClick={() => setModalProps({ isOpen: true, mode: 'create', payrollPeriod: null })}
-          className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-        >
-          <FaPlus className="mr-2" />
-          Generate Payroll
-        </button>
+    <div className="mx-auto max-w-6xl font-inter">
+      <PageHeader
+        title="Payroll"
+        description="Run payroll for one or more months, paying each person only for the months they're owed."
+        actions={
+          <>
+            <Button variant="secondary" icon={<FiRefreshCw aria-hidden="true" />} onClick={() => refresh()}>
+              Refresh
+            </Button>
+            <Button icon={<FiPlus aria-hidden="true" />} onClick={run}>
+              Run payroll
+            </Button>
+          </>
+        }
+      />
+
+      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <StatTile label="Latest payroll" value={latest ? ugx(latest.totalSpent) : "—"} hint={latest ? `${periodName(latest)} · ${latest.payrolls?.length ?? 0} people` : "None yet"} />
+        <StatTile label={`Paid in ${year}`} value={ugx(paidThisYear)} />
+        <StatTile label="Payrolls saved" value={sorted.length} />
       </div>
 
-      <CustomTable 
-        columns={columns} 
-        data={tableData} 
-        pageSize={10}
-        emptyMessage="No payroll periods found. Click 'Generate Payroll' to create a new payroll period."
-      />
+      <Card>
+        {loading && sorted.length === 0 ? (
+          <SkeletonRows rows={4} />
+        ) : error && sorted.length === 0 ? (
+          <EmptyState icon={<FiCalendar className="h-5 w-5" />} title="Couldn't load payrolls" message={error} action={<Button onClick={() => refresh()}>Try again</Button>} />
+        ) : sorted.length === 0 ? (
+          <EmptyState
+            icon={<FiCalendar className="h-5 w-5" />}
+            title="No payrolls yet"
+            message="Run your first payroll: pick the months, tick who's paid for which month, add allowances and deductions."
+            action={<Button icon={<FiPlus aria-hidden="true" />} onClick={run}>Run payroll</Button>}
+          />
+        ) : (
+          <ul className="m-0 list-none divide-y divide-line p-0">
+            {sorted.map((p) => {
+              const n = monthCount(p);
+              return (
+                <li key={p.id} className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center">
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    <span aria-hidden="true" className="flex h-11 w-11 flex-none flex-col items-center justify-center rounded-lg bg-subtle text-brand-text">
+                      <span className="text-[10px] font-semibold uppercase leading-none">{monthLabel(ym(p.periodEnd)).split(" ")[0]}</span>
+                      <span className="font-display text-sm font-semibold leading-tight">{ym(p.periodEnd).slice(2, 4)}</span>
+                    </span>
+                    <div className="min-w-0">
+                      <p className="m-0 flex flex-wrap items-center gap-2 font-medium text-brand-ink">
+                        {periodName(p)}
+                        <Badge tone="brand">
+                          {n} {n === 1 ? "month" : "months"}
+                        </Badge>
+                      </p>
+                      <p className="m-0 text-xs text-brand-muted">
+                        Paid {fmt(p.payDate)} · {p.payrolls?.length ?? 0} {(p.payrolls?.length ?? 0) === 1 ? "person" : "people"} · #{p.id}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 sm:justify-end">
+                    <span className="font-display text-lg font-semibold tabular-nums text-brand-ink">{ugx(p.totalSpent)}</span>
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="secondary" icon={<FiEye aria-hidden="true" />} onClick={() => setViewing(p)}>
+                        View
+                      </Button>
+                      <button
+                        type="button"
+                        onClick={() => askDelete(p)}
+                        aria-label={`Delete the ${periodName(p)} payroll`}
+                        className="flex h-9 w-9 items-center justify-center rounded-lg text-brand-muted hover:bg-[#FDECEA] hover:text-[#B42318] focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand dark:hover:bg-[#381B19]"
+                      >
+                        <FiTrash2 aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Card>
 
-      {/* Add/Edit Payroll Period Modal */}
-      <AddOrModifyPayrollPeriod
-        visible={modalProps.isOpen}
-        payrollPeriod={modalProps.payrollPeriod}
-        onCancel={() => setModalProps({ isOpen: false, mode: "create", payrollPeriod: null })}
-        onSuccess={refresh}
-      />
-      
-      {/* Delete Confirmation Modal */}
-      <CustomDeleteModal
-        visible={isDeleteModalOpen}
-        onCancel={() => setIsDeleteModalOpen(false)}
-        onConfirm={deletePayrollPeriod}
-        title="Delete Payroll Period"
-        message="Are you sure you want to delete this payroll period? This action cannot be undone."
-      />
 
-      {/* Payroll Details Modal */}
-      <PayrollDetailsModal
-        visible={isDetailsModalOpen}
-        payrollPeriod={selectedPayrollPeriod}
-        onClose={() => {
-          setIsDetailsModalOpen(false);
-          setSelectedPayrollPeriod(null);
-        }}
-      />
+      <PayrollDetailsModal visible={!!viewing} payrollPeriod={viewing} onClose={() => setViewing(null)} />
     </div>
   );
 };

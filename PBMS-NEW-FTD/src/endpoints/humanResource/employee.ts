@@ -1,14 +1,15 @@
+type Id = string | number;
+
 export const EmployeeEndpoints = {
   getEmployees: '/api/employees/fetch-all',
-  getEmployeeById: (branchId: string) => `/api/employees/${branchId}`,
+  getEmployeeById: (id: Id) => `/api/employees/fetch/${id}`,
   createEmployee: '/api/employees/create',
-  updateEmployee: (branchId: string) => `/api/employees/modify/${branchId}`,
-  deleteEmployee: (branchId: string) => `/api/employees/delete/${branchId}`,
+  updateEmployee: (id: Id) => `/api/employees/modify/${id}`,
+  deleteEmployee: (id: Id) => `/api/employees/delete/${id}`,
 
   EMPLOYEE_PROFILE: {
-    UPDATE_PROFILE: (id: string) => `/api/employees/update-profile/${id}`,
-    UPLOAD_PROFILE_PICTURE: (id: string) => `/api/employees/upload-profile-picture/${id}`,
-    DISABLE: (id: string) => `/api/employees/disable/${id}`,
+    UPDATE_PROFILE: (id: Id) => `/api/employees/update-profile/${id}`,
+    UPLOAD_PROFILE_PICTURE: (id: Id) => `/api/employees/upload-profile-picture/${id}`,
+    DISABLE: (id: Id) => `/api/employees/disable/${id}`,
   }
 };
-

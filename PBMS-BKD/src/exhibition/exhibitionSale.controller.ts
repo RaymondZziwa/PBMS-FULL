@@ -9,8 +9,11 @@ import {
 } from '@nestjs/common';
 import { ExhibitionCreateSaleDto, UpdateSaleDto } from 'src/dto/pos.dto';
 import { ExhibitionSalesService } from './exhibitionSale.service';
+import { RequirePermissions } from 'src/auth/decorators';
+import { PERMISSIONS } from 'src/auth/permissions';
 
 @Controller('api/exhibition-sales')
+@RequirePermissions(PERMISSIONS.EXHIBITION)
 export class ExhibitionSalesController {
   constructor(private readonly salesService: ExhibitionSalesService) {}
 

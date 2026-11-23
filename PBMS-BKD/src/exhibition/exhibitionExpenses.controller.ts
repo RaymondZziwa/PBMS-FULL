@@ -12,8 +12,11 @@ import {
   UpdateExhibitionExpenseDto,
 } from 'src/dto/exhibition.dto';
 import { ExhibitionExpensesService } from './exhibitionExpenses.service';
+import { RequirePermissions } from 'src/auth/decorators';
+import { PERMISSIONS } from 'src/auth/permissions';
 
 @Controller('api/exhibition-expenses')
+@RequirePermissions(PERMISSIONS.EXHIBITION)
 export class ExhibitionExpensesController {
   constructor(
     private readonly exhibitionExpensesService: ExhibitionExpensesService,

@@ -1,285 +1,171 @@
-import React, { useState, useEffect } from 'react';
-import CustomTextInput from '../../../custom/inputs/customTextInput';
-import CustomDropdown from '../../../custom/inputs/customDropdown';
-import { apiRequest } from '../../../libs/apiConfig';
-import CustomButton from '../../../custom/buttons/customButton';
-import { toast } from 'sonner';
-import { BILLING_CHANNELS } from '../../../endpoints/expense/expenseEndpoints';
-import uedclLogo from '../../../assets/uedcl.png';
-import nwscLogo from '../../../assets/mwsc.png';
-
-interface BillingChannel {
-  id?: number;
-  utility: 'LIGHT' | 'NWSC';
-  meterNumber: string;
-  name?: string;
-  area?: string;
-}
+import { useEffect, useState, type FormEvent } from "react";
+import { apiRequest } from "../../../libs/apiConfig";
+import { BILLING_CHANNELS } from "../../../endpoints/expense/expenseEndpoints";
+import type { IBillingChannel, UtilityType } from "../../../redux/types/systemSettings";
+import { apiErrorMessage, AreaField, btn, fieldClass, Modal, Spinner, UTILITY_INFO } from "./billingShared";
 
 interface AddOrModifyBillingChannelProps {
   visible: boolean;
-  channel: BillingChannel | null;
+  channel: IBillingChannel | null;
   onCancel: () => void;
   onSuccess: () => void;
 }
 
-interface AreaResponse {
-  status: string;
-  data: {
-    utility_code: string;
-    utility_name: string;
-    areas: string[];
-    count: number;
-    description: string;
-  };
-}
+const EMPTY = { utility: "NWSC" as UtilityType, meterNumber: "", name: "", area: "" };
+const cleanMeter = (v: string) => v.replace(/[\s-]+/g, "").toUpperCase();
 
-const AddOrModifyBillingChannel: React.FC<AddOrModifyBillingChannelProps> = ({
-  visible,
-  channel,
-  onCancel,
-  onSuccess
-}) => {
-  const [formData, setFormData] = useState({
-    utility: 'NWSC' as 'LIGHT' | 'NWSC',
-    meterNumber: '',
-    name: '',
-    area: ''
-  });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [areas, setAreas] = useState<string[]>([]);
-  const [isLoadingAreas, setIsLoadingAreas] = useState(false);
+const AddOrModifyBillingChannel = ({ visible, channel, onCancel, onSuccess }: AddOrModifyBillingChannelProps) => {
+  const [form, setForm] = useState(EMPTY);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [invalid, setInvalid] = useState<"meterNumber" | "area" | null>(null);
+  const isEdit = !!channel;
 
-  // Fetch areas when NWSC is selected
+  // Load the channel being edited (or a blank form) each time the dialog opens.
   useEffect(() => {
-    const fetchAreas = async () => {
-      if (formData.utility === 'NWSC') {
-        setIsLoadingAreas(true);
-        try {
-          const response = await apiRequest<AreaResponse>(BILLING_CHANNELS.NWSC_AREAS, 'GET', '');
-          if (response.status === 'success' && response.data?.areas) {
-            setAreas(response.data.areas);
-          } else {
-            setAreas([]);
-          }
-        } catch (error) {
-          console.error('Failed to fetch areas:', error);
-          setAreas([]);
-        } finally {
-          setIsLoadingAreas(false);
-        }
-      } else {
-        setAreas([]);
-      }
-    };
-
-    if (visible && formData.utility === 'NWSC') {
-      fetchAreas();
-    }
-  }, [visible, formData.utility]);
-
-  // Update form data when channel prop changes
-  useEffect(() => {
-    if (channel) {
-      setFormData({
-        utility: channel.utility || 'NWSC',
-        meterNumber: channel.meterNumber || '',
-        name: channel.name || '',
-        area: channel.area || ''
-      });
-    } else {
-      setFormData({
-        utility: 'NWSC',
-        meterNumber: '',
-        name: '',
-        area: ''
-      });
-    }
-  }, [channel]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!formData.meterNumber) {
-      toast.error("Please enter meter number");
-      return;
-    }
-
-    if (!formData.utility) {
-      toast.error("Please select utility type");
-      return;
-    }
-
-    // Validate area for NWSC
-    if (formData.utility === 'NWSC' && !formData.area) {
-      toast.error("Please select an area for water bill verification");
-      return;
-    }
-
-    // Prepare payload based on utility type
-    const payload: any = {
-      utility: formData.utility,
-      meterNumber: formData.meterNumber,
-    };
-
-    // Add name if provided
-    if (formData.name) {
-      payload.name = formData.name;
-    }
-
-    // Add area only for NWSC (water)
-    if (formData.utility === 'NWSC' && formData.area) {
-      payload.area = formData.area;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const endpoint = channel 
-        ? BILLING_CHANNELS.MODIFY(channel.id!) 
-        : BILLING_CHANNELS.CREATE;
-      const method = channel ? "PUT" : "POST";
-      
-      await apiRequest(endpoint, method, '', payload);
-      
-      // Reset form
-      setFormData({
-        utility: 'NWSC',
-        meterNumber: '',
-        name: '',
-        area: ''
-      });
-      
-      onSuccess();
-      onCancel();
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Failed to save billing channel');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Convert areas to dropdown options
-  const areaOptions = areas.map(area => ({
-    value: area,
-    label: area
-  }));
+    if (!visible) return;
+    setForm(
+      channel
+        ? { utility: channel.utility, meterNumber: channel.meterNumber, name: channel.name ?? "", area: channel.area ?? "" }
+        : EMPTY
+    );
+    setError(null);
+    setInvalid(null);
+  }, [visible, channel]);
 
   if (!visible) return null;
 
+  const identityChanged =
+    isEdit &&
+    channel.isVerified &&
+    (form.utility !== channel.utility ||
+      cleanMeter(form.meterNumber) !== channel.meterNumber ||
+      (form.utility === "NWSC" && form.area.trim() !== (channel.area ?? "")));
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (saving) return;
+    setError(null);
+    setInvalid(null);
+
+    const meterNumber = cleanMeter(form.meterNumber);
+    if (!/^[A-Z0-9]{4,30}$/.test(meterNumber)) {
+      setInvalid("meterNumber");
+      setError("Enter the meter or account number: 4 to 30 letters or digits.");
+      return;
+    }
+    if (form.utility === "NWSC" && !form.area.trim()) {
+      setInvalid("area");
+      setError("Choose the NWSC area for this water account.");
+      return;
+    }
+
+    const payload: Record<string, string> = { utility: form.utility, meterNumber, name: form.name.trim() };
+    if (form.utility === "NWSC") payload.area = form.area.trim();
+
+    setSaving(true);
+    try {
+      await apiRequest(isEdit ? BILLING_CHANNELS.MODIFY(channel.id) : BILLING_CHANNELS.CREATE, isEdit ? "PUT" : "POST", payload);
+      onSuccess(); // the success message is shown by apiRequest
+    } catch (err) {
+      setError(apiErrorMessage(err, "Couldn't save the billing channel. Please try again."));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl w-full max-w-md p-6">
-        <h3 className="text-xl font-semibold text-gray-800 mb-4">
-          {channel ? 'Edit Billing Channel' : 'Add New Billing Channel'}
-        </h3>
-        
-        <form onSubmit={handleSubmit}>
-          <div className="space-y-4">
-            {/* Utility Type Selection */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Utility Type *
-              </label>
-              <div className="grid grid-cols-2 gap-3">
+    <Modal
+      title={isEdit ? "Edit billing channel" : "Add billing channel"}
+      subtitle="A water or electricity account the company pays bills for."
+      onClose={onCancel}
+      busy={saving}
+      footer={
+        <>
+          <button type="button" className={btn.secondary} onClick={onCancel} disabled={saving}>
+            Cancel
+          </button>
+          <button type="submit" form="billing-channel-form" className={btn.primary} disabled={saving}>
+            {saving && <Spinner />}
+            {saving ? "Saving…" : isEdit ? "Save changes" : "Add channel"}
+          </button>
+        </>
+      }
+    >
+      <form id="billing-channel-form" onSubmit={submit} noValidate className="flex flex-col gap-5">
+        {error && (
+          <div role="alert" className="rounded-lg border border-[#F3C9C2] bg-[#FDF0EE] px-3.5 py-2.5 text-sm text-[#8A2A1C]">
+            {error}
+          </div>
+        )}
+
+        <fieldset className="m-0 border-0 p-0">
+          <legend className="mb-2 p-0 text-sm font-semibold text-[#2B3240]">Utility</legend>
+          <div className="grid grid-cols-2 gap-3">
+            {(Object.keys(UTILITY_INFO) as UtilityType[]).map((u) => {
+              const active = form.utility === u;
+              return (
                 <button
+                  key={u}
                   type="button"
-                  onClick={() => setFormData(prev => ({ ...prev, utility: 'NWSC', area: '' }))}
-                  className={`p-3 border-2 rounded-lg flex flex-col items-center gap-2 transition-all ${
-                    formData.utility === 'NWSC'
-                      ? 'border-teal-500 bg-teal-50'
-                      : 'border-gray-200 hover:border-gray-300'
+                  aria-pressed={active}
+                  onClick={() => setForm((f) => ({ ...f, utility: u, area: u === "NWSC" ? f.area : "" }))}
+                  className={`flex min-h-[88px] flex-col items-center justify-center gap-2 rounded-xl border-2 p-3 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
+                    active ? "border-brand bg-[#EEF2FA]" : "border-[#E2E6EF] hover:border-[#C9D1E3]"
                   }`}
                 >
-                  <img src={nwscLogo} alt="NWSC Logo" className="h-10 w-10" />
-                  <span className={`text-sm font-medium ${formData.utility === 'NWSC' ? 'text-teal-600' : 'text-gray-600'}`}>
-                    NWSC (Water)
-                  </span>
+                  <img src={UTILITY_INFO[u].logo} alt="" className="h-9 w-9 object-contain" />
+                  <span className={`text-sm ${active ? "font-semibold text-brand" : "font-medium text-[#2B3240]"}`}>{UTILITY_INFO[u].label}</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setFormData(prev => ({ ...prev, utility: 'LIGHT' }))}
-                  className={`p-3 border-2 rounded-lg flex flex-col items-center gap-2 transition-all ${
-                    formData.utility === 'LIGHT'
-                      ? 'border-teal-500 bg-teal-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <img src={uedclLogo} alt="UEDCL Logo" className="h-10 w-10" />
-                  <span className={`text-sm font-medium ${formData.utility === 'LIGHT' ? 'text-teal-600' : 'text-gray-600'}`}>
-                    UEDCL (Electricity)
-                  </span>
-                </button>
-              </div>
-            </div>
-
-            {/* Customer Name (Optional) */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Customer Name (Optional)
-              </label>
-              <CustomTextInput
-                type="text"
-                name="name"
-                value={formData.name}
-                onChange={(val) => setFormData(prev => ({ ...prev, name: val }))}
-                placeholder="Enter customer name"
-              />
-            </div>
-
-            {/* Meter Number */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Meter Number *
-              </label>
-              <CustomTextInput
-                type="text"
-                name="meterNumber"
-                value={formData.meterNumber}
-                onChange={(val) => setFormData(prev => ({ ...prev, meterNumber: val }))}
-                placeholder="Enter meter number"
-                required
-              />
-            </div>
-
-            {/* Area - Dropdown for NWSC */}
-            {formData.utility === 'NWSC' && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Area *
-                </label>
-                {isLoadingAreas ? (
-                  <div className="flex items-center justify-center p-3 border border-gray-200 rounded-lg bg-gray-50">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-teal-600"></div>
-                    <span className="ml-2 text-sm text-gray-500">Loading areas...</span>
-                  </div>
-                ) : (
-                  <CustomDropdown
-                    options={areaOptions}
-                    value={formData.area ? [formData.area] : []}
-                    onChange={(values: string[]) => setFormData(prev => ({ ...prev, area: values[0] || '' }))}
-                    placeholder="Select area"
-                    singleSelect={true}
-                  />
-                )}
-                <p className="text-xs text-gray-500 mt-1">Select the area where the meter is located for proper verification</p>
-              </div>
-            )}
+              );
+            })}
           </div>
-          
-          <div className="flex justify-end space-x-3 mt-6">
-            <CustomButton type='negative' fn={onCancel} />
-            <CustomButton 
-              autoCloseModal={onCancel} 
-              label={channel ? 'Update Channel' : 'Create Channel'} 
-              fn={handleSubmit}
-              disabled={isSubmitting}
-              loading={isSubmitting}
-            />
+        </fieldset>
+
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="bc-meter" className="text-sm font-semibold text-[#2B3240]">
+            {form.utility === "NWSC" ? "Account / meter number" : "Meter number"} <span className="text-[#C4381F]">*</span>
+          </label>
+          <input
+            id="bc-meter"
+            className={`${fieldClass} font-mono tracking-wide`}
+            value={form.meterNumber}
+            onChange={(e) => setForm((f) => ({ ...f, meterNumber: e.target.value }))}
+            placeholder={form.utility === "NWSC" ? "e.g. 2012345678" : "e.g. 04123456789"}
+            inputMode="text"
+            autoComplete="off"
+            aria-invalid={invalid === "meterNumber" || undefined}
+            autoFocus
+          />
+        </div>
+
+        {form.utility === "NWSC" && (
+          <AreaField id="bc-area" value={form.area} onChange={(v) => setForm((f) => ({ ...f, area: v }))} invalid={invalid === "area"} />
+        )}
+
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="bc-name" className="text-sm font-semibold text-[#2B3240]">
+            Label <span className="font-normal text-brand-muted">(optional)</span>
+          </label>
+          <input
+            id="bc-name"
+            className={fieldClass}
+            value={form.name}
+            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+            placeholder="e.g. Head Office water"
+            maxLength={120}
+            autoComplete="off"
+          />
+          <p className="m-0 text-xs text-brand-muted">Replaced by the account holder's name once the meter is verified.</p>
+        </div>
+
+        {identityChanged && (
+          <div className="rounded-lg bg-[#FFF6E5] px-3.5 py-2.5 text-sm text-[#6A4100]">
+            Changing the utility, number or area means this channel must be verified again before it can be used for payments.
           </div>
-        </form>
-      </div>
-    </div>
+        )}
+      </form>
+    </Modal>
   );
 };
 

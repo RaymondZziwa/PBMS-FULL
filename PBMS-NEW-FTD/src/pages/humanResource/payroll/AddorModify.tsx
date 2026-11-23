@@ -20,6 +20,34 @@ interface DeductionAllowance {
   value: string;
 }
 
+/** A general allowance/deduction. perMonth: multiply by each person's months paid. */
+interface GeneralItem extends DeductionAllowance {
+  perMonth: boolean;
+}
+
+interface MonthInfo {
+  month: string; // YYYY-MM
+  label: string; // "Sep 2026"
+  days: number;
+}
+
+interface MonthAttendance extends MonthInfo {
+  expectedHours: number;
+  workedHours: number;
+  missedHours: number;
+}
+
+/** One person in the payroll being prepared. */
+type PayrollRow = IPayrollEmployee & {
+  role: string;
+  monthlySalary: number;
+  /** Months (YYYY-MM) this person is paid for in this run. */
+  paidMonths: string[];
+  /** Missed-hours fine for the paid months only (kept out of `deductions`). */
+  missedHoursFine: number;
+  attendanceData?: AttendanceData;
+};
+
 interface CompanyProfile {
   id: string;
   name: string;
@@ -37,6 +65,7 @@ interface AttendanceData {
   totalWorkedHours: number;
   totalMissedHours: number;
   attendanceRate: string;
+  months?: MonthAttendance[];
 }
 
 interface PayrollApiResponse {
@@ -51,6 +80,7 @@ interface PayrollApiResponse {
     startDate: string;
     endDate: string;
   };
+  months?: MonthInfo[];
   data: AttendanceData[];
 }
 
@@ -68,9 +98,10 @@ const AddOrModifyPayrollPeriod: React.FC<AddOrModifyPayrollPeriodProps> = ({
   });
   
   const [finePerMissedHour, setFinePerMissedHour] = useState<number>(0);
-  const [generalDeductions, setGeneralDeductions] = useState<DeductionAllowance[]>([]);
-  const [generalAllowances, setGeneralAllowances] = useState<DeductionAllowance[]>([]);
-  const [payrollEmployees, setPayrollEmployees] = useState<IPayrollEmployee[]>([]);
+  const [generalDeductions, setGeneralDeductions] = useState<GeneralItem[]>([]);
+  const [generalAllowances, setGeneralAllowances] = useState<GeneralItem[]>([]);
+  const [payrollEmployees, setPayrollEmployees] = useState<PayrollRow[]>([]);
+  const [periodMonths, setPeriodMonths] = useState<MonthInfo[]>([]);
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<Set<string>>(new Set());
   const [employeeSearch, setEmployeeSearch] = useState('');
   const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
@@ -98,38 +129,33 @@ const AddOrModifyPayrollPeriod: React.FC<AddOrModifyPayrollPeriodProps> = ({
       if (response.data && Array.isArray(response.data)) {
         setAttendanceSummary(response);
         
-        // Transform the attendance data to payroll employees
-        const transformedEmployees: IPayrollEmployee[] = response.data.map((attendance: AttendanceData) => {
-          // Calculate fine deduction for missed hours
-          const missedHoursFine = finePerMissedHour > 0 ? (attendance.totalMissedHours * finePerMissedHour) : 0;
-          
-          // Create initial deductions array including the missed hours fine if applicable
-          const initialDeductions: DeductionAllowance[] = [];
-          if (missedHoursFine > 0) {
-            initialDeductions.push({
-              name: 'Missed Hours Fine',
-              value: missedHoursFine.toFixed(2)
-            });
-          }
-          
-          const grossSalary = parseFloat(attendance.salary) || 0;
-          const netSalary = grossSalary - missedHoursFine;
-          
-          return {
-            id: attendance.employeeId,
+        // The calendar months this period covers (from the server; one month if it didn't send them).
+        const months: MonthInfo[] =
+          response.months && response.months.length > 0
+            ? response.months
+            : [{ month: formData.periodStart.slice(0, 7), label: formData.periodStart.slice(0, 7), days: response.data[0]?.totalDays ?? 0 }];
+        setPeriodMonths(months);
+
+        // Everyone starts paid for every month in the period; adjust per person below.
+        const transformedEmployees: PayrollRow[] = response.data.map((attendance: AttendanceData) =>
+          calculateEmployeeNetPay({
+            id: attendance.employeeId as unknown as number,
             firstName: attendance.name.split(' ')[0] || 'Unknown',
             lastName: attendance.name.split(' ').slice(1).join(' ') || 'Employee',
             branch: attendance.branch || 'N/A',
             department: attendance.department || 'N/A',
             role: attendance.role || 'N/A',
-            baseSalary: attendance.salary,
-            deductions: initialDeductions,
+            monthlySalary: parseFloat(attendance.salary) || 0,
+            paidMonths: months.map((m) => m.month),
+            baseSalary: '0',
+            missedHoursFine: 0,
+            deductions: [],
             allowances: [],
-            grossPay: grossSalary.toFixed(2),
-            netPay: Math.max(0, netSalary).toFixed(2),
-            attendanceData: attendance // Store attendance data for reference
-          };
-        });
+            grossPay: '0',
+            netPay: '0',
+            attendanceData: attendance,
+          })
+        );
         
         setPayrollEmployees(transformedEmployees);
         setSelectedEmployeeIds(new Set(transformedEmployees.map(employee => String(employee.id))));
@@ -154,52 +180,12 @@ const AddOrModifyPayrollPeriod: React.FC<AddOrModifyPayrollPeriodProps> = ({
     }
   };
 
-  // Update missed hours fines when finePerMissedHour changes
+  // Re-price everyone when the fine rate or the general items change.
   useEffect(() => {
-    if (payrollEmployees.length > 0 && dataFetched && finePerMissedHour >= 0) {
-      const updatedEmployees = payrollEmployees.map(employee => {
-        const attendance = employee.attendanceData;
-        if (!attendance) return employee;
-
-        // Calculate new fine amount
-        const missedHoursFine = finePerMissedHour > 0 ? (attendance.totalMissedHours * finePerMissedHour) : 0;
-        const grossSalary = parseFloat(attendance.salary) || 0;
-        
-        // Find and update or add the missed hours fine deduction
-        let deductions = [...employee.deductions];
-        const existingFineIndex = deductions.findIndex(d => d.name === 'Missed Hours Fine');
-        
-        if (missedHoursFine > 0) {
-          const fineDeduction = {
-            name: 'Missed Hours Fine',
-            value: missedHoursFine.toFixed(2)
-          };
-          
-          if (existingFineIndex >= 0) {
-            deductions[existingFineIndex] = fineDeduction;
-          } else {
-            deductions.push(fineDeduction);
-          }
-        } else if (existingFineIndex >= 0) {
-          // Remove the fine deduction if fine amount is 0
-          deductions.splice(existingFineIndex, 1);
-        }
-        
-        return {
-          ...employee,
-          deductions,
-          baseSalary: attendance.salary, // Use the actual salary from attendance data
-        };
-      });
-
-      // Recalculate net pay for all employees
-      const employeesWithRecalculatedNetPay = updatedEmployees.map(employee => {
-        return calculateEmployeeNetPay(employee);
-      });
-      
-      setPayrollEmployees(employeesWithRecalculatedNetPay);
-    }
-  }, [finePerMissedHour, dataFetched]);
+    if (!dataFetched) return;
+    setPayrollEmployees((prev) => prev.map((employee) => calculateEmployeeNetPay(employee)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [finePerMissedHour, generalDeductions, generalAllowances, dataFetched]);
 
   // Initialize component
   useEffect(() => {
@@ -213,7 +199,7 @@ const AddOrModifyPayrollPeriod: React.FC<AddOrModifyPayrollPeriodProps> = ({
         setDataFetched(true);
         // For editing, we assume employees data is already available in payrollPeriod
         if (payrollPeriod.payrollDetails) {
-          setPayrollEmployees(payrollPeriod.payrollDetails);
+          setPayrollEmployees(payrollPeriod.payrollDetails as unknown as PayrollRow[]);
           setSelectedEmployeeIds(new Set(payrollPeriod.payrollDetails.map(employee => String(employee.id))));
         }
       } else {
@@ -231,51 +217,87 @@ const AddOrModifyPayrollPeriod: React.FC<AddOrModifyPayrollPeriodProps> = ({
         setExpandedEmployees(new Set());
         setDataFetched(false);
         setAttendanceSummary(null);
+        setPeriodMonths([]);
       }
     }
   }, [payrollPeriod, visible]);
 
-  // Recalculate net pay whenever general deductions/allowances or employee-specific changes occur
-  useEffect(() => {
-    if (payrollEmployees.length > 0 && dataFetched) {
-      const updatedEmployees = payrollEmployees.map(employee => {
-        return calculateEmployeeNetPay(employee);
-      });
-      setPayrollEmployees(updatedEmployees);
+  /** Attendance for the months this person is paid for. */
+  const paidAttendance = (employee: PayrollRow) => {
+    const byMonth = employee.attendanceData?.months;
+    if (!byMonth || byMonth.length === 0) {
+      const a = employee.attendanceData;
+      return {
+        expectedHours: a?.totalExpectedHours ?? 0,
+        workedHours: a?.totalWorkedHours ?? 0,
+        missedHours: a?.totalMissedHours ?? 0,
+        days: a?.totalDays ?? 0,
+      };
     }
-  }, [generalDeductions, generalAllowances, dataFetched]);
+    return byMonth
+      .filter((m) => employee.paidMonths.includes(m.month))
+      .reduce(
+        (t, m) => ({
+          expectedHours: t.expectedHours + m.expectedHours,
+          workedHours: t.workedHours + m.workedHours,
+          missedHours: t.missedHours + m.missedHours,
+          days: t.days + m.days,
+        }),
+        { expectedHours: 0, workedHours: 0, missedHours: 0, days: 0 }
+      );
+  };
 
-  const calculateEmployeeNetPay = (employee: IPayrollEmployee): IPayrollEmployee => {
-    const grossPay = parseFloat(employee.baseSalary) || 0;
-    
-    // Add general allowances
-    const totalGeneralAllowances = generalAllowances.reduce((sum, allowance) => {
-      return sum + (parseFloat(allowance.value) || 0);
-    }, 0);
-    
-    // Add employee-specific allowances
-    const totalEmployeeAllowances = employee.allowances.reduce((sum, allowance) => {
-      return sum + (parseFloat(allowance.value) || 0);
-    }, 0);
-    
-    // Subtract general deductions
-    const totalGeneralDeductions = generalDeductions.reduce((sum, deduction) => {
-      return sum + (parseFloat(deduction.value) || 0);
-    }, 0);
-    
-    // Subtract employee-specific deductions
-    const totalEmployeeDeductions = employee.deductions.reduce((sum, deduction) => {
-      return sum + (parseFloat(deduction.value) || 0);
-    }, 0);
-    
-    const netPay = grossPay + totalGeneralAllowances + totalEmployeeAllowances - totalGeneralDeductions - totalEmployeeDeductions;
-    
+  /** A general item's amount for one person: × months paid when it's per month. */
+  const generalAmount = (item: GeneralItem, monthsPaid: number) => (parseFloat(item.value) || 0) * (item.perMonth ? monthsPaid : 1);
+
+  /**
+   * Works out one person's pay:
+   *   base  = monthly salary × months paid
+   *   gross = base + general allowances + individual allowances
+   *   net   = gross − missed-hours fine (paid months only) − general deductions − individual deductions
+   */
+  const calculateEmployeeNetPay = (employee: PayrollRow): PayrollRow => {
+    const monthsPaid = employee.paidMonths.length;
+    const base = employee.monthlySalary * monthsPaid;
+    const missedHoursFine = finePerMissedHour > 0 ? paidAttendance(employee).missedHours * finePerMissedHour : 0;
+
+    const allowances =
+      generalAllowances.reduce((sum, a) => sum + generalAmount(a, monthsPaid), 0) +
+      employee.allowances.reduce((sum, a) => sum + (parseFloat(a.value) || 0), 0);
+    const deductions =
+      missedHoursFine +
+      generalDeductions.reduce((sum, d) => sum + generalAmount(d, monthsPaid), 0) +
+      employee.deductions.reduce((sum, d) => sum + (parseFloat(d.value) || 0), 0);
+
+    const gross = base + allowances;
     return {
       ...employee,
-      grossPay: grossPay.toFixed(2),
-      netPay: Math.max(0, netPay).toFixed(2)
+      baseSalary: base.toFixed(2),
+      missedHoursFine: +missedHoursFine.toFixed(2),
+      grossPay: gross.toFixed(2),
+      netPay: Math.max(0, gross - deductions).toFixed(2),
     };
   };
+
+  /** Turn one month on or off for one person (at least one month must stay on). */
+  const togglePaidMonth = (employeeIndex: number, month: string) => {
+    setPayrollEmployees((prev) =>
+      prev.map((employee, i) => {
+        if (i !== employeeIndex) return employee;
+        const has = employee.paidMonths.includes(month);
+        if (has && employee.paidMonths.length === 1) {
+          toast.error('Pay at least one month, or untick the person to leave them out of this payroll.');
+          return employee;
+        }
+        const paidMonths = has
+          ? employee.paidMonths.filter((m) => m !== month)
+          : periodMonths.map((m) => m.month).filter((m) => m === month || employee.paidMonths.includes(m));
+        return calculateEmployeeNetPay({ ...employee, paidMonths });
+      })
+    );
+  };
+
+  const monthLabel = (month: string) => periodMonths.find((m) => m.month === month)?.label ?? month;
 
   const toggleEmployeeExpansion = (employeeId: string) => {
     setExpandedEmployees(prev => {
@@ -290,7 +312,7 @@ const AddOrModifyPayrollPeriod: React.FC<AddOrModifyPayrollPeriodProps> = ({
   };
 
   const expandAllEmployees = () => {
-    const allEmployeeIds = new Set(payrollEmployees.map(emp => emp.id));
+    const allEmployeeIds = new Set(payrollEmployees.map(emp => emp.id as unknown as string));
     setExpandedEmployees(allEmployeeIds);
   };
 
@@ -322,7 +344,26 @@ const handleSubmit = async (e: React.FormEvent) => {
     // Construct the paymentStructure array with all employee details
     const paymentStructure = selectedPayrollEmployees.map(employee => {
       const attendance = employee.attendanceData;
-      
+      const monthsPaid = employee.paidMonths.length;
+      const paid = paidAttendance(employee);
+
+      const generalDeductionItems = generalDeductions.map(d => ({
+        name: d.name,
+        amount: generalAmount(d, monthsPaid),
+        unitAmount: parseFloat(d.value) || 0,
+        perMonth: d.perMonth,
+      }));
+      const employeeDeductionItems = employee.deductions.map(d => ({ name: d.name, amount: parseFloat(d.value) || 0 }));
+      const generalAllowanceItems = generalAllowances.map(a => ({
+        name: a.name,
+        amount: generalAmount(a, monthsPaid),
+        unitAmount: parseFloat(a.value) || 0,
+        perMonth: a.perMonth,
+      }));
+      const employeeAllowanceItems = employee.allowances.map(a => ({ name: a.name, amount: parseFloat(a.value) || 0 }));
+
+      const sumItems = (list: { amount: number }[]) => list.reduce((t, i) => t + i.amount, 0);
+
       return {
         // Employee Basic Information
         employeeId: employee.id,
@@ -330,70 +371,43 @@ const handleSubmit = async (e: React.FormEvent) => {
         branch: employee.branch,
         department: employee.department,
         role: employee.role,
-        
-        // Salary Information
+
+        // Salary Information (baseSalary = monthlySalary × monthsPaid)
+        monthlySalary: employee.monthlySalary,
+        monthsPaid,
+        periodMonths: periodMonths.length,
+        paidMonths: employee.paidMonths.map(m => ({ month: m, label: monthLabel(m) })),
         baseSalary: parseFloat(employee.baseSalary),
         grossPay: parseFloat(employee.grossPay),
         netPay: parseFloat(employee.netPay),
-        
-        // Attendance Record for the period
+
+        // Attendance for the paid months only
         attendance: attendance ? {
-          totalDays: attendance.totalDays,
-          totalExpectedHours: attendance.totalExpectedHours,
-          totalWorkedHours: attendance.totalWorkedHours,
-          totalMissedHours: attendance.totalMissedHours,
-          attendanceRate: attendance.attendanceRate
+          totalDays: paid.days,
+          totalExpectedHours: +paid.expectedHours.toFixed(2),
+          totalWorkedHours: +paid.workedHours.toFixed(2),
+          totalMissedHours: +paid.missedHours.toFixed(2),
+          attendanceRate: paid.expectedHours > 0 ? +((paid.workedHours / paid.expectedHours) * 100).toFixed(2) : 0,
         } : null,
-        
+
         // Deductions Breakdown
         deductions: {
-          // Auto-generated missed hours fine
-          missedHoursFine: employee.deductions.find(d => d.name === 'Missed Hours Fine') 
-            ? parseFloat(employee.deductions.find(d => d.name === 'Missed Hours Fine')!.value)
-            : 0,
-          
-          // General deductions applied to all employees
-          generalDeductions: generalDeductions.map(d => ({
-            name: d.name,
-            amount: parseFloat(d.value) || 0
-          })),
-          
-          // Employee-specific additional deductions
-          employeeDeductions: employee.deductions
-            .filter(d => d.name !== 'Missed Hours Fine')
-            .map(d => ({
-              name: d.name,
-              amount: parseFloat(d.value) || 0
-            }))
+          missedHoursFine: employee.missedHoursFine,
+          generalDeductions: generalDeductionItems,
+          employeeDeductions: employeeDeductionItems,
         },
-        
+
         // Allowances Breakdown
         allowances: {
-          // General allowances applied to all employees
-          generalAllowances: generalAllowances.map(a => ({
-            name: a.name,
-            amount: parseFloat(a.value) || 0
-          })),
-          
-          // Employee-specific allowances
-          employeeAllowances: employee.allowances.map(a => ({
-            name: a.name,
-            amount: parseFloat(a.value) || 0
-          }))
+          generalAllowances: generalAllowanceItems,
+          employeeAllowances: employeeAllowanceItems,
         },
-        
+
         // Calculation Summary
         summary: {
-          totalDeductions: employee.deductions.reduce((sum, deduction) => 
-            sum + (parseFloat(deduction.value) || 0), 0) + 
-            generalDeductions.reduce((sum, deduction) => 
-              sum + (parseFloat(deduction.value) || 0), 0),
-          
-          totalAllowances: employee.allowances.reduce((sum, allowance) => 
-            sum + (parseFloat(allowance.value) || 0), 0) + 
-            generalAllowances.reduce((sum, allowance) => 
-              sum + (parseFloat(allowance.value) || 0), 0)
-        }
+          totalDeductions: employee.missedHoursFine + sumItems(generalDeductionItems) + sumItems(employeeDeductionItems),
+          totalAllowances: sumItems(generalAllowanceItems) + sumItems(employeeAllowanceItems),
+        },
       };
     });
 
@@ -429,7 +443,8 @@ const handleSubmit = async (e: React.FormEvent) => {
         periodWorkHours: attendanceSummary?.company.workHours,
         generatedAt: new Date().toISOString(),
         generalDeductions: generalDeductions,
-        generalAllowances: generalAllowances
+        generalAllowances: generalAllowances,
+        periodMonths: periodMonths
       }
     };
     await apiRequest(PayrollEndpoints.PAYROLL.create, 'POST', '', payload);
@@ -454,6 +469,7 @@ const handleSubmit = async (e: React.FormEvent) => {
       setDataFetched(false);
       setAttendanceSummary(null);
       setSelectedEmployeeIds(new Set());
+      setPeriodMonths([]);
     }
   };
 
@@ -479,10 +495,10 @@ const handleSubmit = async (e: React.FormEvent) => {
 
   // General Deductions Management
   const addGeneralDeduction = () => {
-    setGeneralDeductions(prev => [...prev, { name: '', value: '' }]);
+    setGeneralDeductions(prev => [...prev, { name: '', value: '', perMonth: true }]);
   };
 
-  const updateGeneralDeduction = (index: number, field: 'name' | 'value', value: string) => {
+  const updateGeneralDeduction = (index: number, field: 'name' | 'value' | 'perMonth', value: string | boolean) => {
     setGeneralDeductions(prev => 
       prev.map((deduction, i) => 
         i === index ? { ...deduction, [field]: value } : deduction
@@ -496,10 +512,10 @@ const handleSubmit = async (e: React.FormEvent) => {
 
   // General Allowances Management
   const addGeneralAllowance = () => {
-    setGeneralAllowances(prev => [...prev, { name: '', value: '' }]);
+    setGeneralAllowances(prev => [...prev, { name: '', value: '', perMonth: true }]);
   };
 
-  const updateGeneralAllowance = (index: number, field: 'name' | 'value', value: string) => {
+  const updateGeneralAllowance = (index: number, field: 'name' | 'value' | 'perMonth', value: string | boolean) => {
     setGeneralAllowances(prev => 
       prev.map((allowance, i) => 
         i === index ? { ...allowance, [field]: value } : allowance
@@ -568,8 +584,7 @@ const handleSubmit = async (e: React.FormEvent) => {
   // Calculate total fines amount
   const totalFinesAmount = payrollEmployees.reduce((total, employee) => {
     if (!selectedEmployeeIds.has(String(employee.id))) return total;
-    const missedHoursFine = employee.deductions.find(d => d.name === 'Missed Hours Fine');
-    return total + (missedHoursFine ? parseFloat(missedHoursFine.value) : 0);
+    return total + employee.missedHoursFine;
   }, 0);
 
   // Calculate total gross salary
@@ -713,6 +728,32 @@ const handleSubmit = async (e: React.FormEvent) => {
             </div>
           )}
 
+          {dataFetched && periodMonths.length > 1 && (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+              <p className="font-medium">
+                This payroll covers {periodMonths.length} months: {periodMonths.map((m) => m.label).join(', ')}.
+              </p>
+              {(() => {
+                // A month is partial when fewer of its days fall inside the period than the month has.
+                const partial = periodMonths.filter((m) => {
+                  const [y, mo] = m.month.split('-').map(Number);
+                  return m.days < new Date(Date.UTC(y, mo, 0)).getUTCDate();
+                });
+                return partial.length > 0 ? (
+                  <p className="mt-2 rounded-md bg-amber-100 px-3 py-2 font-medium text-amber-900">
+                    {partial.map((m) => `${m.label} (${m.days} days)`).join(' and ')} {partial.length === 1 ? 'is' : 'are'} only partly in this period.
+                    Each month paid adds a full month's salary, so check the months for each person before generating.
+                  </p>
+                ) : null;
+              })()}
+              <p className="mt-1 text-blue-800">
+                Everyone starts on all {periodMonths.length} months. Click the month buttons on a person to pay them for fewer months.
+                Their salary becomes monthly salary × months paid, missed-hours fines only count those months, and general items marked
+                “Per month” are multiplied by the same number.
+              </p>
+            </div>
+          )}
+
           {dataFetched && (
             <>
               {/* General Deductions Section */}
@@ -736,6 +777,17 @@ const handleSubmit = async (e: React.FormEvent) => {
                       onChange={(e) => updateGeneralDeduction(index, 'value', e.target.value)}
                       className="w-32 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
                     />
+                    {periodMonths.length > 1 && (
+                      <label className="flex items-center gap-1.5 whitespace-nowrap text-sm text-gray-700" title="Multiply by each person's months paid">
+                        <input
+                          type="checkbox"
+                          checked={deduction.perMonth}
+                          onChange={(e) => updateGeneralDeduction(index, 'perMonth', e.target.checked)}
+                          className="h-4 w-4 rounded border-gray-300"
+                        />
+                        Per month
+                      </label>
+                    )}
                     <button
                       type="button"
                       onClick={() => removeGeneralDeduction(index)}
@@ -776,6 +828,17 @@ const handleSubmit = async (e: React.FormEvent) => {
                       onChange={(e) => updateGeneralAllowance(index, 'value', e.target.value)}
                       className="w-32 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
                     />
+                    {periodMonths.length > 1 && (
+                      <label className="flex items-center gap-1.5 whitespace-nowrap text-sm text-gray-700" title="Multiply by each person's months paid">
+                        <input
+                          type="checkbox"
+                          checked={allowance.perMonth}
+                          onChange={(e) => updateGeneralAllowance(index, 'perMonth', e.target.checked)}
+                          className="h-4 w-4 rounded border-gray-300"
+                        />
+                        Per month
+                      </label>
+                    )}
                     <button
                       type="button"
                       onClick={() => removeGeneralAllowance(index)}
@@ -859,16 +922,17 @@ const handleSubmit = async (e: React.FormEvent) => {
                 
                 <div className="space-y-2">
                   {filteredPayrollEmployees.map(({ employee, index: empIndex }) => {
-                    const isExpanded = expandedEmployees.has(employee.id);
+                    const isExpanded = expandedEmployees.has(employee.id as unknown as string);
                     const attendance = employee.attendanceData;
-                    const missedHoursFine = employee.deductions.find(d => d.name === 'Missed Hours Fine');
+                    const paid = paidAttendance(employee);
+                    const monthsPaid = employee.paidMonths.length;
                     
                     return (
                       <div key={employee.id} className="border border-gray-200 rounded-lg">
                         {/* Employee Header - Always Visible */}
                         <div 
                           className="flex justify-between items-center p-4 cursor-pointer hover:bg-gray-50 transition-colors"
-                          onClick={() => toggleEmployeeExpansion(employee.id)}
+                          onClick={() => toggleEmployeeExpansion(employee.id as unknown as string)}
                         >
                           <div className="flex items-center gap-3">
                             <input
@@ -896,16 +960,51 @@ const handleSubmit = async (e: React.FormEvent) => {
                                 <span>{employee.branch}</span>
                               </div>
                               <div className="flex gap-4 text-xs text-gray-600 mt-1">
-                                <span>Worked: {attendance?.totalWorkedHours}h</span>
-                                <span>Missed: {attendance?.totalMissedHours}h</span>
-                                <span>Attendance: {attendance?.attendanceRate}</span>
-                                {missedHoursFine && (
-                                  <span className="text-red-600 font-medium">Fine: UGX {missedHoursFine.value}</span>
+                                <span>Worked: {paid.workedHours.toFixed(1)}h</span>
+                                <span>Missed: {paid.missedHours.toFixed(1)}h</span>
+                                {employee.missedHoursFine > 0 && (
+                                  <span className="text-red-600 font-medium">Fine: UGX {employee.missedHoursFine.toLocaleString()}</span>
                                 )}
                               </div>
+                              {periodMonths.length > 1 && (
+                                <div
+                                  role="group"
+                                  aria-label={`Months paid for ${employee.firstName} ${employee.lastName}`}
+                                  className="mt-2 flex flex-wrap items-center gap-1.5"
+                                  onClick={(event) => event.stopPropagation()}
+                                >
+                                  <span className="mr-1 text-xs font-medium text-gray-700">Months paid:</span>
+                                  {periodMonths.map((m) => {
+                                    const on = employee.paidMonths.includes(m.month);
+                                    return (
+                                      <button
+                                        key={m.month}
+                                        type="button"
+                                        aria-pressed={on}
+                                        onClick={() => togglePaidMonth(empIndex, m.month)}
+                                        className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                                          on
+                                            ? 'border-blue-600 bg-blue-600 text-white hover:bg-blue-700'
+                                            : 'border-gray-300 bg-white text-gray-500 line-through hover:border-gray-400'
+                                        }`}
+                                      >
+                                        {m.label}
+                                      </button>
+                                    );
+                                  })}
+                                  <span className="ml-1 text-xs text-gray-600">
+                                    {monthsPaid} of {periodMonths.length} month{periodMonths.length === 1 ? '' : 's'}
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           </div>
                           <div className="text-right min-w-32">
+                            {periodMonths.length > 1 && (
+                              <p className="text-xs text-gray-500">
+                                UGX {employee.monthlySalary.toLocaleString()} × {monthsPaid}
+                              </p>
+                            )}
                             <p className="text-sm text-gray-600">Net Pay</p>
                             <p className="font-medium text-green-600 text-lg">UGX {parseFloat(employee.netPay).toLocaleString()}</p>
                           </div>
@@ -935,43 +1034,52 @@ const handleSubmit = async (e: React.FormEvent) => {
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-3 text-sm bg-gray-50 rounded-lg p-3 mb-3">
                                 <div>
                                   <p className="text-gray-600">Worked Hours</p>
-                                  <p className="font-medium">{attendance.totalWorkedHours}h</p>
+                                  <p className="font-medium">{paid.workedHours.toFixed(1)}h</p>
                                 </div>
                                 <div>
                                   <p className="text-gray-600">Expected Hours</p>
-                                  <p className="font-medium">{attendance.totalExpectedHours}h</p>
+                                  <p className="font-medium">{paid.expectedHours.toFixed(1)}h</p>
                                 </div>
                                 <div>
                                   <p className="text-gray-600">Missed Hours</p>
-                                  <p className="font-medium">{attendance.totalMissedHours}h</p>
+                                  <p className="font-medium">{paid.missedHours.toFixed(1)}h</p>
                                 </div>
                                 <div>
                                   <p className="text-gray-600">Attendance Rate</p>
-                                  <p className="font-medium">{attendance.attendanceRate}</p>
+                                  <p className="font-medium">
+                                    {paid.expectedHours > 0 ? ((paid.workedHours / paid.expectedHours) * 100).toFixed(1) : '0.0'}%
+                                  </p>
                                 </div>
+                                {periodMonths.length > 1 && (
+                                  <p className="col-span-2 md:col-span-4 text-xs text-gray-500">
+                                    For the months paid: {employee.paidMonths.map(monthLabel).join(', ')}
+                                  </p>
+                                )}
                               </div>
                             )}
 
                             {/* Base Salary */}
                             <div className="flex justify-between items-center py-3 border-b border-gray-200">
                               <div>
-                                <p className="text-sm font-medium text-gray-700">Gross Salary</p>
-                                <p className="text-xs text-gray-600">Monthly salary before adjustments</p>
+                                <p className="text-sm font-medium text-gray-700">Base Salary</p>
+                                <p className="text-xs text-gray-600">
+                                  UGX {employee.monthlySalary.toLocaleString()} monthly × {monthsPaid} month{monthsPaid === 1 ? '' : 's'}, before adjustments
+                                </p>
                               </div>
                               <p className="font-medium text-lg">UGX {parseFloat(employee.baseSalary).toLocaleString()}</p>
                             </div>
 
                             {/* Auto-generated Missed Hours Fine */}
-                            {missedHoursFine && (
+                            {employee.missedHoursFine > 0 && (
                               <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
                                 <div className="flex justify-between items-center">
                                   <div>
                                     <p className="text-sm font-medium text-red-800">Missed Hours Fine</p>
                                     <p className="text-xs text-red-600">
-                                      {attendance?.totalMissedHours || 0} missed hours × UGX {finePerMissedHour}/hour
+                                      {paid.missedHours.toFixed(1)} missed hours × UGX {finePerMissedHour}/hour
                                     </p>
                                   </div>
-                                  <p className="font-medium text-red-800 text-lg">- UGX {parseFloat(missedHoursFine.value).toLocaleString()}</p>
+                                  <p className="font-medium text-red-800 text-lg">- UGX {employee.missedHoursFine.toLocaleString()}</p>
                                 </div>
                               </div>
                             )}
@@ -981,9 +1089,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                               <label className="block text-xs font-medium text-gray-700 mb-2">
                                 Additional Employee-specific Deductions
                               </label>
-                              {employee.deductions
-                                .filter(deduction => deduction.name !== 'Missed Hours Fine')
-                                .map((deduction, dedIndex) => (
+                              {employee.deductions.map((deduction, dedIndex) => (
                                 <div key={dedIndex} className="flex gap-2 mb-2 items-center">
                                   <input
                                     type="text"
@@ -1094,7 +1200,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                     <h4 className="font-medium text-gray-900">Total Payroll Summary</h4>
                     <div className="text-sm text-gray-600 space-y-1">
                       <p>Total amount to be paid to {selectedPayrollEmployees.length} employees</p>
-                      <p>Total Gross Salary: UGX {totalGrossSalary.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+                      <p>Total base salary: UGX {totalGrossSalary.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
                       {totalFinesAmount > 0 && (
                         <p className="text-red-600">Total fines: UGX {totalFinesAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
                       )}

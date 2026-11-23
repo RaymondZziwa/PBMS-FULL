@@ -28,6 +28,11 @@ export const permissions = [
     value: 'assess_payroll',
     module: 'Human Resource',
   },
+  {
+    name: 'Record Attendance',
+    value: 'record_attendance',
+    module: 'Human Resource',
+  },
   // {
   //   name: 'Assess Leave Applications',
   //   value: 'assess_leave_applications',
@@ -182,7 +187,14 @@ export const permissions = [
   // },
 
   // Farm
-  // { name: 'Access Farm Module', value: 'access_farm_module', module: 'Farm' },
+  { name: 'Access Farm Module', value: 'access_farm_module', module: 'Farm' },
+
+  // Monk Loyalty Club
+  {
+    name: 'Access Monk Loyalty Club',
+    value: 'access_loyalty_club_module',
+    module: 'Monk Loyalty Club',
+  },
 
   // Projects
   {

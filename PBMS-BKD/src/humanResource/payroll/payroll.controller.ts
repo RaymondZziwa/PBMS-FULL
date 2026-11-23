@@ -6,37 +6,27 @@ import {
   Param,
   Query,
   Put,
+  Delete,
+  ParseIntPipe,
   BadRequestException,
   NotFoundException,
 } from '@nestjs/common';
 import { PayrollService } from './payroll.service';
 import {
-  CreateAttendanceDto,
-  UpdateAttendanceDto,
-} from 'src/dto/attendance.dto';
-import {
   CreatePayrollPeriodDto,
   PaymentStructureDto,
 } from 'src/dto/payroll.dto';
+import { RequirePermissions } from 'src/auth/decorators';
+import { PERMISSIONS } from 'src/auth/permissions';
 
+/**
+ * Payroll: salaries are sensitive. HR or "Assess Payroll" (or admin) only.
+ * Recording attendance lives in AttendanceController with its own permission.
+ */
 @Controller('api/employees')
+@RequirePermissions(PERMISSIONS.HR, PERMISSIONS.PAYROLL)
 export class PayrollController {
   constructor(private readonly payrollService: PayrollService) {}
-
-  @Post('record-attendance')
-  recordAttendance(@Body() dto: CreateAttendanceDto) {
-    return this.payrollService.createAttendance(dto);
-  }
-
-  @Put('modify-attendance/:id')
-  modifyAttendance(@Param('id') id: string, @Body() dto: UpdateAttendanceDto) {
-    return this.payrollService.updateAttendance(Number(id), dto);
-  }
-
-  @Get('attendance/daily-sheet')
-  async getDailyAttendanceSheet(@Query('date') date?: string) {
-    return await this.payrollService.getDailyAttendanceSheet(date);
-  }
 
   @Get('summary')
   async getAttendanceSummaryByPeriod(
@@ -77,8 +67,8 @@ export class PayrollController {
 
   /** GET a single payroll period by ID */
   @Get('period/:id')
-  async getPayrollPeriod(@Param('id') id: string) {
-    const payrollPeriod = await this.payrollService.getPayrollPeriod(Number(id));
+  async getPayrollPeriod(@Param('id', ParseIntPipe) id: number) {
+    const payrollPeriod = await this.payrollService.getPayrollPeriod(id);
     if (!payrollPeriod) throw new NotFoundException('Payroll period not found');
     return payrollPeriod;
   }
@@ -86,24 +76,24 @@ export class PayrollController {
   /** UPDATE payroll period */
   @Put('period/:id')
   async updatePayrollPeriod(
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
     @Body() dto: CreatePayrollPeriodDto,
   ) {
-    return this.payrollService.updatePayrollPeriod(Number(id), dto);
+    return this.payrollService.updatePayrollPeriod(id, dto);
   }
 
   /** UPSERT payrolls for a payroll period */
   @Put('period/:id/payrolls')
   async upsertPayrolls(
-    @Param('id') payrollPeriodId: number,
+    @Param('id', ParseIntPipe) payrollPeriodId: number,
     @Body() payrolls: PaymentStructureDto[],
   ) {
     return this.payrollService.upsertPayrolls(payrollPeriodId, payrolls);
   }
 
-  /** DELETE payroll period */
-  @Post('delete-payroll/:id')
-  async deletePayrollPeriod(@Param('id') id: string) {
-    return this.payrollService.deletePayrollPeriod(Number(id));
+  /** DELETE payroll period (the screen sends DELETE; this used to be POST, so deleting always failed) */
+  @Delete('delete-payroll/:id')
+  async deletePayrollPeriod(@Param('id', ParseIntPipe) id: number) {
+    return this.payrollService.deletePayrollPeriod(id);
   }
 }

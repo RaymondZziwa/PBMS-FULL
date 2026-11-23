@@ -1,10 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FaTimes, FaUserPlus, FaPrint, FaCheck } from 'react-icons/fa';
+import { FiCheck, FiPlus, FiPrinter, FiTrash2 } from 'react-icons/fi';
 import { useReactToPrint } from 'react-to-print';
 import useClients from '../../../hooks/sales/useClients';
 import type { ICartItem, ICheckoutData, IClient, IPaymentMethod } from '../../../redux/types/sales';
 import { PrintableContent } from './receipt';
-import CustomDropdown from '../../../custom/inputs/customDropdown';
+import Modal from '../../../ui/Modal';
+import Button from '../../../ui/Button';
+import Combobox from '../../../ui/Combobox';
+import { ugx } from '../../../ui/Page';
+import { AmountInput } from '../shared/NumberInputs';
+import { CustomerPicker, OrderSummary, PaymentStatusPicker, SummaryRow } from '../shared/CheckoutParts';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../../redux/store';
 import { toast } from 'sonner';
@@ -56,6 +61,18 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     mode: 'create',
     client: null
   });
+
+  const [busy, setBusy] = useState(false);
+  const [pendingPhone, setPendingPhone] = useState<string | null>(null);
+  useEffect(() => {
+    if (!pendingPhone) return;
+    const digits = (s?: string) => (s ?? '').replace(/\D/g, '').slice(-9);
+    const found = clients?.find(c => digits(c.phone) === digits(pendingPhone));
+    if (found) {
+      setSelectedCustomer(String(found.id));
+      setPendingPhone(null);
+    }
+  }, [clients, pendingPhone]);
 
   const receiptRef = useRef<HTMLDivElement>(null);
   const handlePrint = useReactToPrint({
@@ -250,283 +267,133 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     return null;
   }
 
+  // Guard against double taps while the sale is saving.
+  const complete = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await handleCompleteSale();
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
-        {/* Header */}
-        <div className="flex justify-between items-center p-6 border-b">
-          <h2 className="text-2xl font-bold text-gray-800">Checkout</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 transition-colors"
-          >
-            <FaTimes size={20} />
-          </button>
-        </div>
-
-        <div className="overflow-auto max-h-[70vh] p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Left Column - Customer & Payment Info */}
-            <div className="space-y-6">
-              {/* Customer Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Customer
-                </label>
-                <div className="flex gap-2">
-                  <CustomDropdown
-                    options={[
-                      ...(clients?.map(client => ({
-                        value: client.id,
-                        label: `${client.firstName || ''} ${client.lastName || ''} - ${client.phone || ''}`
-                      })) || [])
-                    ]}
-                    value={[selectedCustomer]}
-                    onChange={(selectedValues) => setSelectedCustomer(selectedValues[0] || '')}
-                    placeholder="Select customer..."
-                    searchPlaceholder="Search customers..."
-                    singleSelect={true}
-                    maxHeight={200}
-                  />
-                  <button
-                    onClick={() => setModalProps({ isOpen: true, mode: 'create', client: null })}
-                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 flex items-center transition-colors"
-                  >
-                    <FaUserPlus className="mr-2" />
-                    New
-                  </button>
-                </div>
-              </div>
-
-              {/* Payment Status */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Payment Status
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { value: 'FULLY_PAID', label: 'FULLY PAID' },
-                    { value: 'PARTIALLY_PAID', label: 'PARTIAL' },
-                    { value: 'UNPAID', label: 'UNPAID' }
-                  ].map(status => (
-                    <button
-                      key={status.value}
-                      onClick={() => setPaymentStatus(status.value as any)}
-                      className={`p-3 border rounded-lg text-center transition-colors ${
-                        paymentStatus === status.value
-                          ? 'border-blue-500 bg-blue-50 text-blue-700 font-semibold'
-                          : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
-                      }`}
-                    >
-                      {status.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Amount Paid */}
-              {paymentStatus !== 'UNPAID' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Amount Paid (UGX)
-                  </label>
-                  <input
-                    type="number"
-                    value={amountPaid}
-                    onChange={(e) => handleAmountPaidChange(Number(e.target.value))}
-                    disabled={paymentStatus === 'FULLY_PAID'}
-                    className="w-full p-3 border border-gray-300 rounded-lg text-lg font-semibold disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    min="0"
-                    max={total}
-                  />
-                  <div className="text-xs text-gray-500 mt-1">
-                    Total due: {total.toLocaleString()} UGX
-                  </div>
-                </div>
-              )}
-
-              {/* Payment Methods */}
-              {paymentStatus !== 'UNPAID' && amountPaid > 0 && (
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <label className="block text-sm font-medium text-gray-700">
-                      Payment Methods
-                    </label>
-                    {paymentMethods.length < 3 && (
-                      <button
-                        onClick={addPaymentMethod}
-                        className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-                      >
-                        + Add Method
-                      </button>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-3">
-                    {paymentMethods.map((method, index) => (
-                      <div key={index} className="flex gap-2 items-start">
-                        <div className="flex-1">
-                          <CustomDropdown
-                            options={PAYMENT_METHOD_OPTIONS}
-                            value={[method.type]}
-                            onChange={(selectedValues) => handlePaymentMethodChange(index, 'type', selectedValues[0] || 'CASH')}
-                            placeholder="Select payment method..."
-                            searchPlaceholder="Search payment methods..."
-                            singleSelect={true}
-                            maxHeight={200}
-                          />
-                        </div>
-                        
-                        <input
-                          type="number"
-                          value={method.amount}
-                          onChange={(e) => handlePaymentMethodChange(index, 'amount', Number(e.target.value))}
-                          className="w-32 p-2 border border-gray-300 rounded-lg"
-                          placeholder="Amount"
-                          min="0"
-                          max={amountPaid}
-                        />
-                        
-                        {requiresTransactionId(method.type) && (
-                          <input
-                            type="text"
-                            value={method.transactionId || ''}
-                            onChange={(e) => handlePaymentMethodChange(index, 'transactionId', e.target.value)}
-                            className="flex-1 p-2 border border-gray-300 rounded-lg"
-                            placeholder="Transaction ID"
-                          />
-                        )}
-                        
-                        {paymentMethods.length > 1 && (
-                          <button
-                            onClick={() => removePaymentMethod(index)}
-                            className="p-2 text-red-600 hover:text-red-800 transition-colors"
-                            title="Remove payment method"
-                          >
-                            <FaTimes size={14} />
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  
-                  {paymentMethods.length > 0 && (
-                    <div className="mt-2 text-xs text-gray-500">
-                      Total from payment methods: {paymentMethods.reduce((sum, method) => sum + method.amount, 0).toLocaleString()} UGX
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Notes */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Notes (Optional)
-                </label>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={3}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Add any notes about this sale..."
-                />
-              </div>
-            </div>
-
-            {/* Right Column - Order Summary */}
-            <div className="bg-gray-50 p-6 rounded-lg border">
-              <h3 className="text-lg font-semibold mb-4">Order Summary</h3>
-              
-              {/* Cart Items */}
-              <div className="space-y-3 mb-4 max-h-60 overflow-y-auto">
-                {cart.map(item => (
-                  <div key={item.id} className="flex justify-between text-sm pb-2 border-b border-gray-200">
-                    <div className="flex-1">
-                      <div className="font-medium">
-                        <span className="text-gray-600">{item.quantity}x </span>
-                        {item.name}
-                      </div>
-                      {item.discount > 0 && (
-                        <div className="text-red-600 text-xs">
-                          Discount: -{item.discount.toLocaleString()} UGX
-                        </div>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <div className="font-medium">
-                        {item.total.toLocaleString()} UGX
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {item.price.toLocaleString()} UGX each
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Totals */}
-              <div className="border-t pt-4 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Subtotal:</span>
-                  <span className="font-medium">{total.toLocaleString()} UGX</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Amount Paid:</span>
-                  <span className="font-medium text-green-600">
-                    {amountPaid.toLocaleString()} UGX
-                  </span>
-                </div>
-                <div className="flex justify-between text-lg font-bold border-t pt-2">
-                  <span>Balance:</span>
-                  <span className={balance === 0 ? 'text-green-600' : 'text-orange-600'}>
-                    {balance.toLocaleString()} UGX
-                  </span>
-                </div>
-              </div>
-
-              {/* Payment Status Summary */}
-              <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <div className="text-sm text-blue-800">
-                  <div className="font-semibold">Payment Status: {paymentStatus.replace('_', ' ')}</div>
-                  {paymentStatus !== 'UNPAID' && (
-                    <div className="mt-1">
-                      Methods: {paymentMethods.map(method => {
-                        const methodOption = PAYMENT_METHOD_OPTIONS.find(opt => opt.value === method.type);
-                        return `${methodOption?.label} (${method.amount.toLocaleString()} UGX)`;
-                      }).join(', ')}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Footer Actions */}
-        <div className="flex justify-between items-center p-6 border-t bg-gray-50">
-          <button
-            onClick={handlePrint}
-            className="flex items-center px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
-          >
-            <FaPrint className="mr-2" />
-            Print Receipt
-          </button>
-          
-          <div className="flex gap-3">
-            <button
-              onClick={onClose}
-              className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
-            >
+    <>
+      <Modal
+        open={visible}
+        onClose={onClose}
+        locked={busy}
+        size="xl"
+        title="Checkout"
+        description={`${cart.length} ${cart.length === 1 ? 'service' : 'services'} · ${ugx(total)}`}
+        footer={
+          <>
+            <Button variant="ghost" icon={<FiPrinter aria-hidden="true" />} onClick={() => handlePrint()} disabled={busy} className="sm:mr-auto">
+              Print receipt
+            </Button>
+            <Button variant="secondary" onClick={onClose} disabled={busy}>
               Cancel
-            </button>
-            <button
-              onClick={handleCompleteSale}
-              className="flex items-center px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold"
-            >
-              <FaCheck className="mr-2" />
-              Complete Sale
-            </button>
+            </Button>
+            <Button onClick={complete} loading={busy} icon={<FiCheck aria-hidden="true" />}>
+              Complete sale
+            </Button>
+          </>
+        }
+      >
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="space-y-5">
+            <CustomerPicker clients={clients ?? []} value={selectedCustomer} onChange={setSelectedCustomer} onNew={() => setModalProps({ isOpen: true, mode: 'create', client: null })} />
+
+            <PaymentStatusPicker
+              value={paymentStatus}
+              onChange={(v) => {
+                setPaymentStatus(v);
+                // Part payment: start from nothing so the cashier types what was actually paid.
+                if (v === 'PARTIALLY_PAID') {
+                  // Coming from "On credit" there is no payment method yet.
+                  setPaymentMethods(prev => (prev.length ? prev.map((m, i) => (i === 0 ? { ...m, amount: 0 } : m)) : [{ type: 'CASH', amount: 0 }]));
+                  setAmountPaid(0);
+                }
+              }}
+            />
+
+            {paymentStatus === 'PARTIALLY_PAID' && (
+              <div>
+                <p className="m-0 mb-1.5 text-[13px] font-medium text-ink-soft">Amount paid now</p>
+                <AmountInput size="lg" label="Amount paid now" value={amountPaid} max={total} onChange={handleAmountPaidChange} />
+                <p className="m-0 mt-1.5 text-xs text-brand-muted">Total due {ugx(total)}. The rest is recorded as owed.</p>
+              </div>
+            )}
+
+            {paymentStatus !== 'UNPAID' && amountPaid > 0 && (
+              <div>
+                <div className="mb-1.5 flex items-center justify-between">
+                  <p className="m-0 text-[13px] font-medium text-ink-soft">Paid with</p>
+                  {paymentMethods.length < 3 && (
+                    <button type="button" onClick={addPaymentMethod} className="flex items-center gap-1 rounded-md px-1 text-sm font-medium text-brand-text hover:underline">
+                      <FiPlus aria-hidden="true" /> Add method
+                    </button>
+                  )}
+                </div>
+                <ul className="m-0 list-none space-y-2 p-0">
+                  {paymentMethods.map((method, index) => (
+                    <li key={index} className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-surface-2 p-2">
+                      <Combobox
+                        label={`Payment method ${index + 1}`}
+                        hideLabel
+                        className="min-w-[160px] flex-1"
+                        value={method.type}
+                        onChange={(v) => handlePaymentMethodChange(index, 'type', v || 'CASH')}
+                        options={PAYMENT_METHOD_OPTIONS}
+                        searchPlaceholder="Search methods"
+                      />
+                      <AmountInput label={`Amount for method ${index + 1}`} className="w-40" value={method.amount} max={amountPaid} onChange={(v) => handlePaymentMethodChange(index, 'amount', v)} />
+                      {requiresTransactionId(method.type) && (
+                        <input
+                          aria-label={`Transaction ID for method ${index + 1}`}
+                          value={method.transactionId || ''}
+                          onChange={(e) => handlePaymentMethodChange(index, 'transactionId', e.target.value)}
+                          placeholder="Transaction ID"
+                          className="themed h-10 min-w-[160px] flex-1 rounded-lg border border-line bg-surface px-3 text-sm text-brand-ink outline-none focus:border-brand"
+                        />
+                      )}
+                      {paymentMethods.length > 1 && (
+                        <button type="button" onClick={() => removePaymentMethod(index)} aria-label="Remove this payment method" className="flex h-10 w-10 items-center justify-center rounded-lg text-brand-muted hover:bg-[#FDECEA] hover:text-[#B42318] dark:hover:bg-[#381B19]">
+                          <FiTrash2 aria-hidden="true" />
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                {paymentMethods.length > 1 && (
+                  <p className="m-0 mt-1.5 text-xs text-brand-muted">
+                    Methods add up to {ugx(paymentMethods.reduce((sum, m) => sum + (m.amount || 0), 0))}
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div>
+              <label htmlFor="service-notes" className="mb-1.5 block text-[13px] font-medium text-ink-soft">
+                Notes <span className="font-normal text-brand-muted">(optional)</span>
+              </label>
+              <textarea
+                id="service-notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={2}
+                placeholder="Therapist, room, anything to remember"
+                className="themed w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-brand-ink outline-none placeholder:text-brand-muted/70 focus:border-brand focus:shadow-[0_0_0_3px_rgb(57_89_165/0.18)]"
+              />
+            </div>
           </div>
+
+          <OrderSummary cart={cart}>
+            <SummaryRow label="Total" value={ugx(total)} />
+            {paymentStatus !== 'UNPAID' && <SummaryRow label="Paying now" value={ugx(amountPaid)} />}
+            <SummaryRow strong label="Balance owed" value={ugx(balance)} tone={balance > 0 ? 'warn' : 'good'} />
+          </OrderSummary>
         </div>
 
         {/* Hidden receipt for printing */}
@@ -552,15 +419,15 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
             />
           </div>
         </div>
-      </div>
-      
-      {/* Add Client Modal */}
+      </Modal>
+
       <AddOrModifyClient
         visible={modalProps.isOpen}
         client={modalProps.client}
         onCancel={() => setModalProps({ isOpen: false, mode: 'create', client: null })}
+        onSaved={setPendingPhone}
       />
-    </div>
+    </>
   );
 };
 

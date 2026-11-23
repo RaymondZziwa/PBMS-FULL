@@ -13,8 +13,11 @@ import {
   UpdateSaleDto,
 } from 'src/dto/pos.dto';
 import { MassageSalesService } from './massage.service';
+import { RequirePermissions } from 'src/auth/decorators';
+import { PERMISSIONS } from 'src/auth/permissions';
 
 @Controller('api/service-sales')
+@RequirePermissions(PERMISSIONS.SALES)
 export class MassageSalesController {
   constructor(private readonly salesService: MassageSalesService) {}
 

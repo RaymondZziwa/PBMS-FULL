@@ -4,10 +4,16 @@ import {
   Get,
   Param,
   Query,
+  UseInterceptors,
 } from '@nestjs/common';
+import { PdfResponseInterceptor } from 'src/utils/pdfGenerator/pdf-response.interceptor';
 import { ReportService } from './reports.service';
+import { RequirePermissions } from 'src/auth/decorators';
+import { PERMISSIONS } from 'src/auth/permissions';
 
 @Controller('api/reports')
+@UseInterceptors(PdfResponseInterceptor)
+@RequirePermissions(PERMISSIONS.REPORTS)
 export class ReportsController {
   constructor(private readonly reportService: ReportService) {}
 
@@ -336,6 +342,7 @@ export class ReportsController {
   }
 
   // Store-specific reports
+  @RequirePermissions(PERMISSIONS.REPORTS, PERMISSIONS.SALES)
   @Get('store/:storeId/daily-summary')
   async getStoreDailySalesSummary(
     @Param('storeId') storeId: number,
@@ -344,6 +351,7 @@ export class ReportsController {
     return await this.reportService.dailySalesSummary(storeId.toString(), date);
   }
 
+  @RequirePermissions(PERMISSIONS.REPORTS, PERMISSIONS.SALES)
   @Get('store/:storeId/period-summary')
   async getStorePeriodSalesSummary(
     @Param('storeId') storeId: number,
@@ -357,6 +365,7 @@ export class ReportsController {
     );
   }
 
+  @RequirePermissions(PERMISSIONS.REPORTS, PERMISSIONS.SALES)
   @Get('store/:storeId/export/daily-summary')
   async exportStoreDailySalesSummary(
     @Param('storeId') storeId: number,
@@ -368,6 +377,7 @@ export class ReportsController {
     });
   }
 
+  @RequirePermissions(PERMISSIONS.REPORTS, PERMISSIONS.SALES)
   @Get('store/:storeId/export/period-summary')
   async exportStorePeriodSalesSummary(
     @Param('storeId') storeId: number,

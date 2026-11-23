@@ -2,11 +2,13 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import LayoutSkeleton from './layout/skeleton';
 import SalesDashboard from './pages/dashboard/dashboard';
 import NonAdminDashboard from './pages/dashboard/nonAdminDashboard';
+import { roleHasPermission } from './layout/navigation';
 import CompanyProfile from './pages/settings/company-profile';
 import BranchesManagement from './pages/settings/branch/branchManagement';
 import RoleManagement from './pages/settings/roles/roleManagement';
 import EventTable from './pages/events/events';
 import LoginComponent from './pages/auth/login';
+import ForgotPassword from './pages/auth/forgotPassword';
 import EmployeeProfile from './endpoints/settings/accountSettings';
 import ParticipantsManagement from './pages/events/viewEventParticipants';
 import DepartmentManagement from './pages/humanResource/departments';
@@ -40,6 +42,7 @@ import ExhibitionRevenueComparisonReport from './pages/reports/exhibition/exhibi
 import ExhibitionSalesSummaryReport from './pages/reports/exhibition/exhibitionSalesSummary';
 import ExhibitionExpensesSummaryReport from './pages/reports/exhibition/exhibitionExpenseSummary';
 import DailySalesSummaryReport from './pages/reports/sales/dailySalesSummary';
+import PeriodSalesSummaryReport from './pages/reports/sales/periodSalesSummary';
 import StoreSalesComparisonReport from './pages/reports/sales/storeSalesComparison';
 import ProductPerformanceReport from './pages/reports/sales/productPerformanceReport';
 import ServicePointOfSale from './pages/sales/massageServicePos';
@@ -63,6 +66,13 @@ import WalletTable from './pages/finance/wallets';
 import TransactionsTable from './pages/finance/transactions';
 import BillingChannelsManagement from './pages/settings/billingChannels';
 import ClientAccountsManagement from './pages/sales/customerAccounts';
+import NotFound from './pages/notFound';
+import LoyaltyClub from './pages/loyalty';
+import ClubMembers from './pages/loyalty/members';
+import ClubMemberDetail from './pages/loyalty/memberDetail';
+import ClubTracker from './pages/loyalty/tracker';
+import ClubWallet from './pages/loyalty/wallet';
+import RunPayroll from './pages/humanResource/payroll/RunPayroll';
 
 // Protected Route Component
 interface ProtectedRouteProps {
@@ -104,8 +114,9 @@ interface ProtectedRouteProps {
 
   if (checkingAuth) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="text-lg">Checking authentication...</div>
+      <div role="status" className="flex min-h-screen items-center justify-center bg-canvas font-inter">
+        <span aria-hidden="true" className="mr-3 h-5 w-5 animate-spin rounded-full border-2 border-brand border-r-transparent" />
+        <span className="text-sm text-brand-muted">Checking your session…</span>
       </div>
     );
   }
@@ -144,11 +155,13 @@ const PublicRoute: React.FC<PublicRouteProps> = ({ children }) => {
   );
 };
 
+// Company-wide figures (revenue, credit, expenses) need the reports permission,
+// the same rule the backend applies to /api/dashboard/metrics.
 const RoleBasedDashboard: React.FC = () => {
-  const roleName = useSelector((state: RootState) => state.userAuth.data.role?.name);
-  const isAdmin = (roleName ?? "").trim().toLowerCase() === "administrator";
+  const role = useSelector((state: RootState) => state.userAuth.data.role);
+  const showManagement = roleHasPermission(role, "access_reports_module");
 
-  return isAdmin ? <SalesDashboard /> : <NonAdminDashboard />;
+  return showManagement ? <SalesDashboard /> : <NonAdminDashboard />;
 };
 
 function App() {
@@ -160,6 +173,14 @@ function App() {
         element={
           <PublicRoute>
             <LoginComponent />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/forgot-password"
+        element={
+          <PublicRoute>
+            <ForgotPassword />
           </PublicRoute>
         }
       />
@@ -262,6 +283,14 @@ function App() {
         element={
           <ProtectedRoute>
             <DailySalesSummaryReport />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/reports/period-sales-summary"
+        element={
+          <ProtectedRoute>
+            <PeriodSalesSummaryReport />
           </ProtectedRoute>
         }
       />
@@ -638,7 +667,66 @@ function App() {
       />
 
       {/* Catch all route - redirect to dashboard */}
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      <Route
+        path="/hr/payroll/run"
+        element={
+          <ProtectedRoute>
+            <RunPayroll />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Monk Loyalty Club (sub-modules are added under /loyalty/...) */}
+      <Route
+        path="/loyalty"
+        element={
+          <ProtectedRoute>
+            <LoyaltyClub />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/loyalty/members"
+        element={
+          <ProtectedRoute>
+            <ClubMembers />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/loyalty/members/:id"
+        element={
+          <ProtectedRoute>
+            <ClubMemberDetail />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/loyalty/tracker"
+        element={
+          <ProtectedRoute>
+            <ClubTracker />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/loyalty/wallet"
+        element={
+          <ProtectedRoute>
+            <ClubWallet />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Anything else: a proper "page not found" instead of a silent redirect */}
+      <Route
+        path="*"
+        element={
+          <ProtectedRoute>
+            <NotFound />
+          </ProtectedRoute>
+        }
+      />
     </Routes>
   );
 }

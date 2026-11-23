@@ -10,8 +10,11 @@ import {
 import { ChannelService } from './channel.service';
 import { CreateChannelDto, UpdateChannelDto } from './dto';
 import { ValidateBankAccountDto } from './dto/validateBankAccount.dto';
+import { RequirePermissions } from 'src/auth/decorators';
+import { PERMISSIONS } from 'src/auth/permissions';
 
 @Controller('api/channels')
+@RequirePermissions(PERMISSIONS.FINANCE)
 export class ChannelController {
   constructor(private readonly channelService: ChannelService) {}
 

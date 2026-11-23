@@ -5,6 +5,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AuthService } from 'src/auth/auth.service';
 import type { Request } from 'express';
+import { requireSecret } from 'src/auth/jwtSecrets';
 
 type JwtRefreshPayload = {
   sub: number;
@@ -40,8 +41,7 @@ export class JwtRefreshStrategy extends PassportStrategy(
       ]),
       ignoreExpiration: false,
       secretOrKey:
-        configService.get<string>('JWT_REFRESH_SECRET') ||
-        'fallback-refresh-secret',
+        requireSecret(configService, 'JWT_REFRESH_SECRET'),
     });
   }
 

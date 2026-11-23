@@ -9,8 +9,11 @@ import {
 } from '@nestjs/common';
 import { CreateChequeDto, UpdateChequeDto } from 'src/dto/chequeMgt.dto';
 import { ChequeService } from './chequeMgt.service';
+import { RequirePermissions } from 'src/auth/decorators';
+import { PERMISSIONS } from 'src/auth/permissions';
 
 @Controller('api/cheques')
+@RequirePermissions(PERMISSIONS.FINANCE)
 export class ChequeController {
   constructor(private readonly chequeService: ChequeService) {}
 

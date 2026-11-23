@@ -1,50 +1,12 @@
-import { useEffect } from "react";
-import { useDispatch, useSelector } from 'react-redux';
-import { fetchDataStart, fetchDataSuccess, fetchDataFailure } from "../../redux/slices/settings/branchSlice";
-import { apiRequest } from "../../libs/apiConfig";
+import * as actions from "../../redux/slices/settings/branchSlice";
 import { branchEndpoints } from "../../endpoints/settings/branch/branchEndpoints";
+import type { IBranch } from "../../redux/types/systemSettings";
 import type { RootState } from "../../redux/store";
+import { useListResource } from "../humanResource/useListResource";
 
-const useBranches = () => {
-  const dispatch = useDispatch();
-  //const { token, isFetchingLocalToken } = useAuth();
+const select = (state: RootState) => state.branch;
 
-  const fetchDataFromApi = async () => {
-    //if (isFetchingLocalToken || !token?.access_token) return;
-
-    dispatch(fetchDataStart()); // Dispatch action to indicate data fetching has started
-
-    try {
-      const response = await apiRequest(
-          branchEndpoints.getBranches,
-          "GET",
-            '',
-      );
-      //console.log(response)
-      if (response.status == 200) {
-        //console.log('subs data', response.data)
-        dispatch(fetchDataSuccess(response.data)); // Dispatch action with fetched data
-      } else {
-        throw new Error("Failed to fetch branches.");
-      }
-    } catch (error) {
-      console.error("Failed to fetch branches:", error);
-      dispatch(
-        fetchDataFailure(
-          error instanceof Error ? error.message : "An unknown error occurred."
-        )
-      );
-    }
-  };
-
-  useEffect(()=> {
-    fetchDataFromApi()
-  }, [])
-
-
-const data = useSelector((state: RootState) => state.branch);
-
-return { ...data, refresh: fetchDataFromApi };
-};
+/** Branches, loaded once and shared; upsert/remove update every screen at once. */
+const useBranches = () => useListResource<IBranch>(branchEndpoints.getBranches, select, actions);
 
 export default useBranches;

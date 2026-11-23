@@ -18,7 +18,10 @@ import { FilesInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { join, extname } from 'path';
 import { DeliveryNoteService } from './deliveryNotes.service';
+import { RequirePermissions } from 'src/auth/decorators';
+import { PERMISSIONS } from 'src/auth/permissions';
 @Controller('api/stock-movement')
+@RequirePermissions(PERMISSIONS.INVENTORY)
 export class StockMovementController {
   constructor(
     private readonly stockMovementService: StockMovementService,

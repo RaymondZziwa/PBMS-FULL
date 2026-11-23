@@ -1,196 +1,82 @@
-import { FaTimes, FaMoneyBillWave, FaShoppingCart, FaCalendarAlt, FaUser } from 'react-icons/fa';
-import type { IClientAccount } from '../../../redux/types/finance';
+import { useMemo, useState } from "react";
+import { FiArrowDownLeft, FiArrowUpRight, FiList } from "react-icons/fi";
+import Modal from "../../../ui/Modal";
+import Button from "../../../ui/Button";
+import { Badge, EmptyState, ugx } from "../../../ui/Page";
+import { accountName, type ClientAccount } from "./types";
 
-interface TransactionsModalProps {
-  visible: boolean;
-  clientAccount: IClientAccount | null;
-  onClose: () => void;
-}
+type Props = { visible: boolean; clientAccount: ClientAccount | null; onClose: () => void };
 
-const TransactionsModal = ({ visible, clientAccount, onClose }: TransactionsModalProps) => {
-  if (!visible || !clientAccount) return null;
+const fmt = (d: string) => new Date(d).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+const LABEL: Record<string, string> = { DEPOSIT: "Deposit", WITHDRAWAL: "Withdrawal", PURCHASE: "Purchase", REFUND: "Refund" };
+const IN = new Set(["DEPOSIT", "REFUND"]);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'UGX',
-    }).format(amount);
-  };
-
-  const formatDate = (date: string | Date) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  const getTransactionTypeBadge = (type: string) => {
-    const typeStyles = {
-      DEPOSIT: 'bg-green-100 text-green-800',
-      WITHDRAWAL: 'bg-red-100 text-red-800',
-      PURCHASE: 'bg-blue-100 text-blue-800',
-      REFUND: 'bg-purple-100 text-purple-800',
-    };
-    const style = typeStyles[type as keyof typeof typeStyles] || 'bg-gray-100 text-gray-800';
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${style}`}>
-        {type.charAt(0).toUpperCase() + type.slice(1).toLowerCase()}
-      </span>
-    );
-  };
-
-  const getTransactionIcon = (type: string) => {
-    switch (type) {
-      case 'DEPOSIT':
-        return <FaMoneyBillWave className="text-green-600" />;
-      case 'WITHDRAWAL':
-        return <FaMoneyBillWave className="text-red-600" />;
-      case 'PURCHASE':
-        return <FaShoppingCart className="text-blue-600" />;
-      default:
-        return <FaMoneyBillWave className="text-gray-600" />;
-    }
-  };
-
-  const transactions = clientAccount.PatientAccountTransaction || [];
+/** Every deposit and purchase on a prepaid account, newest first. */
+const TransactionsModal = ({ visible, clientAccount, onClose }: Props) => {
+  const [type, setType] = useState("all");
+  const txns = useMemo(
+    () => [...(clientAccount?.PatientAccountTransaction ?? [])].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))),
+    [clientAccount],
+  );
+  const shown = txns.filter((t) => type === "all" || t.type === type);
+  const sum = (k: string) => txns.filter((t) => t.type === k).reduce((a, t) => a + Number(t.amount || 0), 0);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] flex flex-col">
-        {/* Header - Fixed */}
-        <div className="flex justify-between items-center mb-4 pb-4 border-b border-gray-200 flex-shrink-0">
-          <div>
-            <h2 className="text-xl font-bold text-gray-800">Transaction History</h2>
-            <div className="flex items-center gap-4 mt-1 text-sm text-gray-600">
-              <div className="flex items-center gap-2">
-                <FaUser className="text-gray-400" size={14} />
-                <span>{clientAccount.client.firstName} {clientAccount.client.lastName}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="font-medium">Balance:</span>
-                <span className="font-bold text-gray-800">{formatCurrency(clientAccount.balance)}</span>
-              </div>
-            </div>
+    <Modal
+      open={visible && !!clientAccount}
+      onClose={onClose}
+      size="lg"
+      title="Account history"
+      description={clientAccount ? `${accountName(clientAccount)} · balance ${ugx(clientAccount.balance)}` : undefined}
+      footer={<Button variant="secondary" onClick={onClose}>Close</Button>}
+    >
+      <div className="mb-4 grid grid-cols-3 gap-2">
+        {[
+          ["Deposited", sum("DEPOSIT")],
+          ["Spent", sum("PURCHASE") + sum("WITHDRAWAL")],
+          ["Transactions", txns.length],
+        ].map(([l, v]) => (
+          <div key={l as string} className="rounded-xl border border-line bg-surface-2 px-3 py-2.5">
+            <p className="m-0 text-xs text-brand-muted">{l}</p>
+            <p className="m-0 font-display font-semibold tabular-nums text-brand-ink">{l === "Transactions" ? v : ugx(v as number)}</p>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors p-1"
-          >
-            <FaTimes size={20} />
-          </button>
-        </div>
-
-        {/* Transaction Summary - Fixed */}
-        <div className="grid grid-cols-3 gap-4 mb-4 flex-shrink-0">
-          <div className="bg-green-50 rounded-lg p-3">
-            <p className="text-xs text-gray-500">Total Deposits</p>
-            <p className="text-lg font-bold text-green-700">
-              {formatCurrency(
-                transactions
-                  .filter(t => t.type === 'DEPOSIT')
-                  .reduce((sum, t) => sum + t.amount, 0)
-              )}
-            </p>
-          </div>
-          <div className="bg-blue-50 rounded-lg p-3">
-            <p className="text-xs text-gray-500">Total Transactions</p>
-            <p className="text-lg font-bold text-blue-700">
-              {transactions.length}
-            </p>
-          </div>
-          <div className="bg-gray-50 rounded-lg p-3">
-            <p className="text-xs text-gray-500">Account Status</p>
-            <p className={`text-lg font-bold ${
-              clientAccount.status === 'ACTIVE' ? 'text-green-700' : 'text-gray-700'
-            }`}>
-              {clientAccount.status.charAt(0).toUpperCase() + clientAccount.status.slice(1).toLowerCase()}
-            </p>
-          </div>
-        </div>
-
-        {/* Transactions Table - Scrollable */}
-        <div className="flex-1 overflow-auto min-h-[200px]">
-          {transactions.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <FaMoneyBillWave className="mx-auto text-4xl text-gray-300 mb-3" />
-              <p className="text-lg font-medium">No transactions found</p>
-              <p className="text-sm">This account has no transaction history yet.</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 sticky top-0 z-10">
-                  <tr>
-                    <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
-                      Transaction Type
-                    </th>
-                    <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
-                      Amount
-                    </th>
-                    <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
-                      Notes
-                    </th>
-                    <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-4">
-                      Date
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {transactions.map((transaction) => (
-                    <tr key={transaction.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
-                          {getTransactionIcon(transaction.type)}
-                          {getTransactionTypeBadge(transaction.type)}
-                        </div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className={`font-medium ${
-                          transaction.type === 'DEPOSIT' 
-                            ? 'text-green-600' 
-                            : transaction.type === 'WITHDRAWAL'
-                            ? 'text-red-600'
-                            : 'text-blue-600'
-                        }`}>
-                          {transaction.type === 'DEPOSIT' ? '+' : '-'}{formatCurrency(transaction.amount)}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className="text-sm text-gray-600">
-                          {transaction.notes || '-'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <FaCalendarAlt size={12} className="text-gray-400" />
-                          {formatDate(transaction.createdAt)}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* Footer - Fixed */}
-        <div className="mt-4 pt-4 border-t border-gray-200 flex justify-between items-center flex-shrink-0">
-          <div className="text-sm text-gray-500">
-            Showing {transactions.length} transaction{transactions.length !== 1 ? 's' : ''}
-          </div>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
-          >
-            Close
-          </button>
-        </div>
+        ))}
       </div>
-    </div>
+      <div role="tablist" aria-label="Type" className="mb-3 inline-flex rounded-lg border border-line bg-surface-2 p-0.5">
+        {["all", "DEPOSIT", "PURCHASE"].map((t) => (
+          <button key={t} type="button" role="tab" aria-selected={type === t} onClick={() => setType(t)} className={`h-9 rounded-md px-3 text-[13px] font-medium ${type === t ? "bg-surface text-brand-ink shadow-card" : "text-brand-muted"}`}>
+            {t === "all" ? "All" : `${LABEL[t]}s`}
+          </button>
+        ))}
+      </div>
+      {shown.length === 0 ? (
+        <EmptyState icon={<FiList className="h-5 w-5" />} title="Nothing here yet" />
+      ) : (
+        <ul className="m-0 list-none divide-y divide-line rounded-lg border border-line p-0">
+          {shown.map((t) => {
+            const incoming = IN.has(t.type);
+            return (
+              <li key={t.id} className="flex items-center gap-3 px-3 py-3 text-sm">
+                <span aria-hidden="true" className={`flex h-9 w-9 flex-none items-center justify-center rounded-full ${incoming ? "bg-[#E7F6EC] text-[#1E7B43] dark:bg-[#15301F] dark:text-[#8FD6A8]" : "bg-subtle text-brand-text"}`}>
+                  {incoming ? <FiArrowDownLeft /> : <FiArrowUpRight />}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="m-0 flex items-center gap-2 text-brand-ink">
+                    <Badge tone={incoming ? "good" : "brand"}>{LABEL[t.type] ?? t.type}</Badge>
+                    <span className="truncate text-ink-soft">{t.notes || ""}</span>
+                  </p>
+                  <p className="m-0 mt-0.5 text-xs text-brand-muted">{fmt(t.createdAt)}</p>
+                </div>
+                <span className={`font-semibold tabular-nums ${incoming ? "text-[#1E7B43] dark:text-[#8FD6A8]" : "text-brand-ink"}`}>
+                  {incoming ? "+" : "−"}
+                  {ugx(t.amount)}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Modal>
   );
 };
 

@@ -9,12 +9,25 @@ import {
   UseGuards,
   Get,
   UnauthorizedException,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { AuthDto } from 'src/dto/auth.dto';
-import { JwtAuthGuard } from 'src/guards/authGuard.guard';
+import { Public } from './decorators';
 import { RefreshAuthGuard } from 'src/guards/refreshTokenGuard.guard';
+import { PasswordResetService } from './passwordReset.service';
+import {
+  CompleteResetDto,
+  RequestResetCodeDto,
+  VerifyResetCodeDto,
+} from 'src/dto/forgotPwd.dto';
+
+const strictValidation = new ValidationPipe({
+  whitelist: true,
+  forbidNonWhitelisted: true,
+});
 
 // Define the user type that matches what your guards return
 interface AuthUser {
@@ -34,9 +47,43 @@ declare module 'express' {
 
 @Controller('api/auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private passwordResetService: PasswordResetService,
+  ) {}
+
+  /**
+   * Password reset, step 1: send a 6-digit code by email or SMS.
+   * Always answers the same way so it can't be used to find accounts.
+   */
+  @HttpCode(200)
+  @Public()
+  @Post('forgot-password')
+  @UsePipes(strictValidation)
+  requestPasswordReset(@Body() dto: RequestResetCodeDto) {
+    return this.passwordResetService.requestCode(dto);
+  }
+
+  /** Password reset, step 2: check the code, get a 15-minute reset token. */
+  @HttpCode(200)
+  @Public()
+  @Post('forgot-password/verify')
+  @UsePipes(strictValidation)
+  verifyPasswordResetCode(@Body() dto: VerifyResetCodeDto) {
+    return this.passwordResetService.verifyCode(dto);
+  }
+
+  /** Password reset, step 3: save the new password (token is single-use). */
+  @HttpCode(200)
+  @Public()
+  @Post('forgot-password/reset')
+  @UsePipes(strictValidation)
+  completePasswordReset(@Body() dto: CompleteResetDto) {
+    return this.passwordResetService.completeReset(dto);
+  }
 
   @HttpCode(200)
+  @Public()
   @Post('login')
   async login(
     @Body() loginDto: AuthDto,
@@ -89,6 +136,7 @@ export class AuthController {
   }
 
   @HttpCode(200)
+  @Public()
   @Post('pbd/login')
   async Pbdlogin(
     @Body() loginDto: AuthDto,
@@ -140,7 +188,6 @@ export class AuthController {
   }
 
   @Get('verify')
-  @UseGuards(JwtAuthGuard)
   verifyAuth(@Req() req: Request) {
     // If JwtAuthGuard passes, the user is authenticated
     if (!req.user) {
@@ -161,7 +208,6 @@ export class AuthController {
    * Get current authenticated user's complete profile
    */
   @Get('me')
-  @UseGuards(JwtAuthGuard)
   async getCurrentUser(@Req() req: Request) {
     if (!req.user) {
       throw new UnauthorizedException('User not authenticated');
@@ -178,6 +224,7 @@ export class AuthController {
   /**
    * Refresh access token using refresh token
    */
+  @Public()
   @Post('refresh')
   @UseGuards(RefreshAuthGuard)
   async refreshToken(
@@ -233,6 +280,7 @@ export class AuthController {
   /**
    * Logout - clear cookies
    */
+  @Public()
   @Post('logout')
   logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const forwardedProto = req.headers['x-forwarded-proto'];

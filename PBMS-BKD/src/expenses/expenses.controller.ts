@@ -13,8 +13,11 @@ import {
   UpdateBranchExpenseDto,
 } from 'src/dto/expenses.dto';
 import { BranchExpenseService } from './expenses.service';
+import { RequirePermissions } from 'src/auth/decorators';
+import { PERMISSIONS } from 'src/auth/permissions';
 
 @Controller('api/branch-expenses')
+@RequirePermissions(PERMISSIONS.EXPENSES)
 export class BranchExpenseController {
   constructor(private readonly service: BranchExpenseService) {}
 

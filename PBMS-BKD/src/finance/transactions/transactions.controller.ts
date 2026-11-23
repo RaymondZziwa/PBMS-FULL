@@ -2,8 +2,11 @@ import { Controller, Get, Post, Body, Param } from '@nestjs/common';
 import { WithdrawToBankDto } from './dtos/transferToBank.dto';
 import { TransactionService } from './transactions.service';
 import { MobileMoneyPaymentDto } from './dtos/sendMomo.dto';
+import { Public, RequirePermissions } from 'src/auth/decorators';
+import { PERMISSIONS } from 'src/auth/permissions';
 
 @Controller('api/transactions')
+@RequirePermissions(PERMISSIONS.FINANCE)
 export class TransactionsController {
   constructor(private readonly transactionService: TransactionService) {}
 
@@ -26,6 +29,7 @@ export class TransactionsController {
   }
 
   //Transaction status callback endpoint for marz to call and update the transaction status in the database
+  @Public()
   @Post('marz-callback')
   marzCallback(@Body() data: any) {
     console.log('Marz callback data received:', data);
@@ -33,6 +37,7 @@ export class TransactionsController {
   }
 
   //check transfer status, the id is the reference id of the transfer transaction
+  @RequirePermissions(PERMISSIONS.FINANCE, PERMISSIONS.SALES, PERMISSIONS.EXHIBITION)
   @Get('payment-status/:reference')
   checkPaymentStatus(@Param() reference: { reference: string }) {
     //console.log('Data received in controller:', reference);

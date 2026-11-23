@@ -1,230 +1,237 @@
-import { useState } from 'react';
-import { FaEye, FaImage, FaClipboardCheck } from 'react-icons/fa';
-import useClientPrescription from '../../hooks/sales/usePrescriptions';
-import type { IClientPrescription } from '../../redux/types/pbpd';
-import CustomDeleteModal from '../../custom/modals/customDeleteModal';
-import CustomTable from '../../custom/table/customTable';
-import ImagePreviewModal from '../../custom/modals/imagePreviewModal';
-import ReviewModal from './review';
-import { toast } from 'sonner';
-import { apiRequest } from '../../libs/apiConfig';
-import { SALESENDPOINTS } from '../../endpoints/sales/salesEndpoints';
+import { useEffect, useMemo, useState } from "react";
+import { FiCheckCircle, FiChevronLeft, FiChevronRight, FiClipboard, FiClock, FiExternalLink, FiImage, FiRefreshCw } from "react-icons/fi";
+import useClientPrescription from "../../hooks/sales/usePrescriptions";
+import type { IClientPrescription } from "../../redux/types/pbpd";
+import { apiRequest, baseURL } from "../../libs/apiConfig";
+import { SALESENDPOINTS } from "../../endpoints/sales/salesEndpoints";
+import Button from "../../ui/Button";
+import Modal from "../../ui/Modal";
+import { SearchBox } from "../../ui/Field";
+import { Badge, Card, EmptyState, initials, PageHeader, SkeletonRows, StatTile } from "../../ui/Page";
+import ReviewModal from "./review";
 
+type Filter = "pending" | "reviewed" | "all";
+const PAGE = 20;
+
+/** Images are stored as a JSON array of "/uploads/prescription/…" paths. */
+const imagesOf = (p: IClientPrescription): string[] => {
+  const raw = p.images as unknown;
+  const list = Array.isArray(raw) ? raw : typeof raw === "string" ? (() => { try { const v = JSON.parse(raw); return Array.isArray(v) ? v : [raw]; } catch { return [raw]; } })() : [];
+  return list.filter((x): x is string => typeof x === "string" && !!x).map((u) => (u.startsWith("http") ? u : `${baseURL}${u}`));
+};
+const clientName = (p: IClientPrescription) => `${p.client?.firstName ?? ""} ${p.client?.lastName ?? ""}`.trim() || "Unknown client";
+const byName = (p: IClientPrescription) => `${p.employee?.firstName ?? ""} ${p.employee?.lastName ?? ""}`.trim() || "—";
+const fmt = (d: string | Date) => new Date(d).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+
+/** Client prescriptions sent in from the field, waiting for (or after) review. */
 const ClientPrescriptionsManagement = () => {
-  const { data: prescriptions, refresh } = useClientPrescription();
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const { data, loading, refresh } = useClientPrescription();
+  const prescriptions: IClientPrescription[] = data ?? [];
+  const [filter, setFilter] = useState<Filter>("pending");
+  const [query, setQuery] = useState("");
+  const [limit, setLimit] = useState(PAGE);
+  const [open, setOpen] = useState<IClientPrescription | null>(null);
+  const [img, setImg] = useState(0);
+  const [reviewing, setReviewing] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const [modalProps, setModalProps] = useState<{
-    isOpen: boolean;
-    mode: 'create' | 'edit' | 'review' | '';
-    prescription: IClientPrescription | null;
-  }>({
-    isOpen: false,
-    mode: 'create',
-    prescription: null
-  });
+  const pending = prescriptions.filter((p) => !p.isReviewed).length;
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return prescriptions.filter(
+      (p) =>
+        (filter === "all" || (filter === "pending" ? !p.isReviewed : p.isReviewed)) &&
+        (!q || [clientName(p), p.client?.phone, byName(p), p.notes].some((v) => (v ?? "").toLowerCase().includes(q))),
+    );
+  }, [prescriptions, filter, query]);
+  useEffect(() => setLimit(PAGE), [filter, query]);
 
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [imagePreviewProps, setImagePreviewProps] = useState<{
-    isOpen: boolean;
-    imageUrl: string;
-    title: string;
-  }>({
-    isOpen: false,
-    imageUrl: '',
-    title: ''
-  });
+  const images = open ? imagesOf(open) : [];
 
-  const handleReviewConfirm = async (reviewNotes: string) => {
+  // ← / → move through the images while the viewer is open.
+  useEffect(() => {
+    if (!open || reviewing) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight") setImg((i) => Math.min(images.length - 1, i + 1));
+      if (e.key === "ArrowLeft") setImg((i) => Math.max(0, i - 1));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, reviewing, images.length]);
+
+  const submitReview = async (notes: string) => {
+    if (!open) return;
+    setSaving(true);
     try {
-      setIsSubmitting(true)
-      await apiRequest(SALESENDPOINTS.CLIENT.review_prescription(modalProps?.prescription?.id), 'PUT', '', { reviewNotes: reviewNotes });
-      refresh()
-      setModalProps({ ...modalProps, isOpen: false })
-      setIsSubmitting(false)
-    } catch (error) {
-      toast.error(error?.response?.data?.message || 'Something went wrong');
-      setIsSubmitting(false)
-    }
-  }
-
-  // Table columns
-  const columns = [
-    { key: 'clientName', label: 'Client', sortable: true, filterable: true },
-    { key: 'clientContact', label: 'Contact', sortable: true, filterable: true },
-    { key: 'prescribedByName', label: 'Prescribed By', sortable: true, filterable: true },
-    { key: 'isReviewed', label: 'Reviewed', sortable: true, filterable: false },
-    { key: 'images', label: 'Images', sortable: true, filterable: false },
-    { key: 'createdAt', label: 'Created At', sortable: true, filterable: false },
-    { key: 'actions', label: 'Actions', sortable: false, filterable: false },
-  ];
-
-  const formatDate = (date: string | Date) => {
-    return new Date(date).toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const handleViewImage = (prescription: IClientPrescription) => {
-    if (prescription.images && prescription.images.length > 0) {
-      setImagePreviewProps({
-        isOpen: true,
-        imageUrl: prescription.images[0], // Show first image, you can extend this to handle multiple images
-        title: `Prescription for ${prescription.client?.firstName} ${prescription.client?.lastName}`
-      });
+      await apiRequest(SALESENDPOINTS.CLIENT.review_prescription(String(open.id)), "PUT", "", { reviewNotes: notes });
+      await refresh();
+      setOpen({ ...open, isReviewed: true, reviewNotes: notes });
+      setReviewing(false);
+    } catch {
+      // error shown
+    } finally {
+      setSaving(false);
     }
   };
-
-  const handleViewAllImages = (prescription: IClientPrescription) => {
-    if (prescription.images && prescription.images.length > 0) {
-      // For now, we'll just show the first image
-      // You can extend this to show a carousel for multiple images
-      setImagePreviewProps({
-        isOpen: true,
-        imageUrl: prescription.images[0],
-        title: `Prescription for ${prescription.client?.firstName} ${prescription.client?.lastName} (1 of ${prescription.images.length})`
-      });
-    }
-  };
-
-  // Prepare data for table
-  const tableData = prescriptions.map(prescription => ({
-    clientName: `${prescription.client?.firstName || ''} ${prescription.client?.lastName || ''}`.trim() || 'N/A',
-    clientContact: prescription.client?.phone || 'N/A',
-    prescribedByName: `${prescription.employee?.firstName || ''} ${prescription.employee?.lastName || ''}`.trim() || 'N/A',
-    isReviewed: prescription.isReviewed ? (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-        Reviewed
-      </span>
-    ) : (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-        Pending
-      </span>
-    ),
-    images: (
-      <div className="flex items-center gap-2">
-        {prescription.images && prescription.images.length > 0 ? (
-          <>
-            <span className="text-sm text-gray-600">{prescription.images.length}</span>
-            <button
-              onClick={() => handleViewAllImages(prescription)}
-              className="flex items-center gap-1 px-2 py-1 text-xs text-blue-600 border border-blue-200 rounded hover:bg-blue-50 transition-colors"
-              title="View all images"
-            >
-              <FaImage className="w-3 h-3" />
-              View
-            </button>
-          </>
-        ) : (
-          <span className="text-sm text-gray-400">No images</span>
-        )}
-      </div>
-    ),
-    createdAt: formatDate(prescription.createdAt),
-    actions: (
-      <div className="flex gap-3">
-        {/* View Images Button - Only show if there are images */}
-        {prescription.images && prescription.images.length > 0 && (
-          <div className="relative group">
-            <button
-              className="text-green-600 hover:text-green-800 transition-colors"
-              onClick={() => handleViewImage(prescription)}
-              title="View Prescription Images"
-            >
-              <FaEye />
-            </button>
-            <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-              View Images
-            </span>
-          </div>
-        )}
-        
-        {/* Edit Button */}
-        <div className="relative group">
-          <button
-            className="text-blue-600 hover:text-blue-800 transition-colors"
-            onClick={() => setModalProps({ isOpen: true, mode: 'review', prescription })}
-            title="Review Prescription"
-          >
-            <FaClipboardCheck />
-          </button>
-          <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-            Review
-          </span>
-        </div>
-        
-        {/* Delete Button */}
-        {/* <div className="relative group">
-          <button
-            className="text-red-600 hover:text-red-800 transition-colors"
-            onClick={() => {
-              setModalProps({ isOpen: false, mode: '', prescription });
-              setIsDeleteModalOpen(true);
-            }}
-            title="Delete Prescription"
-          >
-            <FaTrash />
-          </button>
-          <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-            Delete
-          </span>
-        </div> */}
-      </div>
-    )
-  }));
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">Client Prescriptions</h2>
-        {/* <button
-          onClick={() => setModalProps({ isOpen: true, mode: 'create', prescription: null })}
-          className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-        >
-          <FaPlus className="mr-2" /> Add New Prescription
-        </button> */}
+    <div className="mx-auto max-w-7xl font-inter">
+      <PageHeader
+        title="Prescription database"
+        description="Prescriptions captured for clients. Open one to see every page and record your review."
+        actions={<Button variant="secondary" icon={<FiRefreshCw aria-hidden="true" />} onClick={() => refresh()}>Refresh</Button>}
+      />
+
+      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <StatTile label="Waiting for review" value={pending} />
+        <StatTile label="Reviewed" value={prescriptions.length - pending} />
+        <StatTile label="All prescriptions" value={prescriptions.length} />
       </div>
 
-      <CustomTable 
-        columns={columns} 
-        data={tableData} 
-        pageSize={10}
-        emptyMessage="No prescriptions found. Click 'Add New Prescription' to create one."
+      <Card>
+        <div className="flex flex-col gap-3 border-b border-line p-3 sm:flex-row sm:items-center sm:p-4">
+          <SearchBox value={query} onChange={setQuery} placeholder="Search client, phone or prescriber" label="Search prescriptions" />
+          <div role="tablist" aria-label="Review status" className="inline-flex rounded-lg border border-line bg-surface-2 p-0.5 sm:ml-auto">
+            {([
+              ["pending", `Waiting (${pending})`],
+              ["reviewed", "Reviewed"],
+              ["all", "All"],
+            ] as const).map(([v, l]) => (
+              <button key={v} type="button" role="tab" aria-selected={filter === v} onClick={() => setFilter(v)} className={`h-10 rounded-md px-3 text-[13px] font-medium ${filter === v ? "bg-surface text-brand-ink shadow-card" : "text-brand-muted hover:text-brand-ink"}`}>
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {loading && prescriptions.length === 0 ? (
+          <SkeletonRows />
+        ) : filtered.length === 0 ? (
+          <EmptyState icon={<FiClipboard className="h-5 w-5" />} title={filter === "pending" ? "Nothing waiting for review" : "No prescriptions found"} message={filter === "pending" ? "New prescriptions from the field appear here." : "Try another search."} />
+        ) : (
+          <>
+            <ul className="m-0 list-none divide-y divide-line p-0">
+              {filtered.slice(0, limit).map((p) => {
+                const n = imagesOf(p).length;
+                return (
+                  <li key={p.id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOpen(p);
+                        setImg(0);
+                      }}
+                      className="flex w-full items-center gap-3 px-4 py-3.5 text-left hover:bg-surface-2 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand"
+                    >
+                      <span aria-hidden="true" className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-subtle text-[13px] font-semibold text-brand-text">
+                        {initials(p.client?.firstName, p.client?.lastName)}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex flex-wrap items-center gap-2 font-medium text-brand-ink">
+                          {clientName(p)}
+                          {p.isReviewed ? <Badge tone="good">Reviewed</Badge> : <Badge tone="warn">Waiting</Badge>}
+                        </span>
+                        <span className="block truncate text-xs text-brand-muted">
+                          {[p.client?.phone, `by ${byName(p)}`, fmt(p.createdAt)].filter(Boolean).join(" · ")}
+                        </span>
+                      </span>
+                      <span className="flex flex-none items-center gap-1 text-xs text-brand-muted">
+                        <FiImage aria-hidden="true" /> {n}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            {filtered.length > limit && (
+              <div className="border-t border-line p-3 text-center">
+                <Button variant="secondary" size="sm" onClick={() => setLimit((l) => l + PAGE)}>Show more ({filtered.length - limit} left)</Button>
+              </div>
+            )}
+          </>
+        )}
+      </Card>
+
+      <Modal
+        open={!!open && !reviewing}
+        onClose={() => setOpen(null)}
+        size="xl"
+        title={open ? clientName(open) : ""}
+        description={open ? [open.client?.phone, `prescribed by ${byName(open)}`, fmt(open.createdAt)].filter(Boolean).join(" · ") : undefined}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setOpen(null)}>Close</Button>
+            <Button icon={<FiCheckCircle aria-hidden="true" />} onClick={() => setReviewing(true)}>
+              {open?.isReviewed ? "Update review" : "Review"}
+            </Button>
+          </>
+        }
+      >
+        {open && (
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+            <div>
+              {images.length === 0 ? (
+                <EmptyState icon={<FiImage className="h-5 w-5" />} title="No images attached" />
+              ) : (
+                <>
+                  <div className="relative flex h-[52vh] items-center justify-center overflow-hidden rounded-xl border border-line bg-surface-2">
+                    <img src={images[img]} alt={`Prescription page ${img + 1} of ${images.length}`} className="max-h-full max-w-full object-contain" />
+                    {images.length > 1 && (
+                      <>
+                        <button type="button" aria-label="Previous page" disabled={img === 0} onClick={() => setImg(img - 1)} className="absolute left-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-surface/90 text-brand-ink shadow-card disabled:opacity-30">
+                          <FiChevronLeft aria-hidden="true" />
+                        </button>
+                        <button type="button" aria-label="Next page" disabled={img === images.length - 1} onClick={() => setImg(img + 1)} className="absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-surface/90 text-brand-ink shadow-card disabled:opacity-30">
+                          <FiChevronRight aria-hidden="true" />
+                        </button>
+                      </>
+                    )}
+                    <a href={images[img]} target="_blank" rel="noreferrer" className="absolute right-2 top-2 flex h-9 items-center gap-1.5 rounded-lg bg-surface/90 px-2.5 text-xs font-medium text-brand-ink shadow-card">
+                      <FiExternalLink aria-hidden="true" /> Full size
+                    </a>
+                  </div>
+                  {images.length > 1 && (
+                    <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+                      {images.map((src, i) => (
+                        <button key={src + i} type="button" onClick={() => setImg(i)} aria-label={`Page ${i + 1}`} aria-current={i === img} className={`h-16 w-16 flex-none overflow-hidden rounded-lg border-2 ${i === img ? "border-brand" : "border-transparent opacity-70 hover:opacity-100"}`}>
+                          <img src={src} alt="" className="h-full w-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+            <aside className="space-y-4 text-sm">
+              <div>
+                <p className="m-0 mb-1 text-xs font-semibold uppercase tracking-wider text-brand-muted">Status</p>
+                {open.isReviewed ? (
+                  <Badge tone="good"><FiCheckCircle aria-hidden="true" /> Reviewed</Badge>
+                ) : (
+                  <Badge tone="warn"><FiClock aria-hidden="true" /> Waiting for review</Badge>
+                )}
+              </div>
+              <div>
+                <p className="m-0 mb-1 text-xs font-semibold uppercase tracking-wider text-brand-muted">Prescriber's notes</p>
+                <p className="m-0 whitespace-pre-wrap text-ink-soft">{open.notes || "None"}</p>
+              </div>
+              <div>
+                <p className="m-0 mb-1 text-xs font-semibold uppercase tracking-wider text-brand-muted">Review notes</p>
+                <p className="m-0 whitespace-pre-wrap text-ink-soft">{open.reviewNotes || "Not reviewed yet"}</p>
+              </div>
+            </aside>
+          </div>
+        )}
+      </Modal>
+
+      <ReviewModal
+        visible={reviewing}
+        title={open ? `Review ${clientName(open)}'s prescription` : "Review prescription"}
+        initialNotes={open?.reviewNotes ?? ""}
+        onCancel={() => setReviewing(false)}
+        onConfirm={submitReview}
+        isSubmitting={saving}
       />
-
-      {/* Delete Confirmation Modal */}
-      <CustomDeleteModal
-        visible={isDeleteModalOpen}
-        onCancel={() => setIsDeleteModalOpen(false)}
-        onConfirm={() => {
-          // deletePrescription();
-          setIsDeleteModalOpen(false);
-        }}
-        title="Delete Prescription"
-        message="Are you sure you want to delete this prescription? This action cannot be undone."
-      />
-
-      {/* Image Preview Modal */}
-       {imagePreviewProps.isOpen && (
-  <ImagePreviewModal
-    imageUrl={imagePreviewProps.imageUrl}
-    title={imagePreviewProps.title}
-    onClose={() => setImagePreviewProps({ isOpen: false, imageUrl: '', title: '' })}
-  />
-)}
-
-      {/* Add/Edit Prescription Modal - You'll need to create this component */}
-        <ReviewModal 
-          visible={modalProps.isOpen}
-          title="Review Prescription"
-          onCancel={() => setModalProps({ ...modalProps, isOpen: false })}
-        onConfirm={(reviewNotes) => handleReviewConfirm(reviewNotes)}
-        isSubmitting={isSubmitting}
-        />
     </div>
   );
 };

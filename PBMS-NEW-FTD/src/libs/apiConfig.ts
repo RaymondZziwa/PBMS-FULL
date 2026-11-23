@@ -40,12 +40,12 @@ export const apiRequest = async <T>(
   // even though the signature historically had a `token` param.
   const resolvedData = typeof tokenOrData === 'string' ? data : tokenOrData;
 
+  // File uploads (FormData): let the browser set the multipart boundary.
+  const isForm = typeof FormData !== "undefined" && resolvedData instanceof FormData;
   const config: AxiosRequestConfig = {
     url,
     method,
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: isForm ? {} : { "Content-Type": "application/json" },
     withCredentials: true, // This sends cookies automatically
     ...(resolvedData !== undefined && { data: resolvedData }),
   };
@@ -142,12 +142,12 @@ export const legacyApiRequest = async <T>(
 ): Promise<T> => {
   const url = `${legacyBaseURL}${endpoint}`;
 
+  // File uploads (FormData): let the browser set the multipart boundary.
+  const isForm = typeof FormData !== "undefined" && data instanceof FormData;
   const config: AxiosRequestConfig = {
     url,
     method,
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: isForm ? {} : { "Content-Type": "application/json" },
     ...(data !== undefined ? { data } : {}),
   };
 

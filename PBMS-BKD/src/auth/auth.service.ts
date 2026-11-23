@@ -15,6 +15,9 @@ import {
   IUserAuthWithoutPassword,
   IUserAuthWithoutToken,
 } from 'src/types/userAuth';
+import { phoneCandidates } from 'src/utils/phone';
+import { requireSecret } from './jwtSecrets';
+import { userCache } from './userCache';
 
 @Injectable()
 export class AuthService {
@@ -43,8 +46,8 @@ export class AuthService {
           },
         });
       } else {
-        user = await this.prismaService.employee.findUniqueOrThrow({
-          where: { tel: identifier },
+        user = await this.prismaService.employee.findFirstOrThrow({
+          where: { tel: { in: phoneCandidates(identifier) } },
           include: {
             branch: { select: { id: true, name: true } },
             dept: { select: { id: true, name: true } },
@@ -63,6 +66,10 @@ export class AuthService {
       }
 
       // Validate password
+      // People added without sign-in details have no password.
+      if (!user.password) {
+        throw new UnauthorizedException('Invalid credentials');
+      }
       const isValid = await bcrypt.compare(password, user.password);
       if (!isValid) {
         throw new UnauthorizedException('Invalid credentials');
@@ -78,13 +85,12 @@ export class AuthService {
       const [accessToken, refreshToken] = await Promise.all([
         this.jwtService.signAsync(payload, {
           secret:
-            this.configService.get<string>('JWT_SECRET') || 'fallback-secret',
+            requireSecret(this.configService, 'JWT_SECRET'),
           expiresIn: accessTokenExpiry,
         }),
         this.jwtService.signAsync(payload, {
           secret:
-            this.configService.get<string>('JWT_REFRESH_SECRET') ||
-            'fallback-refresh-secret',
+            requireSecret(this.configService, 'JWT_REFRESH_SECRET'),
           expiresIn: refreshTokenExpiry,
         }),
       ]);
@@ -167,8 +173,8 @@ export class AuthService {
           },
         });
       } else {
-        user = await this.prismaService.employee.findUniqueOrThrow({
-          where: { tel: identifier },
+        user = await this.prismaService.employee.findFirstOrThrow({
+          where: { tel: { in: phoneCandidates(identifier) } },
           include: {
             branch: { select: { id: true, name: true } },
             dept: { select: { id: true, name: true } },
@@ -194,6 +200,10 @@ export class AuthService {
       }
 
       // Validate password
+      // People added without sign-in details have no password.
+      if (!user.password) {
+        throw new UnauthorizedException('Invalid credentials');
+      }
       const isValid = await bcrypt.compare(password, user.password);
       if (!isValid) {
         throw new UnauthorizedException('Invalid credentials');
@@ -208,13 +218,12 @@ export class AuthService {
 
       const [accessToken, refreshToken] = await Promise.all([
         this.jwtService.signAsync(payload, {
-          secret: this.configService.get<string>('JWT_SECRET') || 'fallback-secret',
+          secret: requireSecret(this.configService, 'JWT_SECRET'),
           expiresIn: accessTokenExpiry,
         }),
         this.jwtService.signAsync(payload, {
           secret:
-            this.configService.get<string>('JWT_REFRESH_SECRET') ||
-            'fallback-refresh-secret',
+            requireSecret(this.configService, 'JWT_REFRESH_SECRET'),
           expiresIn: refreshTokenExpiry,
         }),
       ]);
@@ -306,14 +315,13 @@ export class AuthService {
 
       const newAccessToken = await this.jwtService.signAsync(newPayload, {
         secret:
-          this.configService.get<string>('JWT_SECRET') || 'fallback-secret',
+          requireSecret(this.configService, 'JWT_SECRET'),
         expiresIn: '1d',
       });
 
       const newRefreshToken = await this.jwtService.signAsync(newPayload, {
         secret:
-          this.configService.get<string>('JWT_REFRESH_SECRET') ||
-          'fallback-refresh-secret',
+          requireSecret(this.configService, 'JWT_REFRESH_SECRET'),
         expiresIn: '7d',
       });
 
@@ -389,6 +397,8 @@ export class AuthService {
   }
 
   async validateUser(userId: number) {
+    const cached = userCache.get<Record<string, unknown>>(userId);
+    if (cached) return cached;
     try {
       const user = await this.prismaService.employee.findUnique({
         where: { id: userId, isActive: true },
@@ -428,7 +438,7 @@ export class AuthService {
         return null;
       }
 
-      return {
+      const result = {
         id: user.id,
         firstName: user.firstName,
         lastName: user.lastName,
@@ -442,6 +452,8 @@ export class AuthService {
         dept: user.dept || null,
         role: user.role || null,
       };
+      userCache.set(userId, result);
+      return result;
     } catch {
       return null;
     }

@@ -1,371 +1,384 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useSelector } from "react-redux";
+import { FiAlertOctagon, FiArrowRight, FiFileText, FiMapPin, FiPackage, FiShoppingBag, FiShoppingCart } from "react-icons/fi";
 import type { RootState } from "../../redux/store";
 import { apiRequest } from "../../libs/apiConfig";
+import { visibleNavigation } from "../../layout/navigation";
+import {
+  BarList,
+  compact,
+  DashboardHeader,
+  EmptyState,
+  ErrorBanner,
+  full,
+  greeting,
+  Panel,
+  PaymentBadge,
+  RefreshButton,
+  Skeleton,
+  StatTile,
+  StockBadge,
+  timeAgo,
+  titleCase,
+  todayLabel,
+  usePolledData,
+} from "./dashboardUi";
 
-const NonAdminDashboard: React.FC = () => {
-  type EmployeeMetricsResponse = {
-    status: number;
-    message: string;
-    data: {
-      inventory: {
-        totalInventoryRecords: number;
-        outOfStockCount: number;
-        lowStockCount: number;
-        inStockCount: number;
-        overStockedCount: number;
-        lowStockItems: Array<{
-          itemId?: number;
-          itemName?: string;
-          category?: string;
-          qty?: number;
-          unit?: string;
-          storeId?: number;
-          storeName?: string;
-        }>;
-        recentInventoryActivity: Array<{
-          id: number;
-          category: string;
-          qty: number;
-          transferStatus?: string;
-          createdAt: string;
-          item?: { id: number; name: string };
-          unit?: { name: string };
-          store?: { id: number; name: string };
-          toStore?: { id: number; name: string } | null;
-          employee?: { firstName: string; lastName: string };
-        }>;
-      };
-      sales: {
-        range: { startDate: string; endDate: string; days: number };
-        totalSalesCount: number;
-        statusCounts: Record<string, number>;
-        totalItemsSold: number;
-        topItemsByQuantity: Array<{ name: string; quantity: number }>;
-        recentSales: Array<{
-          id: number;
-          status: string;
-          createdAt: string;
-          storeId?: number;
-          storeName?: string;
-          servedBy: string;
-          clientName?: string;
-          itemsCount: number;
-        }>;
-      };
-      expenses: {
-        range: { startDate: string; endDate: string; days: number };
-        totalExpenseEntries: number;
-        byCategory: Record<string, number>;
-        recentExpenses: Array<{
-          id: number;
-          title: string;
-          category: string;
-          dateIncurred: string;
-          branchId?: number;
-          branchName?: string;
-          recordedBy: string;
-        }>;
-      };
-    };
+type StaffData = {
+  generatedAt: string;
+  scope: {
+    branch: { id: number; name: string } | null;
+    store: { id: number; name: string } | null;
+    stores: { id: number; name: string }[];
   };
+  sales: {
+    days: number;
+    salesCount: number;
+    salesToday: number;
+    unitsSold: number;
+    byPaymentStatus: Record<string, number>;
+    topItems: { name: string; quantity: number }[];
+    recentSales: {
+      id: number;
+      paymentStatus: string;
+      createdAt: string;
+      storeName: string;
+      servedBy: string;
+      clientName: string | null;
+      itemsCount: number;
+    }[];
+  } | null;
+  inventory: {
+    lowStockLevel: number;
+    outOfStockCount: number;
+    lowStockCount: number;
+    alerts: { itemId?: number; itemName: string; qty: number; unit: string; storeName: string }[];
+    recentActivity: {
+      id: number;
+      type: string;
+      qty: number;
+      unit: string;
+      status: string;
+      createdAt: string;
+      itemName: string;
+      fromStore: string;
+      toStore: string | null;
+      recordedBy: string;
+    }[];
+  } | null;
+  expenses: {
+    days: number;
+    entries: number;
+    byCategory: { category: string; entries: number }[];
+    recent: { id: number; title: string; category: string; dateIncurred: string; recordedBy: string }[];
+  } | null;
+};
 
-  const branchIdRaw = useSelector(
-    (state: RootState) => state.userAuth.data.branch?.id,
-  );
+const movementLabel: Record<string, string> = {
+  RESTOCK: "Restock",
+  DEPLETION: "Taken out",
+  TRANSFER: "Transfer",
+  ADJUSTMENT: "Adjustment",
+  MANUFACTURING: "Manufacturing",
+};
 
-  const branchId = useMemo(() => {
-    const num = Number(branchIdRaw);
-    return Number.isFinite(num) && num > 0 ? num : undefined;
-  }, [branchIdRaw]);
+const NonAdminDashboard = () => {
+  const user = useSelector((s: RootState) => s.userAuth?.data);
+  const role = user?.role;
+  const [storeId, setStoreId] = useState<string>("");
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string>("");
-  const [payload, setPayload] = useState<EmployeeMetricsResponse | null>(null);
-
-  const fetchEmployeeMetrics = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const query = new URLSearchParams();
-      if (branchId) query.set("branchId", String(branchId));
-      query.set("salesDays", "7");
-      query.set("expenseDays", "30");
-
-      const endpoint = query.toString()
-        ? `/api/dashboard/employee-metrics?${query.toString()}`
-        : "/api/dashboard/employee-metrics";
-
-      const res = await apiRequest<EmployeeMetricsResponse>(endpoint, "GET");
-      setPayload(res);
-    } catch (e) {
-      setPayload(null);
-      setError(e instanceof Error ? e.message : "Failed to load dashboard");
-    } finally {
-      setLoading(false);
+  const shortcuts = useMemo(() => {
+    const links: { label: string; path: string }[] = [];
+    for (const section of visibleNavigation(role)) {
+      for (const item of section.items) {
+        if (item.path && item.path !== "/dashboard") links.push({ label: item.label, path: item.path });
+        else if (item.children?.[0]) links.push({ label: item.children[0].label, path: item.children[0].path });
+      }
     }
-  }, [branchId]);
+    return links.slice(0, 6);
+  }, [role]);
 
-  useEffect(() => {
-    fetchEmployeeMetrics();
-  }, [fetchEmployeeMetrics]);
+  const load = useCallback(() => {
+    const q = new URLSearchParams({ salesDays: "7", expenseDays: "30" });
+    if (storeId) q.set("storeId", storeId);
+    return apiRequest<{ data: StaffData }>(`/api/dashboard/employee-metrics?${q.toString()}`, "GET").then((r) => r.data);
+  }, [storeId]);
+  const { data, error, loading, refreshing, updatedAt, refresh } = usePolledData(load, 60_000, storeId || "all");
 
-  const formatDateTime = (value?: string) => {
-    if (!value) return "";
-    const dt = new Date(value);
-    if (Number.isNaN(dt.getTime())) return value;
-    return dt.toLocaleString("en-GB");
-  };
+  const noSections = !!data && !data.sales && !data.inventory && !data.expenses;
+  const branchName = data?.scope.branch?.name ?? user?.branch?.name;
+  const stores = data?.scope.stores ?? [];
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-gray-100 p-6">
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
-          <p className="mt-1 text-sm text-gray-600">
-            Operational overview (no financial figures)
-          </p>
+    <div className="mx-auto w-full max-w-[1400px] font-inter">
+      <DashboardHeader
+        title={`${greeting()}${user?.firstName ? `, ${user.firstName}` : ""}`}
+        subtitle={
+          <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+            {todayLabel()}
+            {branchName && (
+              <span className="inline-flex items-center gap-1">
+                · <FiMapPin aria-hidden="true" className="h-3.5 w-3.5 text-brand" /> {branchName}
+              </span>
+            )}
+          </span>
+        }
+      >
+        {stores.length > 1 && (
+          <label className="flex h-10 items-center gap-2 rounded-lg border border-[#DDE1EA] bg-white pl-3 pr-1 text-sm text-brand-muted">
+            Store
+            <select
+              value={storeId}
+              onChange={(e) => setStoreId(e.target.value)}
+              className="h-8 max-w-[200px] rounded-md border-0 bg-transparent pr-6 font-medium text-brand-ink outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            >
+              <option value="">All stores</option>
+              {stores.map((s) => (
+                <option key={s.id} value={String(s.id)}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        <RefreshButton onClick={refresh} refreshing={refreshing} updatedAt={updatedAt} />
+      </DashboardHeader>
+
+      {error && <ErrorBanner message={error} onRetry={refresh} />}
+
+      {/* Shortcuts to what this role can open */}
+      {shortcuts.length > 0 && (
+        <nav aria-label="Shortcuts" className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+          {shortcuts.map((s) => (
+            <Link
+              key={s.path}
+              to={s.path}
+              className="group flex min-h-12 items-center justify-between gap-2 rounded-xl border border-[#E6E9F0] bg-white px-3.5 py-2.5 text-sm font-medium text-brand-ink no-underline hover:border-brand/40 hover:bg-[#F6F8FD] focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"
+            >
+              <span className="truncate">{s.label}</span>
+              <FiArrowRight aria-hidden="true" className="h-4 w-4 flex-none text-[#9AA3B5] transition-transform group-hover:translate-x-0.5 group-hover:text-brand" />
+            </Link>
+          ))}
+        </nav>
+      )}
+
+      {loading && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-[132px]" />
+          ))}
         </div>
+      )}
 
-        <button
-          type="button"
-          onClick={fetchEmployeeMetrics}
-          disabled={loading}
-          className="rounded-lg bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-gray-200 hover:bg-gray-50 disabled:opacity-50"
-        >
-          Refresh
-        </button>
-      </div>
+      {noSections && (
+        <EmptyState>
+          Your dashboard fills in once your role is given access to sales, inventory or expenses. Ask your system administrator.
+        </EmptyState>
+      )}
 
-      {error ? (
-        <div className="rounded-xl border border-red-200 bg-white p-6 text-sm text-red-700 shadow-sm">
-          <div className="font-medium">Failed to load dashboard</div>
-          <div className="mt-1 text-red-600">{error}</div>
-        </div>
-      ) : null}
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl bg-white p-5 shadow-sm">
-          <div className="text-sm text-gray-500">Low stock items</div>
-          <div className="mt-1 text-2xl font-bold text-gray-800">
-            {loading ? "..." : payload?.data.inventory.lowStockCount ?? 0}
-          </div>
-          <div className="mt-2 text-xs text-gray-500">Qty 1 - 20</div>
-        </div>
-
-        <div className="rounded-xl bg-white p-5 shadow-sm">
-          <div className="text-sm text-gray-500">Out of stock</div>
-          <div className="mt-1 text-2xl font-bold text-gray-800">
-            {loading ? "..." : payload?.data.inventory.outOfStockCount ?? 0}
-          </div>
-          <div className="mt-2 text-xs text-gray-500">Qty 0</div>
-        </div>
-
-        <div className="rounded-xl bg-white p-5 shadow-sm">
-          <div className="text-sm text-gray-500">Sales (last 7 days)</div>
-          <div className="mt-1 text-2xl font-bold text-gray-800">
-            {loading ? "..." : payload?.data.sales.totalSalesCount ?? 0}
-          </div>
-          <div className="mt-2 text-xs text-gray-500">Count only</div>
-        </div>
-
-        <div className="rounded-xl bg-white p-5 shadow-sm">
-          <div className="text-sm text-gray-500">Expenses entries (30 days)</div>
-          <div className="mt-1 text-2xl font-bold text-gray-800">
-            {loading ? "..." : payload?.data.expenses.totalExpenseEntries ?? 0}
-          </div>
-          <div className="mt-2 text-xs text-gray-500">Count only</div>
-        </div>
-      </div>
-
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="rounded-xl bg-white p-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-800">Low stock preview</h2>
-            <div className="text-xs text-gray-500">Top 10</div>
-          </div>
-
-          <div className="mt-4 overflow-x-auto">
-            <table className="min-w-full table-fixed text-sm">
-              <thead>
-                <tr className="border-b text-left text-xs font-semibold text-gray-500">
-                  <th className="w-[45%] pb-2">Item</th>
-                  <th className="w-[20%] pb-2">Qty</th>
-                  <th className="w-[35%] pb-2">Store</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {(payload?.data.inventory.lowStockItems ?? []).length === 0 ? (
-                  <tr>
-                    <td className="py-3 text-gray-500" colSpan={3}>
-                      {loading ? "Loading..." : "No low stock items"}
-                    </td>
-                  </tr>
-                ) : (
-                  (payload?.data.inventory.lowStockItems ?? []).map((row) => (
-                    <tr key={`${row.storeId ?? ""}-${row.itemId ?? ""}`}>
-                      <td className="py-2 pr-2">
-                        <div className="truncate font-medium text-gray-800" title={row.itemName}>
-                          {row.itemName}
-                        </div>
-                        <div className="truncate text-xs text-gray-500" title={row.category}>
-                          {row.category}
-                        </div>
-                      </td>
-                      <td className="py-2 pr-2 text-gray-700">
-                        {row.qty} {row.unit}
-                      </td>
-                      <td className="py-2 text-gray-700">
-                        <div className="truncate" title={row.storeName}>
-                          {row.storeName}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="rounded-xl bg-white p-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-800">Sales overview</h2>
-            <div className="text-xs text-gray-500">Last 7 days</div>
-          </div>
-
-          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="rounded-lg bg-gray-50 p-4">
-              <div className="text-xs font-semibold text-gray-500">Items sold</div>
-              <div className="mt-1 text-xl font-bold text-gray-800">
-                {loading ? "..." : payload?.data.sales.totalItemsSold ?? 0}
-              </div>
-            </div>
-            <div className="rounded-lg bg-gray-50 p-4">
-              <div className="text-xs font-semibold text-gray-500">Paid status counts</div>
-              <div className="mt-2 space-y-1 text-sm text-gray-700">
-                {Object.keys(payload?.data.sales.statusCounts ?? {}).length === 0 ? (
-                  <div className="text-gray-500">{loading ? "Loading..." : "No data"}</div>
-                ) : (
-                  Object.entries(payload?.data.sales.statusCounts ?? {}).map(
-                    ([k, v]) => (
-                      <div key={k} className="flex justify-between">
-                        <span className="truncate pr-2">{k}</span>
-                        <span className="font-medium">{v}</span>
-                      </div>
-                    ),
-                  )
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-5">
-            <div className="text-sm font-semibold text-gray-800">Top items (qty)</div>
-            <div className="mt-2 space-y-2">
-              {(payload?.data.sales.topItemsByQuantity ?? []).length === 0 ? (
-                <div className="text-sm text-gray-500">{loading ? "Loading..." : "No items"}</div>
-              ) : (
-                (payload?.data.sales.topItemsByQuantity ?? []).map((it) => (
-                  <div key={it.name} className="flex items-center justify-between text-sm">
-                    <span className="truncate pr-2 text-gray-700" title={it.name}>
-                      {it.name}
-                    </span>
-                    <span className="font-medium text-gray-800">{it.quantity}</span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="rounded-xl bg-white p-6 shadow-sm lg:col-span-2">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-800">Recent inventory activity</h2>
-            <div className="text-xs text-gray-500">Last 10</div>
-          </div>
-
-          <div className="mt-4 overflow-x-auto">
-            <table className="min-w-full table-fixed text-sm">
-              <thead>
-                <tr className="border-b text-left text-xs font-semibold text-gray-500">
-                  <th className="w-[30%] pb-2">Item</th>
-                  <th className="w-[18%] pb-2">Qty</th>
-                  <th className="w-[18%] pb-2">Type</th>
-                  <th className="w-[18%] pb-2">Status</th>
-                  <th className="w-[16%] pb-2">When</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {(payload?.data.inventory.recentInventoryActivity ?? []).length === 0 ? (
-                  <tr>
-                    <td className="py-3 text-gray-500" colSpan={5}>
-                      {loading ? "Loading..." : "No inventory activity"}
-                    </td>
-                  </tr>
-                ) : (
-                  (payload?.data.inventory.recentInventoryActivity ?? []).map((r) => (
-                    <tr key={r.id}>
-                      <td className="py-2 pr-2">
-                        <div className="truncate font-medium text-gray-800" title={r.item?.name}>
-                          {r.item?.name}
-                        </div>
-                        <div className="truncate text-xs text-gray-500" title={r.store?.name}>
-                          {r.store?.name}
-                          {r.toStore?.name ? ` → ${r.toStore.name}` : ""}
-                        </div>
-                      </td>
-                      <td className="py-2 pr-2 text-gray-700">
-                        {r.qty} {r.unit?.name}
-                      </td>
-                      <td className="py-2 pr-2 text-gray-700">{r.category}</td>
-                      <td className="py-2 pr-2 text-gray-700">
-                        {r.transferStatus ?? ""}
-                      </td>
-                      <td className="py-2 text-xs text-gray-600">
-                        {formatDateTime(r.createdAt)}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="rounded-xl bg-white p-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-800">Recent expenses</h2>
-            <div className="text-xs text-gray-500">Last 10</div>
-          </div>
-
-          <div className="mt-4 space-y-3">
-            {(payload?.data.expenses.recentExpenses ?? []).length === 0 ? (
-              <div className="text-sm text-gray-500">{loading ? "Loading..." : "No entries"}</div>
-            ) : (
-              (payload?.data.expenses.recentExpenses ?? []).map((e) => (
-                <div key={e.id} className="rounded-lg border border-gray-200 p-3">
-                  <div className="truncate text-sm font-medium text-gray-800" title={e.title}>
-                    {e.title}
-                  </div>
-                  <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs text-gray-600">
-                    <span className="rounded bg-gray-100 px-2 py-0.5">
-                      {e.category}
-                    </span>
-                    <span>{formatDateTime(e.dateIncurred)}</span>
-                    <span className="truncate" title={e.branchName}>
-                      {e.branchName}
-                    </span>
-                  </div>
-                  <div className="mt-1 text-xs text-gray-500">By {e.recordedBy}</div>
-                </div>
-              ))
+      {data && !noSections && (
+        <>
+          {/* Headline counts (no money figures here) */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
+            {data.sales && (
+              <>
+                <StatTile
+                  label="Sales today"
+                  icon={<FiShoppingCart className="h-[18px] w-[18px]" />}
+                  value={full(data.sales.salesToday)}
+                  footer={<span className="text-xs text-brand-muted">Completed sales</span>}
+                />
+                <StatTile
+                  label={`Sales, last ${data.sales.days} days`}
+                  icon={<FiShoppingBag className="h-[18px] w-[18px]" />}
+                  value={full(data.sales.salesCount)}
+                  footer={<span className="text-xs text-brand-muted">{compact(data.sales.unitsSold)} units sold</span>}
+                />
+              </>
+            )}
+            {data.inventory && (
+              <>
+                <StatTile
+                  label="Out of stock"
+                  icon={<FiAlertOctagon className="h-[18px] w-[18px]" />}
+                  value={full(data.inventory.outOfStockCount)}
+                  footer={<span className="text-xs text-brand-muted">Items at zero</span>}
+                />
+                <StatTile
+                  label="Running low"
+                  icon={<FiPackage className="h-[18px] w-[18px]" />}
+                  value={full(data.inventory.lowStockCount)}
+                  footer={<span className="text-xs text-brand-muted">{data.inventory.lowStockLevel} or fewer left</span>}
+                />
+              </>
+            )}
+            {data.expenses && (
+              <StatTile
+                label={`Expense entries, last ${data.expenses.days} days`}
+                icon={<FiFileText className="h-[18px] w-[18px]" />}
+                value={full(data.expenses.entries)}
+                footer={<span className="text-xs text-brand-muted">Entries recorded</span>}
+              />
             )}
           </div>
-        </div>
-      </div>
+
+          <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {data.inventory && (
+              <Panel
+                title="Stock alerts"
+                subtitle={data.scope.store ? data.scope.store.name : "Your branch's stores"}
+                action={
+                  <Link to="/inventory/stock-movement" className="flex min-h-9 items-center whitespace-nowrap text-xs font-medium text-brand no-underline hover:underline">
+                    Stock movement →
+                  </Link>
+                }
+              >
+                {data.inventory.alerts.length > 0 ? (
+                  <ul className="m-0 flex list-none flex-col divide-y divide-[#EEF0F5] p-0">
+                    {data.inventory.alerts.map((a, i) => (
+                      <li key={`${a.itemId ?? i}-${a.storeName}`} className="flex items-center justify-between gap-3 py-2.5">
+                        <div className="min-w-0">
+                          <p className="m-0 truncate text-sm font-medium text-brand-ink">{a.itemName}</p>
+                          <p className="m-0 truncate text-xs text-brand-muted">{a.storeName}</p>
+                        </div>
+                        <div className="flex flex-none items-center gap-2.5">
+                          <span className="text-sm tabular-nums">
+                            {full(a.qty)} <span className="text-xs text-brand-muted">{a.unit}</span>
+                          </span>
+                          <StockBadge qty={a.qty} />
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <EmptyState>All stock is above the alert level.</EmptyState>
+                )}
+              </Panel>
+            )}
+
+            {data.sales && (
+              <Panel title="Best-selling items" subtitle={`Units sold, last ${data.sales.days} days`}>
+                <BarList
+                  rows={data.sales.topItems.map((i) => ({ key: i.name, label: i.name, value: i.quantity }))}
+                  format={compact}
+                  unit="units"
+                  emptyText={`No items sold in the last ${data.sales.days} days.`}
+                />
+              </Panel>
+            )}
+          </div>
+
+          {data.sales && (
+            <Panel className="mt-4" title="Latest sales" subtitle="Completed sales in your branch">
+              {data.sales.recentSales.length > 0 ? (
+                <div className="-mx-4 overflow-x-auto sm:-mx-5">
+                  <table className="w-full min-w-[560px] text-sm">
+                    <thead>
+                      <tr className="border-b border-[#EEF0F5] text-left text-xs text-brand-muted">
+                        <th className="px-4 pb-2 font-semibold sm:px-5">When</th>
+                        <th className="px-2 pb-2 font-semibold">Store</th>
+                        <th className="px-2 pb-2 font-semibold">Client</th>
+                        <th className="px-2 pb-2 font-semibold">Served by</th>
+                        <th className="px-2 pb-2 text-right font-semibold">Items</th>
+                        <th className="px-4 pb-2 font-semibold sm:px-5">Payment</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.sales.recentSales.map((s) => (
+                        <tr key={s.id} className="border-b border-[#F2F4F8] last:border-0">
+                          <td className="whitespace-nowrap px-4 py-2.5 text-brand-muted sm:px-5" title={new Date(s.createdAt).toLocaleString("en-GB")}>
+                            {timeAgo(s.createdAt)}
+                          </td>
+                          <td className="max-w-[150px] truncate px-2 py-2.5">{s.storeName}</td>
+                          <td className="max-w-[150px] truncate px-2 py-2.5">{s.clientName || <span className="text-brand-muted">Walk-in</span>}</td>
+                          <td className="max-w-[150px] truncate px-2 py-2.5">{s.servedBy}</td>
+                          <td className="px-2 py-2.5 text-right tabular-nums">{full(s.itemsCount)}</td>
+                          <td className="px-4 py-2.5 sm:px-5">
+                            <PaymentBadge status={s.paymentStatus} />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <EmptyState>No completed sales in the last {data.sales.days} days.</EmptyState>
+              )}
+            </Panel>
+          )}
+
+          <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-5">
+            {data.inventory && (
+              <Panel className={data.expenses ? "lg:col-span-3" : "lg:col-span-5"} title="Recent stock activity" subtitle="Latest movements">
+                {data.inventory.recentActivity.length > 0 ? (
+                  <ul className="m-0 flex list-none flex-col divide-y divide-[#EEF0F5] p-0">
+                    {data.inventory.recentActivity.map((r) => (
+                      <li key={r.id} className="flex items-start justify-between gap-3 py-2.5">
+                        <div className="min-w-0">
+                          <p className="m-0 truncate text-sm font-medium text-brand-ink">
+                            {r.itemName}{" "}
+                            <span className="font-normal text-brand-muted">
+                              · {full(r.qty)} {r.unit}
+                            </span>
+                          </p>
+                          <p className="m-0 truncate text-xs text-brand-muted">
+                            {movementLabel[r.type] ?? titleCase(r.type)} · {r.fromStore}
+                            {r.toStore ? ` → ${r.toStore}` : ""} · {r.recordedBy}
+                          </p>
+                        </div>
+                        <div className="flex flex-none flex-col items-end gap-1">
+                          <span className="text-xs text-brand-muted" title={new Date(r.createdAt).toLocaleString("en-GB")}>
+                            {timeAgo(r.createdAt)}
+                          </span>
+                          {r.status !== "CONFIRMED" && (
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                r.status === "PENDING" ? "bg-[#FFF3DC] text-[#7A4B00]" : "bg-[#FDECEA] text-[#A32A1A]"
+                              }`}
+                            >
+                              {titleCase(r.status)}
+                            </span>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <EmptyState>No stock movements yet.</EmptyState>
+                )}
+              </Panel>
+            )}
+
+            {data.expenses && (
+              <Panel className={data.inventory ? "lg:col-span-2" : "lg:col-span-5"} title="Expenses" subtitle={`Entries by category, last ${data.expenses.days} days`}>
+                <BarList
+                  rows={data.expenses.byCategory.slice(0, 5).map((c) => ({ key: c.category, label: titleCase(c.category), value: c.entries }))}
+                  format={full}
+                  unit="entries"
+                  emptyText="No expenses recorded."
+                />
+                {data.expenses.recent.length > 0 && (
+                  <>
+                    <h3 className="mb-2 mt-5 text-xs font-semibold uppercase tracking-wide text-brand-muted">Latest entries</h3>
+                    <ul className="m-0 flex list-none flex-col gap-2 p-0">
+                      {data.expenses.recent.map((e) => (
+                        <li key={e.id} className="rounded-lg bg-[#F7F8FB] px-3 py-2">
+                          <p className="m-0 truncate text-sm font-medium text-brand-ink">{e.title}</p>
+                          <p className="m-0 truncate text-xs text-brand-muted">
+                            {titleCase(e.category)} · {new Date(e.dateIncurred).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} ·{" "}
+                            {e.recordedBy}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </Panel>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 };

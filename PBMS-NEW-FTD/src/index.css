@@ -1,3 +1,141 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * Theme tokens (RGB triplets, used by tailwind.config.js as rgb(var(--x) / alpha)).
+ * Light is the default; <html class="dark"> switches to dark (src/theme/ThemeProvider.tsx).
+ */
+:root {
+  --canvas: 245 246 250;
+  --surface: 255 255 255;
+  --surface-2: 247 248 251;
+  --line: 226 230 239;
+  --ink: 20 24 31;
+  --ink-soft: 43 50 64;
+  --muted: 88 97 116;
+  --subtle: 233 238 249;
+  --brand-text: 57 89 165;
+  color-scheme: light;
+}
+
+html.dark {
+  --canvas: 11 15 23;
+  --surface: 20 25 35;
+  --surface-2: 26 32 44;
+  --line: 43 51 67;
+  --ink: 234 237 243;
+  --ink-soft: 205 211 222;
+  --muted: 152 162 181;
+  --subtle: 31 42 70;
+  --brand-text: 143 168 232;
+  color-scheme: dark;
+}
+
+@layer base {
+  body {
+    background-color: rgb(var(--canvas));
+    color: rgb(var(--ink));
+  }
+}
+
+/* ------------------------------------------------------------------------------------
+ * Dark mode for screens built before the theme existed.
+ * They use plain Tailwind greys and fixed hex colours; these rules map them onto the
+ * dark palette so every page is readable. New screens should use the theme tokens
+ * (bg-surface, text-brand-ink, border-line...) instead of adding rules here.
+ * ---------------------------------------------------------------------------------- */
+.dark .bg-white { background-color: rgb(var(--surface)); }
+.dark .bg-gray-50, .dark .bg-slate-50 { background-color: rgb(var(--surface-2)); }
+.dark .bg-gray-100, .dark .bg-slate-100 { background-color: #1F2633; }
+.dark .bg-gray-200, .dark .bg-slate-200 { background-color: #283041; }
+.dark .hover\:bg-gray-50:hover, .dark .hover\:bg-gray-100:hover, .dark .hover\:bg-slate-50:hover { background-color: #232B39; }
+.dark .hover\:bg-gray-200:hover { background-color: #2C3546; }
+.dark .text-gray-900, .dark .text-gray-800, .dark .text-slate-900, .dark .text-slate-800, .dark .text-black { color: rgb(var(--ink)); }
+.dark .text-gray-700, .dark .text-gray-600, .dark .text-slate-700, .dark .text-slate-600 { color: rgb(var(--ink-soft)); }
+.dark .text-gray-500, .dark .text-gray-400, .dark .text-slate-500 { color: rgb(var(--muted)); }
+.dark .border-gray-100, .dark .border-gray-200, .dark .border-gray-300, .dark .border-slate-200 { border-color: rgb(var(--line)); }
+.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
+.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) { border-color: rgb(var(--line)); }
+.dark .bg-blue-50 { background-color: #1A2640; }
+.dark .bg-green-50 { background-color: #14291E; }
+.dark .bg-red-50 { background-color: #331A1A; }
+.dark .bg-yellow-50, .dark .bg-amber-50 { background-color: #2E2614; }
+.dark .bg-amber-100 { background-color: #3A2F15; }
+.dark .text-blue-800, .dark .text-blue-700 { color: #9DB8F0; }
+.dark .text-green-800, .dark .text-green-700 { color: #8FD6A8; }
+.dark .text-red-800, .dark .text-red-700, .dark .text-red-600 { color: #F2A29A; }
+.dark .text-amber-900, .dark .text-amber-800 { color: #F0CF85; }
+.dark .border-blue-200 { border-color: #2C3E66; }
+.dark .text-brand { color: rgb(var(--brand-text)); }
+.dark .bg-black.bg-opacity-50 { background-color: rgb(0 0 0 / 0.65); }
+
+/* Form controls on older screens */
+.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not(.bg-transparent):not(.themed),
+.dark select:not(.themed),
+.dark textarea:not(.themed) {
+  background-color: rgb(var(--surface-2));
+  color: rgb(var(--ink));
+  border-color: rgb(var(--line));
+}
+.dark input::placeholder, .dark textarea::placeholder { color: rgb(var(--muted)); }
+
+/* Fixed hex colours used on the redesigned screens (generated, see check/gen_dark.py) */
+.dark .bg-\[\#E2E6EF\] { background-color: #262B36; }
+.dark .bg-\[\#E3E9F6\] { background-color: #20293C; }
+.dark .bg-\[\#E6F3EC\] { background-color: #24382D; }
+.dark .bg-\[\#E9EEF9\] { background-color: #1E283E; }
+.dark .bg-\[\#EDEFF4\] { background-color: #272B35; }
+.dark .bg-\[\#EEF0F5\] { background-color: #272B35; }
+.dark .bg-\[\#EEF1F7\] { background-color: #242B38; }
+.dark .bg-\[\#EEF2FA\] { background-color: #1F293D; }
+.dark .bg-\[\#F1F4FB\] { background-color: #1F283D; }
+.dark .bg-\[\#F1FAF5\] { background-color: #213B2C; }
+.dark .bg-\[\#F3F6FC\] { background-color: #181D28; }
+.dark .bg-\[\#F5F6FA\] { background-color: #181B28; }
+.dark .bg-\[\#F6F7FA\] { background-color: #181C28; }
+.dark .bg-\[\#F6F8FC\] { background-color: #181D27; }
+.dark .bg-\[\#F6F8FD\] { background-color: #171C27; }
+.dark .bg-\[\#F7F8FB\] { background-color: #181B27; }
+.dark .bg-\[\#FDECEA\] { background-color: #431E19; }
+.dark .bg-\[\#FDF0EE\] { background-color: #431F19; }
+.dark .bg-\[\#FFF3DC\] { background-color: #433419; }
+.dark .bg-\[\#FFF6E5\] { background-color: #433419; }
+.dark .border-\[\#CDD2DD\] { border-color: #2D3443; }
+.dark .border-\[\#CFE8DA\] { border-color: #2B503B; }
+.dark .border-\[\#DDE1EA\] { border-color: #2B3345; }
+.dark .border-\[\#E2E6EF\] { border-color: #283248; }
+.dark .border-\[\#E6E9F0\] { border-color: #2A3246; }
+.dark .border-\[\#EEF0F5\] { border-color: #2A3247; }
+.dark .border-\[\#F1D69C\] { border-color: #50442B; }
+.dark .border-\[\#F2F4F8\] { border-color: #2B3750; }
+.dark .border-\[\#F3C9C2\] { border-color: #50302B; }
+.dark .divide-\[\#DCEFE4\] > :not([hidden]) ~ :not([hidden]) { border-color: #2B503A; }
+.dark .divide-\[\#E9ECF3\] > :not([hidden]) ~ :not([hidden]) { border-color: #283249; }
+.dark .divide-\[\#EEF0F5\] > :not([hidden]) ~ :not([hidden]) { border-color: #2A3247; }
+.dark .focus-visible\:bg-\[\#F3F5FA\]:focus-visible { background-color: #232939; }
+.dark .focus-visible\:bg-\[\#FDF0EE\]:focus-visible { background-color: #431F19; }
+.dark .hover\:bg-\[\#E2E9F7\]:hover { background-color: #1E293E; }
+.dark .hover\:bg-\[\#E9EDF6\]:hover { background-color: #222939; }
+.dark .hover\:bg-\[\#EEF1F8\]:hover { background-color: #222939; }
+.dark .hover\:bg-\[\#F3F5FA\]:hover { background-color: #232939; }
+.dark .hover\:bg-\[\#F6F8FD\]:hover { background-color: #171C27; }
+.dark .hover\:bg-\[\#FAFBFD\]:hover { background-color: #171C26; }
+.dark .hover\:bg-\[\#FDF0EE\]:hover { background-color: #431F19; }
+.dark .hover\:border-\[\#C9D1E3\]:hover { border-color: #2B3650; }
+.dark .hover\:text-\[\#B42318\]:hover { color: #EE928B; }
+.dark .text-\[\#1F6B44\] { color: #98E1BC; }
+.dark .text-\[\#1F7A4D\] { color: #95E4BD; }
+.dark .text-\[\#2B3240\] { color: #DDE0E6; }
+.dark .text-\[\#2E5E43\] { color: #A6D3BA; }
+.dark .text-\[\#4A5263\] { color: #C9CDD6; }
+.dark .text-\[\#6A4100\] { color: #EEC88B; }
+.dark .text-\[\#7A4B00\] { color: #EEC88B; }
+.dark .text-\[\#7A8294\] { color: #ADB2BD; }
+.dark .text-\[\#8A2A1C\] { color: #E99C91; }
+.dark .text-\[\#8A93A6\] { color: #A0A7B7; }
+.dark .text-\[\#8F9CC2\] { color: #A9B3D0; }
+.dark .text-\[\#9AA3B5\] { color: #959EB1; }
+.dark .text-\[\#A32A1A\] { color: #ED988D; }
+.dark .text-\[\#B42318\] { color: #EE928B; }
+.dark .text-\[\#C4381F\] { color: #ED9B8D; }

@@ -1,50 +1,12 @@
-import { useEffect } from "react";
-import { useDispatch, useSelector } from 'react-redux';
-import { fetchDataStart, fetchDataSuccess, fetchDataFailure } from "../../redux/slices/settings/roleSlice";
-import { apiRequest } from "../../libs/apiConfig";
-import type { RootState } from "../../redux/store";
+import * as actions from "../../redux/slices/settings/roleSlice";
 import { RoleEndpoints } from "../../endpoints/settings/role/roleEndpoints";
+import type { IRole } from "../../redux/types/systemSettings";
+import type { RootState } from "../../redux/store";
+import { useListResource } from "../humanResource/useListResource";
 
-const useRoles = () => {
-  const dispatch = useDispatch();
-  //const { token, isFetchingLocalToken } = useAuth();
+const select = (state: RootState) => state.role;
 
-  const fetchDataFromApi = async () => {
-    //if (isFetchingLocalToken || !token?.access_token) return;
-
-    dispatch(fetchDataStart()); // Dispatch action to indicate data fetching has started
-
-    try {
-      const response = await apiRequest(
-          RoleEndpoints.getAllRoles,
-          "GET",
-            '',
-      );
-      //console.log(response)
-      if (response.status == 200) {
-        //console.log('subs data', response.data)
-        dispatch(fetchDataSuccess(response.data)); // Dispatch action with fetched data
-      } else {
-        throw new Error("Failed to fetch roles.");
-      }
-    } catch (error) {
-      console.error("Failed to fetch roles:", error);
-      dispatch(
-        fetchDataFailure(
-          error instanceof Error ? error.message : "An unknown error occurred."
-        )
-      );
-    }
-  };
-
-  useEffect(()=> {
-    fetchDataFromApi()
-  }, [])
-
-
-const data = useSelector((state: RootState) => state.role);
-
-return { ...data, refresh: fetchDataFromApi };
-};
+/** Roles with their permissions and holders; upsert/remove update every screen at once. */
+const useRoles = () => useListResource<IRole>(RoleEndpoints.getAllRoles, select, actions);
 
 export default useRoles;

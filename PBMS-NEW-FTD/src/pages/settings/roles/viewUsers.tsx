@@ -1,42 +1,32 @@
-import React from "react";
-import { FaTimes } from "react-icons/fa";
-import CustomTable from "../../../custom/table/customTable";
+import Modal from "../../../ui/Modal";
+import Button from "../../../ui/Button";
+import { Badge, EmptyState, initials } from "../../../ui/Page";
 import type { IRole } from "../../../redux/types/systemSettings";
 
-interface RoleUsersModalProps {
-  visible: boolean;
-  onClose: () => void;
-  role: IRole;
-}
+type Props = { visible: boolean; onClose: () => void; role: IRole | null };
 
-const RoleUsersModal: React.FC<RoleUsersModalProps> = ({ visible, onClose, role }) => {
-  if (!visible) return null;
-
-  const columns = [
-    { key: "firstName", label: "First Name", sortable: true, filterable: true },
-    { key: "lastName", label: "Last Name", sortable: true, filterable: true },
-  ];
-
+/** Who has a role. */
+const RoleUsersModal = ({ visible, onClose, role }: Props) => {
+  const people = role?.Employee ?? [];
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
-      <div className="bg-white rounded-xl shadow-lg w-full max-w-4xl p-6 relative">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-gray-800">
-            Users with Role: <span className="text-gray-600">{role.name}</span>
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 p-2 rounded-full hover:bg-gray-100"
-          >
-            <FaTimes size={18} />
-          </button>
-        </div>
-
-        {/* Table */}
-        <CustomTable columns={columns} data={role.Employee} pageSize={5} />
-      </div>
-    </div>
+    <Modal open={visible} onClose={onClose} size="md" title={role ? `People with ${role.name}` : ""} description={`${people.length} ${people.length === 1 ? "person" : "people"}`} footer={<Button variant="secondary" onClick={onClose}>Close</Button>}>
+      {!people.length ? (
+        <EmptyState title="Nobody has this role yet" message="Give it to someone from their employee record." />
+      ) : (
+        <ul className="m-0 list-none divide-y divide-line p-0">
+          {people.map((p) => (
+            <li key={p.id} className="flex items-center gap-3 py-2.5">
+              <span aria-hidden="true" className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-subtle text-xs font-semibold text-brand-text">{initials(p.firstName, p.lastName)}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium text-brand-ink">{p.firstName} {p.lastName}</span>
+                <span className="block truncate text-xs text-brand-muted">{p.email || "Doesn't use the system"}</span>
+              </span>
+              {p.isActive === false && <Badge tone="neutral">Inactive</Badge>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </Modal>
   );
 };
 

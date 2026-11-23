@@ -22,6 +22,11 @@ import { FarmModule } from './farm/farm.module';
 import { ManufacturingModule } from './manufacturing/manufacturing.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { FinanceModule } from './finance/finance.module';
+import { ClubModule } from './club/club.module';
+import { APP_GUARD } from '@nestjs/core';
+import { GlobalAuthGuard } from './guards/global-auth.guard';
+import { PermissionsGuard } from './guards/permissions.guard';
+import { PermissionsSyncService } from './auth/permissionsSync.service';
 @Module({
   imports: [
     ServeStaticModule.forRoot({
@@ -53,6 +58,14 @@ import { FinanceModule } from './finance/finance.module';
     FarmModule,
     ManufacturingModule,
     FinanceModule,
+    ClubModule,
+  ],
+  providers: [
+    // Every route needs a signed-in user unless marked @Public(),
+    // then @RequirePermissions() is checked. Order matters: auth first.
+    { provide: APP_GUARD, useClass: GlobalAuthGuard },
+    { provide: APP_GUARD, useClass: PermissionsGuard },
+    PermissionsSyncService,
   ],
 })
 export class AppModule {}

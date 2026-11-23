@@ -1,240 +1,103 @@
-import { useEffect, useState } from 'react';
-import { FaTrash, FaToggleOn, FaToggleOff, FaMoneyBillWave, FaUser, FaList } from 'react-icons/fa';
-import CustomTable from '../../../custom/table/customTable';
-import CustomDeleteModal from '../../../custom/modals/customDeleteModal';
-import { toast } from 'sonner';
-import { apiRequest } from '../../../libs/apiConfig';
-import useClientAccounts from '../../../hooks/sales/useClientAccounts';
-import { SALESENDPOINTS } from '../../../endpoints/sales/salesEndpoints';
-import type { IClientAccount } from '../../../redux/types/finance';
-import DepositModal from './depositModal';
-import CustomConfirmModal from './customConfirmModal';
-import TransactionsModal from './txnModal';
+import { useMemo, useState } from "react";
+import { FiList, FiPlusCircle, FiRefreshCw, FiCreditCard } from "react-icons/fi";
+import { apiRequest } from "../../../libs/apiConfig";
+import useClientAccounts from "../../../hooks/sales/useClientAccounts";
+import { SALESENDPOINTS } from "../../../endpoints/sales/salesEndpoints";
+import Button from "../../../ui/Button";
+import { SearchBox, Toggle } from "../../../ui/Field";
+import { Badge, Card, EmptyState, PageHeader, SkeletonRows, StatTile, ugx } from "../../../ui/Page";
+import { useConfirm } from "../../../ui/ConfirmDialog";
+import DepositModal from "./depositModal";
+import TransactionsModal from "./txnModal";
+import { accountName, type ClientAccount } from "./types";
 
+/** Prepaid customer accounts: deposit money, see history, switch accounts on or off. */
 const ClientAccountsManagement = () => {
-  const { data, refresh } = useClientAccounts();
-  const [clientAccounts, setClientAccounts] = useState<IClientAccount[]>(data);
+  const { data, loading, refresh } = useClientAccounts();
+  const accounts = (data ?? []) as unknown as ClientAccount[];
+  const confirm = useConfirm();
+  const [query, setQuery] = useState("");
+  const [deposit, setDeposit] = useState<ClientAccount | null>(null);
+  const [history, setHistory] = useState<ClientAccount | null>(null);
 
-  useEffect(() => {
-    setClientAccounts(data);
-  }, [data]);
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return accounts.filter((a) => !q || accountName(a).toLowerCase().includes(q) || (a.client?.phone ?? "").includes(q) || (a.accountNumber ?? "").toLowerCase().includes(q));
+  }, [accounts, query]);
+  const held = accounts.reduce((s, a) => s + Number(a.balance || 0), 0);
+  const active = accounts.filter((a) => a.status === "ACTIVE").length;
 
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
-  const [isStatusConfirmModalOpen, setIsStatusConfirmModalOpen] = useState(false);
-  const [isTransactionsModalOpen, setIsTransactionsModalOpen] = useState(false);
-  const [selectedAccount, setSelectedAccount] = useState<IClientAccount | null>(null);
-  const [accountToDelete, setAccountToDelete] = useState<IClientAccount | null>(null);
-  const [statusAction, setStatusAction] = useState<'activate' | 'deactivate' | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-
-  const handleStatusToggle = (clientAccount: IClientAccount, action: 'activate' | 'deactivate') => {
-    setSelectedAccount(clientAccount);
-    setStatusAction(action);
-    setIsStatusConfirmModalOpen(true);
-  };
-
-  const confirmStatusChange = async () => {
-    if (!selectedAccount || !statusAction) return;
-
-    setIsProcessing(true);
-    try {
-      const endpoint = statusAction === 'activate' 
-        ? SALESENDPOINTS.CLIENT_ACCOUNTS.activate(selectedAccount.id)
-        : SALESENDPOINTS.CLIENT_ACCOUNTS.deactivate(selectedAccount.id);
-
-      await apiRequest(endpoint, 'PATCH', {});
-      
-      refresh();
-      setIsStatusConfirmModalOpen(false);
-      setSelectedAccount(null);
-      setStatusAction(null);
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Failed to update account status');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleDeposit = (clientAccount: IClientAccount) => {
-    setSelectedAccount(clientAccount);
-    setIsDepositModalOpen(true);
-  };
-
-  const handleViewTransactions = (clientAccount: IClientAccount) => {
-    setSelectedAccount(clientAccount);
-    setIsTransactionsModalOpen(true);
-  };
-
-  // Table columns configuration
-  const columns = [
-    { key: 'clientName', label: 'Client Name', sortable: true, filterable: true },
-    { key: 'balance', label: 'Balance', sortable: true, filterable: true },
-    { key: 'status', label: 'Status', sortable: true, filterable: true },
-    { key: 'transactions', label: 'Transactions', sortable: true, filterable: false },
-    { key: 'createdAt', label: 'Created At', sortable: true, filterable: false },
-    { key: 'actions', label: 'Actions', sortable: false, filterable: false },
-  ];
-
-  const formatDate = (date: string | Date) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
+  const toggle = (a: ClientAccount) => {
+    const on = a.status === "ACTIVE";
+    return confirm({
+      title: `${on ? "Switch off" : "Switch on"} ${accountName(a)}'s account?`,
+      message: on
+        ? "They won't be able to pay from it or deposit into it until it's switched on again. Their balance is kept."
+        : "They can deposit money and pay for purchases from it again.",
+      details: <span>Balance: <strong className="font-semibold text-brand-ink">{ugx(a.balance)}</strong></span>,
+      confirmLabel: on ? "Switch off" : "Switch on",
+      tone: on ? "danger" : "primary",
+      onConfirm: async () => {
+        await apiRequest(on ? SALESENDPOINTS.CLIENT_ACCOUNTS.deactivate(a.id) : SALESENDPOINTS.CLIENT_ACCOUNTS.activate(a.id), "PATCH", {});
+        await refresh();
+      },
     });
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'UGX',
-    }).format(amount);
-  };
-
-  const getStatusBadge = (status: string) => {
-    const statusStyles = {
-      ACTIVE: 'bg-green-100 text-green-800',
-      INACTIVE: 'bg-gray-100 text-gray-800',
-      SUSPENDED: 'bg-red-100 text-red-800',
-    };
-    const style = statusStyles[status as keyof typeof statusStyles] || 'bg-gray-100 text-gray-800';
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${style}`}>
-        {status.charAt(0).toUpperCase() + status.slice(1).toLowerCase()}
-      </span>
-    );
-  };
-
-  const tableData = clientAccounts.map(clientAccount => ({
-    clientName: (
-      <div className="flex items-center gap-2">
-        <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
-          <FaUser className="text-gray-600" size={14} />
-        </div>
-        <div>
-          <div className="font-medium text-gray-800">
-            {clientAccount.client.firstName} {clientAccount.client.lastName}
-          </div>
-          <div className="text-xs text-gray-500">
-            {clientAccount.client.phone}
-          </div>
-        </div>
-      </div>
-    ),
-    balance: formatCurrency(clientAccount.balance),
-    status: getStatusBadge(clientAccount.status),
-    transactions: clientAccount.PatientAccountTransaction?.length || 0,
-    createdAt: formatDate(clientAccount.createdAt),
-    actions: (
-      <div className="flex gap-2 flex-wrap">
-        {/* View Transactions Action - Always visible */}
-        <div className="relative group">
-          <button
-            className="text-blue-600 hover:text-blue-800 transition-colors p-1"
-            onClick={() => handleViewTransactions(clientAccount)}
-          >
-            <FaList />
-          </button>
-          <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-            View Transactions
-          </span>
-        </div>
-
-        {/* Deposit Action - Only visible for active accounts */}
-        {clientAccount.status === 'ACTIVE' && (
-          <div className="relative group">
-            <button
-              className="text-green-600 hover:text-green-800 transition-colors p-1"
-              onClick={() => handleDeposit(clientAccount)}
-            >
-              <FaMoneyBillWave />
-            </button>
-            <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-              Deposit
-            </span>
-          </div>
-        )}
-
-        {/* Activate/Deactivate Action - Always visible */}
-        <div className="relative group">
-          {clientAccount.status === 'ACTIVE' ? (
-            <button
-              className="text-yellow-600 hover:text-yellow-800 transition-colors p-1"
-              onClick={() => handleStatusToggle(clientAccount, 'deactivate')}
-            >
-              <FaToggleOn size={18} />
-            </button>
-          ) : (
-            <button
-              className="text-gray-600 hover:text-gray-800 transition-colors p-1"
-              onClick={() => handleStatusToggle(clientAccount, 'activate')}
-            >
-              <FaToggleOff size={18} />
-            </button>
-          )}
-          <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-            {clientAccount.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
-          </span>
-        </div>
-      </div>
-    )
-  }));
-
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">Client Accounts</h2>
-        <div className="text-sm text-gray-500">
-          Total Accounts: {clientAccounts.length}
-        </div>
+    <div className="mx-auto max-w-7xl font-inter">
+      <PageHeader
+        title="Customer accounts"
+        description="Money customers have paid in advance. They spend it at the till with “Patient Account”. Open new accounts from Customers."
+        actions={<Button variant="secondary" icon={<FiRefreshCw aria-hidden="true" />} onClick={() => refresh()}>Refresh</Button>}
+      />
+      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <StatTile label="Held for customers" value={ugx(held)} />
+        <StatTile label="Accounts" value={accounts.length} hint={`${active} switched on`} />
+        <StatTile label="Average balance" value={accounts.length ? ugx(held / accounts.length) : "—"} />
       </div>
+      <Card>
+        <div className="border-b border-line p-3 sm:p-4">
+          <SearchBox value={query} onChange={setQuery} placeholder="Search name, phone or account number" label="Search accounts" />
+        </div>
+        {loading && accounts.length === 0 ? (
+          <SkeletonRows />
+        ) : filtered.length === 0 ? (
+          <EmptyState icon={<FiCreditCard className="h-5 w-5" />} title={accounts.length === 0 ? "No accounts yet" : "No one matches"} message={accounts.length === 0 ? "Open an account for a customer from the Customers page." : undefined} />
+        ) : (
+          <ul className="m-0 list-none divide-y divide-line p-0">
+            {filtered.map((a) => {
+              const on = a.status === "ACTIVE";
+              return (
+                <li key={a.id} className="flex flex-col gap-3 px-4 py-3.5 lg:flex-row lg:items-center">
+                  <div className="min-w-0 flex-1">
+                    <p className="m-0 flex flex-wrap items-center gap-2 font-medium text-brand-ink">
+                      {accountName(a)} {on ? <Badge tone="good">On</Badge> : <Badge>Off</Badge>}
+                    </p>
+                    <p className="m-0 text-xs text-brand-muted">
+                      {[a.accountNumber, a.client?.phone, `${a.PatientAccountTransaction?.length ?? 0} transactions`].filter(Boolean).join(" · ")}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-2 lg:justify-end">
+                    <div className="mr-2 text-right">
+                      <p className="m-0 text-[11px] uppercase tracking-wide text-brand-muted">Balance</p>
+                      <p className="m-0 font-display text-lg font-semibold tabular-nums text-brand-ink">{ugx(a.balance)}</p>
+                    </div>
+                    <Button size="sm" variant="secondary" icon={<FiList aria-hidden="true" />} onClick={() => setHistory(a)}>History</Button>
+                    <Button size="sm" icon={<FiPlusCircle aria-hidden="true" />} onClick={() => setDeposit(a)} disabled={!on} title={on ? undefined : "Switch the account on to deposit"}>Deposit</Button>
+                    <div className="w-[150px]">
+                      <Toggle label={on ? "Switched on" : "Switched off"} checked={on} onChange={() => toggle(a)} />
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Card>
 
-      <CustomTable columns={columns} data={tableData} pageSize={10} />
-
-      <DepositModal
-        visible={isDepositModalOpen}
-        clientAccount={selectedAccount}
-        onCancel={() => {
-          setIsDepositModalOpen(false);
-          setSelectedAccount(null);
-        }}
-        onSuccess={() => {
-          refresh();
-          setIsDepositModalOpen(false);
-          setSelectedAccount(null);
-          toast.success('Deposit completed successfully');
-        }}
-      />
-
-      <TransactionsModal
-        visible={isTransactionsModalOpen}
-        clientAccount={selectedAccount}
-        onClose={() => {
-          setIsTransactionsModalOpen(false);
-          setSelectedAccount(null);
-        }}
-      />
-
-      {/* Status Change Confirmation Modal */}
-      <CustomConfirmModal
-        visible={isStatusConfirmModalOpen}
-        title={statusAction === 'activate' ? 'Activate Account' : 'Deactivate Account'}
-        message={
-          statusAction === 'activate' 
-            ? `Are you sure you want to activate the account for ${selectedAccount?.client.firstName} ${selectedAccount?.client.lastName}? Once activated, the account will become usable for transactions and deposits.`
-            : `Are you sure you want to deactivate the account for ${selectedAccount?.client.firstName} ${selectedAccount?.client.lastName}? The account will need to be activated again to become usable.`
-        }
-        confirmText={statusAction === 'activate' ? 'Activate' : 'Deactivate'}
-        cancelText="Cancel"
-        onConfirm={confirmStatusChange}
-        onCancel={() => {
-          setIsStatusConfirmModalOpen(false);
-          setSelectedAccount(null);
-          setStatusAction(null);
-        }}
-        isLoading={isProcessing}
-        type={statusAction === 'activate' ? 'success' : 'warning'}
-      />
+      <DepositModal visible={!!deposit} clientAccount={deposit} onCancel={() => setDeposit(null)} onSuccess={() => { setDeposit(null); refresh(); }} />
+      <TransactionsModal visible={!!history} clientAccount={history} onClose={() => setHistory(null)} />
     </div>
   );
 };

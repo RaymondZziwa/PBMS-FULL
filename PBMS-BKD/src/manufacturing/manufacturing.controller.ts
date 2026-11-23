@@ -13,8 +13,11 @@ import {
   UpdateManufacturingDto,
   CompleteManufacturingDto,
 } from 'src/dto/manufacturing.dto';
+import { RequirePermissions } from 'src/auth/decorators';
+import { PERMISSIONS } from 'src/auth/permissions';
 
 @Controller('api/manufacturing')
+@RequirePermissions(PERMISSIONS.INVENTORY)
 export class ManufacturingController {
   constructor(private readonly manufacturingService: ManufacturingService) {}
 

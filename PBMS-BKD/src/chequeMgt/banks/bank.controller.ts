@@ -10,8 +10,11 @@ import {
 } from '@nestjs/common';
 import { BankService } from './bank.service';
 import { CreateBankDto, UpdateBankDto } from 'src/dto/bank.dto';
+import { RequirePermissions, SignedIn } from 'src/auth/decorators';
+import { PERMISSIONS } from 'src/auth/permissions';
 
 @Controller('api/banks')
+@RequirePermissions(PERMISSIONS.FINANCE)
 export class BankController {
   constructor(private readonly bankService: BankService) {}
 
@@ -20,11 +23,13 @@ export class BankController {
     return this.bankService.create(dto);
   }
 
+  @SignedIn()
   @Get('fetch-all')
   findAll() {
     return this.bankService.findAll();
   }
 
+  @SignedIn()
   @Get('fetch/:id')
   findOne(@Param('id') id: string) {
     return this.bankService.findOne(Number(id));

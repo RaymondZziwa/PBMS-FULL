@@ -1,56 +1,71 @@
-import React from 'react';
+import { FiClock, FiLogOut } from "react-icons/fi";
+import Modal from "../../ui/Modal";
+import Button from "../../ui/Button";
+import { WARNING_MS } from "../../hooks/useAutoLogout";
 
-interface AutoLogoutWarningProps {
+type Props = {
   isOpen: boolean;
   timeLeft: number;
   onStayLoggedIn: () => void;
   onLogout: () => void;
-}
+};
 
-export const AutoLogoutWarning: React.FC<AutoLogoutWarningProps> = ({
-  isOpen,
-  timeLeft,
-  onStayLoggedIn,
-  onLogout,
-}) => {
-  if (!isOpen) return null;
-
-  const minutes = Math.floor(timeLeft / 60);
-  const seconds = timeLeft % 60;
+/** "You're about to be signed out" with a live countdown. Esc keeps the session. */
+export const AutoLogoutWarning = ({ isOpen, timeLeft, onStayLoggedIn, onLogout }: Props) => {
+  const total = WARNING_MS / 1000;
+  const pct = Math.max(0, Math.min(1, timeLeft / total));
+  const r = 34;
+  const c = 2 * Math.PI * r;
+  const mm = Math.floor(timeLeft / 60);
+  const ss = String(timeLeft % 60).padStart(2, "0");
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-        <h2 className="text-xl font-bold text-gray-800 mb-4">
-          Session Timeout Warning
-        </h2>
-        
-        <p className="text-gray-600 mb-4">
-          Your session will expire due to inactivity in{' '}
-          <span className="font-semibold text-red-600">
-            {minutes}:{seconds.toString().padStart(2, '0')}
-          </span>
-        </p>
-        
-        <p className="text-sm text-gray-500 mb-6">
-          Do you want to stay logged in?
-        </p>
-        
-        <div className="flex gap-3 justify-end">
-          <button
-            onClick={onLogout}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-          >
-            Log Out
-          </button>
-          <button
-            onClick={onStayLoggedIn}
-            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-          >
-            Stay Logged In
-          </button>
+    <Modal
+      open={isOpen}
+      onClose={onStayLoggedIn}
+      size="sm"
+      role="alertdialog"
+      title="Still there?"
+      description="For security, you'll be signed out soon because there's been no activity."
+      footer={
+        <>
+          <Button variant="secondary" icon={<FiLogOut aria-hidden="true" />} onClick={onLogout}>
+            Sign out now
+          </Button>
+          <Button onClick={onStayLoggedIn} data-autofocus>
+            Stay signed in
+          </Button>
+        </>
+      }
+    >
+      <div className="flex items-center gap-5">
+        <div className="relative h-20 w-20 flex-none" aria-hidden="true">
+          <svg viewBox="0 0 80 80" className="h-20 w-20 -rotate-90">
+            <circle cx="40" cy="40" r={r} fill="none" strokeWidth="6" className="stroke-line" />
+            <circle
+              cx="40"
+              cy="40"
+              r={r}
+              fill="none"
+              strokeWidth="6"
+              strokeLinecap="round"
+              strokeDasharray={c}
+              strokeDashoffset={c * (1 - pct)}
+              className={`transition-[stroke-dashoffset] duration-1000 ease-linear ${timeLeft <= 15 ? "stroke-[#D92D20]" : "stroke-brand"}`}
+            />
+          </svg>
+          <FiClock className="absolute inset-0 m-auto h-6 w-6 text-brand-muted" />
+        </div>
+        <div>
+          <p className="m-0 text-sm text-brand-muted">Signing you out in</p>
+          <p role="timer" className="m-0 font-display text-4xl font-semibold tabular-nums text-brand-ink">
+            {mm}:{ss}
+          </p>
+          <p className="m-0 mt-1 text-xs text-brand-muted">Anything you haven't saved will be lost.</p>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 };
+
+export default AutoLogoutWarning;

@@ -1,312 +1,155 @@
-// VerifyMeterModal.tsx
-import React, { useState } from 'react';
-import { FaCheck, FaSpinner, FaUser, FaMapMarkerAlt, FaCalendarAlt, FaMoneyBillWave, FaBolt, FaTint } from 'react-icons/fa';
-import { apiRequest } from '../../../libs/apiConfig';
-import { toast } from 'sonner';
-import { BILLING_CHANNELS } from '../../../endpoints/expense/expenseEndpoints';
-import axios from 'axios';
-
-interface IBillingChannel {
-  id: number;
-  utility: 'NWSC' | 'LIGHT';
-  name: string | null;
-  meterNumber: string;
-  isVerified: boolean;
-  area: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
+import { useEffect, useState } from "react";
+import { apiRequest } from "../../../libs/apiConfig";
+import { BILLING_CHANNELS } from "../../../endpoints/expense/expenseEndpoints";
+import type { IBillingChannel } from "../../../redux/types/systemSettings";
+import { apiErrorMessage, AreaField, btn, Modal, Spinner, UTILITY_INFO, UtilityBadge, VerifiedBadge } from "./billingShared";
 
 interface VerifyMeterModalProps {
   visible: boolean;
   channel: IBillingChannel | null;
   onClose: () => void;
+  /** Called after a successful verification so the list refreshes. */
   onSuccess: () => void;
 }
 
-interface VerificationData {
-  customer_details: {
-    customer_ref: string;
-    customer_name: string;
-    outstanding_balance: string;
-    area: string;
-    customer_type: string;
-    last_payment_date: string;
-    last_payment_amount: string;
-  };
-  utility_code: string;
-  meter_number: string;
-}
+type Customer = {
+  customerRef: string | null;
+  customerName: string | null;
+  area: string | null;
+  customerType: string | null;
+  outstandingBalance: string | null;
+  lastPaymentDate: string | null;
+  lastPaymentAmount: string | null;
+};
 
-const VerifyMeterModal: React.FC<VerifyMeterModalProps> = ({
-  visible,
-  channel,
-  onClose,
-  onSuccess,
-}) => {
-  const [verificationData, setVerificationData] = useState<VerificationData | null>(null);
-  const [area, setArea] = useState(channel?.area || '');
-  const [showConnectingModal, setShowConnectingModal] = useState(false);
-  const [connectionStep, setConnectionStep] = useState(0);
-  const token = ''
-  const connectionSteps = [
-    { message: `Connecting to ${channel?.utility === 'NWSC' ? 'NWSC' : 'UEDCL'} servers...`, icon: channel?.utility === 'NWSC' ? FaTint : FaBolt },
-    { message: 'Authenticating credentials...', icon: FaSpinner },
-    { message: 'Fetching meter details...', icon: FaSpinner },
-    { message: 'Verifying customer information...', icon: FaSpinner },
-  ];
+const money = (v: string | null) => {
+  const n = v === null ? NaN : Number(v);
+  return Number.isFinite(n) ? `UGX ${n.toLocaleString("en-UG", { maximumFractionDigits: 0 })}` : "—";
+};
 
-  const handleVerify = async () => {
-    if (!channel) return;
+const Row = ({ label, value }: { label: string; value: string }) => (
+  <div className="flex items-baseline justify-between gap-4 py-2">
+    <dt className="text-sm text-brand-muted">{label}</dt>
+    <dd className="m-0 text-right text-sm font-medium text-brand-ink">{value}</dd>
+  </div>
+);
 
-    // Show connecting modal and start animation
-    setShowConnectingModal(true);
-    setConnectionStep(0);
+const VerifyMeterModal = ({ visible, channel, onClose, onSuccess }: VerifyMeterModalProps) => {
+  const [area, setArea] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [customer, setCustomer] = useState<Customer | null>(null);
 
-    // Animate through connection steps
-    for (let i = 0; i < connectionSteps.length; i++) {
-      setConnectionStep(i);
-      await new Promise(resolve => setTimeout(resolve, 800));
-    }
-
-    try {
-      const payload: any = {
-        meterNumber: channel.meterNumber,
-        utilityType: channel.utility,
-        channelId: channel.id,
-      };
-
-      if (channel.utility === 'NWSC' && area) {
-        payload.area = area;
-      }
-
-      const response = await axios.post(
-        BILLING_CHANNELS.VERIFY,
-        payload,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      // Close connecting modal
-      setShowConnectingModal(false);
-
-      if (response.status === 200 && response.data.status === 'success') {
-        setVerificationData(response.data.data);
-        toast.success(response.data.message || 'Meter number verified successfully');
-        onSuccess();
-      } else {
-        toast.error(response.data?.message || 'Verification failed');
-      }
-    } catch (error: any) {
-      setShowConnectingModal(false);
-      toast.error(error?.response?.data?.message || 'Failed to verify meter number');
-    }
-  };
+  // Fresh state for each channel opened.
+  useEffect(() => {
+    if (!visible) return;
+    setArea(channel?.area ?? "");
+    setError(null);
+    setCustomer(null);
+  }, [visible, channel]);
 
   if (!visible || !channel) return null;
 
+  const isWater = channel.utility === "NWSC";
+  const provider = isWater ? "NWSC" : "UEDCL";
+
+  const verify = async () => {
+    if (verifying) return;
+    if (isWater && !area.trim()) {
+      setError("Choose the NWSC area first.");
+      return;
+    }
+    setVerifying(true);
+    setError(null);
+    try {
+      const res = await apiRequest<{ data: { customer: Customer } }>(
+        BILLING_CHANNELS.VERIFY_CHANNEL(channel.id),
+        "POST",
+        isWater ? { area: area.trim() } : {}
+      );
+      setCustomer(res.data.customer);
+      onSuccess();
+    } catch (err) {
+      setError(apiErrorMessage(err, `We couldn't verify this ${isWater ? "water account" : "meter"}. Please try again.`));
+    } finally {
+      setVerifying(false);
+    }
+  };
+
   return (
-    <>
-      {/* Main Modal */}
-      <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
-          {/* Header */}
-          <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4">
-            <h3 className="text-xl font-semibold text-gray-800">
-              Verify Meter Number
-            </h3>
-            <p className="text-sm text-gray-500 mt-1">
-              {channel.utility === 'NWSC' ? 'Water Meter' : 'Electricity Meter'} Verification
-            </p>
-          </div>
-
-          {/* Content */}
-          <div className="px-6 py-4 space-y-4">
-            {/* Channel Info */}
-            <div className="bg-teal-50 rounded-lg p-4 space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-600">Utility:</span>
-                <span className="text-sm font-semibold text-teal-700">
-                  {channel.utility === 'NWSC' ? 'NWSC (Water)' : 'UEDCL (Electricity)'}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-600">Meter Number:</span>
-                <span className="text-sm font-mono font-semibold text-gray-800">
-                  {channel.meterNumber}
-                </span>
-              </div>
-              {channel.name && (
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-gray-600">Customer Name:</span>
-                  <span className="text-sm font-medium text-gray-800">{channel.name}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Area Input for NWSC */}
-            {channel.utility === 'NWSC' && !verificationData && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Area (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={area}
-                  onChange={(e) => setArea(e.target.value)}
-                  placeholder="Enter area (e.g., Kampala)"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Providing area helps verify the correct water meter
-                </p>
-              </div>
-            )}
-
-            {/* Verification Results */}
-            {verificationData && (
-              <div className="space-y-4 mt-4">
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <FaCheck className="text-green-600" />
-                    <span className="font-semibold text-green-800">Verification Successful</span>
-                  </div>
-                  
-                  <div className="space-y-3">
-                    <div className="flex items-start gap-3">
-                      <FaUser className="text-gray-400 mt-0.5" />
-                      <div>
-                        <p className="text-xs text-gray-500">Customer Name</p>
-                        <p className="text-sm font-medium text-gray-800">
-                          {verificationData.customer_details.customer_name}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-start gap-3">
-                      <FaMapMarkerAlt className="text-gray-400 mt-0.5" />
-                      <div>
-                        <p className="text-xs text-gray-500">Area</p>
-                        <p className="text-sm font-medium text-gray-800">
-                          {verificationData.customer_details.area}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-start gap-3">
-                      <FaMoneyBillWave className="text-gray-400 mt-0.5" />
-                      <div>
-                        <p className="text-xs text-gray-500">Outstanding Balance</p>
-                        <p className="text-sm font-semibold text-red-600">
-                          UGX {parseFloat(verificationData.customer_details.outstanding_balance).toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-start gap-3">
-                      <FaCalendarAlt className="text-gray-400 mt-0.5" />
-                      <div>
-                        <p className="text-xs text-gray-500">Last Payment</p>
-                        <p className="text-sm font-medium text-gray-800">
-                          {verificationData.customer_details.last_payment_date} - 
-                          UGX {parseFloat(verificationData.customer_details.last_payment_amount).toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Footer */}
-          <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-            >
-              Close
+    <Modal
+      title={customer ? "Meter verified" : "Verify meter"}
+      subtitle={customer ? `Confirmed with ${provider}.` : `We'll check this ${isWater ? "water account" : "meter"} with ${provider} through MarzPay.`}
+      onClose={onClose}
+      busy={verifying}
+      footer={
+        customer ? (
+          <button type="button" className={btn.primary} onClick={onClose}>
+            Done
+          </button>
+        ) : (
+          <>
+            <button type="button" className={btn.secondary} onClick={onClose} disabled={verifying}>
+              Cancel
             </button>
-            
-            {!verificationData && (
-              <button
-                type="button"
-                onClick={handleVerify}
-                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 flex items-center gap-2 transition-all"
-              >
-                <FaCheck />
-                Verify Meter
-              </button>
-            )}
+            <button type="button" className={btn.primary} onClick={verify} disabled={verifying}>
+              {verifying && <Spinner />}
+              {verifying ? `Checking with ${provider}…` : channel.isVerified ? "Verify again" : "Verify meter"}
+            </button>
+          </>
+        )
+      }
+    >
+      <div className="flex flex-col gap-5">
+        <dl className="m-0 rounded-xl bg-[#F6F8FC] px-4 py-2 divide-y divide-[#E9ECF3]">
+          <div className="flex items-center justify-between gap-4 py-2">
+            <dt className="text-sm text-brand-muted">Utility</dt>
+            <dd className="m-0">
+              <UtilityBadge utility={channel.utility} />
+            </dd>
           </div>
-        </div>
+          <Row label={isWater ? "Account number" : "Meter number"} value={channel.meterNumber} />
+          {!customer && channel.name && <Row label="Label" value={channel.name} />}
+          {!customer && (
+            <div className="flex items-center justify-between gap-4 py-2">
+              <dt className="text-sm text-brand-muted">Status</dt>
+              <dd className="m-0">
+                <VerifiedBadge verified={channel.isVerified} />
+              </dd>
+            </div>
+          )}
+        </dl>
+
+        {!customer && isWater && <AreaField id="verify-area" value={area} onChange={setArea} invalid={!!error && !area.trim()} />}
+
+        {error && (
+          <div role="alert" className="rounded-lg border border-[#F3C9C2] bg-[#FDF0EE] px-3.5 py-2.5 text-sm text-[#8A2A1C]">
+            {error}
+          </div>
+        )}
+
+        {customer && (
+          <section aria-labelledby="verified-heading" className="rounded-xl border border-[#CFE8DA] bg-[#F1FAF5] px-4 py-3">
+            <h3 id="verified-heading" className="m-0 mb-1 flex items-center gap-2 text-sm font-semibold text-[#1F6B44]">
+              <span aria-hidden="true">✓</span> Account found
+            </h3>
+            <dl className="m-0 divide-y divide-[#DCEFE4]">
+              <Row label="Account holder" value={customer.customerName || "—"} />
+              {customer.customerRef && <Row label="Customer reference" value={customer.customerRef} />}
+              {customer.area && <Row label="Area" value={customer.area} />}
+              {customer.customerType && <Row label="Account type" value={customer.customerType} />}
+              <Row label="Outstanding balance" value={money(customer.outstandingBalance)} />
+              {customer.lastPaymentDate && (
+                <Row label="Last payment" value={`${customer.lastPaymentDate} · ${money(customer.lastPaymentAmount)}`} />
+              )}
+            </dl>
+            <p className="m-0 mt-2 text-xs text-[#2E5E43]">
+              The account holder's name is now saved on this channel, and it can be used for {UTILITY_INFO[channel.utility].short.toLowerCase()} payments.
+            </p>
+          </section>
+        )}
       </div>
-
-      {/* Connecting Animation Modal */}
-      {showConnectingModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
-          <div className="bg-white rounded-2xl w-full max-w-md p-8 shadow-2xl">
-            {/* Animated Icon */}
-            <div className="flex justify-center mb-6">
-              <div className="relative">
-                <div className="absolute inset-0 bg-teal-500 rounded-full opacity-20 animate-ping"></div>
-                <div className="relative bg-gradient-to-br from-teal-500 to-teal-600 rounded-full w-20 h-20 flex items-center justify-center shadow-lg">
-                  {React.createElement(connectionSteps[connectionStep]?.icon || FaSpinner, {
-                    className: "text-white text-3xl animate-pulse"
-                  })}
-                </div>
-              </div>
-            </div>
-
-            {/* Progress Message */}
-            <div className="text-center mb-6">
-              <h3 className="text-xl font-semibold text-gray-800 mb-2">
-                {connectionSteps[connectionStep]?.message || 'Processing...'}
-              </h3>
-              <p className="text-gray-500 text-sm">
-                Please wait while we connect to the server
-              </p>
-            </div>
-
-            {/* Progress Bar */}
-            <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-              <div 
-                className="bg-gradient-to-r from-teal-500 to-teal-600 h-2 rounded-full transition-all duration-500 ease-out"
-                style={{ width: `${((connectionStep + 1) / connectionSteps.length) * 100}%` }}
-              />
-            </div>
-
-            {/* Step Indicators */}
-            <div className="flex justify-between mt-4">
-              {connectionSteps.map((step, idx) => (
-                <div key={idx} className="flex flex-col items-center">
-                  <div 
-                    className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                      idx <= connectionStep ? 'bg-teal-500' : 'bg-gray-300'
-                    }`}
-                  />
-                  <span className="text-xs text-gray-400 mt-1 hidden sm:block">
-                    Step {idx + 1}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            {/* Loading Dots Animation */}
-            <div className="flex justify-center gap-1 mt-6">
-              <div className="w-2 h-2 bg-teal-500 rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
-              <div className="w-2 h-2 bg-teal-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-              <div className="w-2 h-2 bg-teal-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
-            </div>
-          </div>
-        </div>
-      )}
-    </>
+    </Modal>
   );
 };
 

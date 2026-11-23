@@ -1,7 +1,6 @@
 import {
   Controller,
   Get,
-  Post,
   Patch,
   Body,
   Param,
@@ -13,6 +12,8 @@ import { diskStorage } from 'multer';
 import { v4 as uuidv4 } from 'uuid';
 import { extname } from 'path';
 import { CompanyService } from './profile.service';
+import { RequirePermissions } from 'src/auth/decorators';
+import { PERMISSIONS } from 'src/auth/permissions';
 
 @Controller('api/company')
 export class CompanyController {
@@ -23,6 +24,7 @@ export class CompanyController {
     return this.companyService.getProfile();
   }
 
+  @RequirePermissions(PERMISSIONS.COMPANY_SETTINGS)
   @Patch('modify/:id')
   @UseInterceptors(
     FileInterceptor('logo', {
@@ -33,8 +35,9 @@ export class CompanyController {
           cb(null, uniqueName);
         },
       }),
+      limits: { fileSize: 3 * 1024 * 1024 },
       fileFilter: (req, file, cb) => {
-        if (!file.originalname.match(/\.(jpg|jpeg|png|gif)$/)) {
+        if (!/\.(jpe?g|png|gif|webp|svg)$/i.test(file.originalname) || !/^image\//.test(file.mimetype)) {
           return cb(new Error('Only image files are allowed!'), false);
         }
         cb(null, true);
@@ -44,30 +47,32 @@ export class CompanyController {
   async updateCompany(
     @Param('id') id: string,
     @UploadedFile() logo: Express.Multer.File,
-    @Body() body: any,
+    @Body() body: Record<string, unknown>,
   ) {
-    const logoPath = logo ? `/uploads/logos/${logo.filename}` : undefined;
+    const phoneNumbers =
+      typeof body.phoneNumbers === 'string'
+        ? (JSON.parse(body.phoneNumbers) as string[])
+        : Array.isArray(body.phoneNumbers)
+          ? (body.phoneNumbers as string[])
+          : undefined;
 
-    const phoneNumbers = body.phoneNumbers
-  ? typeof body.phoneNumbers === 'string'
-    ? JSON.parse(body.phoneNumbers)
-    : body.phoneNumbers
-  : undefined;
-
-
-    const payload = {
-      ...body,
+    // Only known fields are passed on (the old code saved whatever was sent).
+    const data = await this.companyService.update(Number(id) || 0, {
+      name: body.name as string | undefined,
+      email: body.email as string | undefined,
+      tel1: body.tel1 as string | undefined,
+      tel2: body.tel2 as string | undefined,
       phoneNumbers,
-      logoPath,
-    };
-
-    // Remove undefined values
-    Object.keys(payload).forEach((key) => {
-      if (payload[key] === undefined) {
-        delete payload[key];
-      }
+      address: body.address as string | undefined,
+      website: body.website as string | undefined,
+      tinNumber: body.tinNumber as string | undefined,
+      description: body.description as string | undefined,
+      foundedYear: body.foundedYear as string | undefined,
+      industry: body.industry as string | undefined,
+      employees: body.employees as string | undefined,
+      workHours: body.workHours as string | undefined,
+      logoPath: logo ? `/uploads/logos/${logo.filename}` : undefined,
     });
-
-    return this.companyService.update(Number(id), payload);
+    return { status: 200, data, message: 'Company profile saved' };
   }
 }

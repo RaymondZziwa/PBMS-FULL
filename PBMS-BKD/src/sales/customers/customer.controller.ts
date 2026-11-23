@@ -22,8 +22,11 @@ import { diskStorage } from 'multer';
 import { join, extname } from 'path';
 import { CreateClientAccountDto, DepositDto } from 'src/dto/patientAccount.dto';
 import { ClientAccountService } from './customerAccounts.service';
+import { RequirePermissions } from 'src/auth/decorators';
+import { PERMISSIONS } from 'src/auth/permissions';
 
 @Controller('api/clients')
+@RequirePermissions(PERMISSIONS.SALES, PERMISSIONS.PRESCRIPTIONS, PERMISSIONS.EXHIBITION)
 export class ClientController {
   constructor(
     private readonly clientService: ClientService,
@@ -112,6 +115,7 @@ export class ClientController {
     );
   }
 
+  @RequirePermissions(PERMISSIONS.PRESCRIPTIONS)
   @Put('review-prescription/:id')
   reviewPrescription(
     @Param('id') id: string,

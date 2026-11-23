@@ -13,8 +13,11 @@ import {
 import { StoreService } from './stores.service';
 import { JwtAuthGuard } from 'src/guards/authGuard.guard';
 import type { Request } from 'express';
+import { RequirePermissions } from 'src/auth/decorators';
+import { PERMISSIONS } from 'src/auth/permissions';
 
 @Controller('api/store')
+@RequirePermissions(PERMISSIONS.INVENTORY, PERMISSIONS.STORES)
 export class StoresController {
   constructor(private readonly storeService: StoreService) {}
 
@@ -48,11 +51,13 @@ export class StoresController {
     });
   }
 
+  @RequirePermissions(PERMISSIONS.INVENTORY, PERMISSIONS.SALES, PERMISSIONS.EXHIBITION, PERMISSIONS.STORES)
   @Get('fetch-all')
   findAll() {
     return this.storeService.findAll();
   }
 
+  @RequirePermissions(PERMISSIONS.INVENTORY, PERMISSIONS.SALES, PERMISSIONS.EXHIBITION, PERMISSIONS.STORES)
   @Get('fetch/:id')
   findOne(@Param('id') id: string) {
     return this.storeService.findOne(Number(id));

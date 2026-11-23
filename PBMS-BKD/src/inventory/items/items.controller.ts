@@ -8,8 +8,11 @@ import {
   Param,
 } from '@nestjs/common';
 import { ItemService } from './items.service';
+import { RequirePermissions } from 'src/auth/decorators';
+import { PERMISSIONS } from 'src/auth/permissions';
 
 @Controller('api/item')
+@RequirePermissions(PERMISSIONS.INVENTORY)
 export class ItemController {
   constructor(private readonly itemCategoryService: ItemService) {}
 
@@ -26,16 +29,19 @@ export class ItemController {
     return this.itemCategoryService.create(data);
   }
 
+  @RequirePermissions(PERMISSIONS.INVENTORY, PERMISSIONS.SALES, PERMISSIONS.EXHIBITION)
   @Get('fetch-all')
   findAll() {
     return this.itemCategoryService.findAll();
   }
 
+  @RequirePermissions(PERMISSIONS.INVENTORY, PERMISSIONS.SALES, PERMISSIONS.EXHIBITION)
   @Get('fetch-store-inventory/:id')
   findAllStoreInventory(@Param('id') id: string) {
     return this.itemCategoryService.findAllWithStoreQuantity(Number(id));
   }
 
+  @RequirePermissions(PERMISSIONS.INVENTORY, PERMISSIONS.SALES, PERMISSIONS.EXHIBITION)
   @Get('fetch/:id')
   findOne(@Param('id') id: string) {
     return this.itemCategoryService.findOne(Number(id));

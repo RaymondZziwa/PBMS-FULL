@@ -18,8 +18,11 @@ import { ProjectPaymentsService } from './payments.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { join, extname } from 'path';
+import { RequirePermissions } from 'src/auth/decorators';
+import { PERMISSIONS } from 'src/auth/permissions';
 
 @Controller('api/project-payments')
+@RequirePermissions(PERMISSIONS.PROJECTS)
 export class ProjectPaymentsController {
   constructor(
     private readonly projectPaymentsService: ProjectPaymentsService,

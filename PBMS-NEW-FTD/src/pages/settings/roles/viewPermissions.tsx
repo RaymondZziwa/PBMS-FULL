@@ -1,42 +1,49 @@
-import React from "react";
-import { FaTimes } from "react-icons/fa";
-import CustomTable from "../../../custom/table/customTable";
-import type { IRole } from "../../../redux/types/systemSettings";
+import Modal from "../../../ui/Modal";
+import Button from "../../../ui/Button";
+import { EmptyState } from "../../../ui/Page";
+import type { IPermission, IRole } from "../../../redux/types/systemSettings";
+import { moduleLabel, permLabel } from "./permissionUtils";
 
-interface RolePermissionsModalProps {
-  visible: boolean;
-  onClose: () => void;
-  role: IRole;
-}
+type Props = { visible: boolean; onClose: () => void; role: IRole | null; onEdit?: () => void };
 
-const RolePermissionsModal: React.FC<RolePermissionsModalProps> = ({ visible, onClose, role }) => {
-  if (!visible) return null;
-
-  const columns = [
-    { key: "module", label: "Module", sortable: true, filterable: true },
-    { key: "name", label: "Permission Name", sortable: true, filterable: true },
-  ];
-
+/** Read-only list of what a role can do, grouped by module. */
+const RolePermissionsModal = ({ visible, onClose, role, onEdit }: Props) => {
+  const perms = (role?.permissions ?? []).filter((p): p is IPermission => typeof p !== "string");
+  const groups = perms.reduce<Record<string, IPermission[]>>((acc, p) => {
+    (acc[p.module ?? "other"] ??= []).push(p);
+    return acc;
+  }, {});
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
-      <div className="bg-white rounded-xl shadow-lg w-full max-w-5xl p-6 relative">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-gray-800">
-            Permissions for Role: <span className="text-gray-600">{role.name}</span>
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 p-2 rounded-full hover:bg-gray-100"
-          >
-            <FaTimes size={18} />
-          </button>
+    <Modal
+      open={visible}
+      onClose={onClose}
+      size="lg"
+      title={role ? `${role.name}: permissions` : ""}
+      description={`${perms.length} permission(s)`}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>Close</Button>
+          {onEdit && <Button onClick={onEdit}>Edit role</Button>}
+        </>
+      }
+    >
+      {!perms.length ? (
+        <EmptyState title="No permissions yet" message="People with this role can only see their own dashboard." />
+      ) : (
+        <div className="space-y-4">
+          {Object.entries(groups).sort(([a], [b]) => a.localeCompare(b)).map(([m, list]) => (
+            <section key={m}>
+              <h3 className="m-0 mb-1.5 text-xs font-semibold uppercase tracking-wider text-brand-muted">{moduleLabel(m)}</h3>
+              <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0">
+                {list.map((p) => (
+                  <li key={p.value} className="rounded-full bg-subtle px-2.5 py-1 text-xs text-brand-text first-letter:uppercase">{permLabel(p)}</li>
+                ))}
+              </ul>
+            </section>
+          ))}
         </div>
-
-        {/* Permissions Table */}
-        <CustomTable columns={columns} data={role.permissions} pageSize={6} />
-      </div>
-    </div>
+      )}
+    </Modal>
   );
 };
 

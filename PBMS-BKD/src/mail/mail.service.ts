@@ -1,129 +1,134 @@
-import { Injectable } from '@nestjs/common';
-import * as nodemailer from 'nodemailer';
-import * as fs from 'fs-extra';
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { HttpService } from '@nestjs/axios';
+import { isAxiosError } from 'axios';
+import { firstValueFrom } from 'rxjs';
+import { readFile } from 'fs/promises';
+import { createHash } from 'crypto';
 import * as path from 'path';
 import * as Handlebars from 'handlebars';
-import { ConfigService } from '@nestjs/config';
 
+const RESEND_API_URL = 'https://api.resend.com/emails';
+
+type TemplateName =
+  | 'welcome'
+  | 'email-verification'
+  | 'email-verified'
+  | 'forgot-pwd';
+
+type SendOptions = {
+  to: string;
+  subject: string;
+  template: TemplateName;
+  variables: Record<string, unknown>;
+  /** Stops Resend sending the same email twice if a request is retried (24 h window). */
+  idempotencyKey?: string;
+};
+
+/**
+ * Sends PBMS emails through Resend (https://resend.com).
+ *
+ * Needs in .env:
+ *   RESEND_API_KEY=re_...
+ *   RESEND_FROM="Prof Bioresearch <no-reply@your-verified-domain>"
+ * The sender's domain must be verified in the Resend dashboard.
+ */
 @Injectable()
 export class MailService {
-  private transporter: nodemailer.Transporter;
-  year = new Date().getFullYear();
+  private readonly logger = new Logger(MailService.name);
+  private readonly templates = new Map<TemplateName, Handlebars.TemplateDelegate>();
 
-  constructor(private readonly configService: ConfigService) {
-    this.transporter = nodemailer.createTransport({
-      host: this.configService.get<string>('SMTP_HOST'),
-      port: this.configService.get<number>('SMTP_PORT'),
-      secure: true,
-      auth: {
-        user: this.configService.get<string>('SMTP_USER'),
-        pass: this.configService.get<string>('SMTP_PASS'),
-      },
-      tls: {
-        minVersion: 'TLSv1.2', // Zoho requires TLS 1.2+
-        rejectUnauthorized: true,
-        //ciphers: this.configService.get<string>('CIPHER_KEY'), /// Uncomment if you need to specify ciphers for gmail
-      },
-      authMethod: 'PLAIN',
+  constructor(
+    private readonly config: ConfigService,
+    private readonly http: HttpService,
+  ) {}
+
+  /** Welcome email for a new employee, optionally with a one-time code. */
+  async sendOnRegistration(firstName: string, lastName: string, email: string, otp?: string) {
+    await this.send({
+      to: email,
+      subject: 'Welcome to Prof Bioresearch',
+      template: 'welcome',
+      variables: { firstName, lastName, otp },
     });
   }
 
-  private async loadTemplate(
-    templateName: string,
-    variables: Record<string, unknown>,
-  ): Promise<string> {
-    const templatePath = path.join(
-      __dirname,
-      'templates',
-      `${templateName}.hbs`,
-    );
-    const templateContent = await fs.readFile(templatePath, 'utf-8');
-    const compiledTemplate: Handlebars.TemplateDelegate =
-      Handlebars.compile(templateContent);
-    return compiledTemplate(variables);
-  }
-
-  async sendOnRegistration(name: string, email: string) {
-    try {
-      // Load the HTML template
-      const html = await this.loadTemplate('welcome', {
-        name,
-        year: this.year,
-      });
-
-      await this.transporter.sendMail({
-        from: `"Street Match Africa" <${this.configService.get<string>('FROM_EMAIL')}>`,
-        to: email,
-        subject: 'Your Registration at Street Match Africa',
-        html,
-      });
-
-      console.log('User Registration Email sent to: ', name);
-    } catch (error) {
-      console.error('Error sending email:', error);
-      throw new Error('Failed to send user registration email');
-    }
-  }
-
-  async sendOnEmailVerification(name: string, email: string, code: string) {
-    try {
-      // Load the HTML template
-      const html = await this.loadTemplate('email-verification', {
-        name,
-        code,
-        year: this.year,
-      });
-
-      await this.transporter.sendMail({
-        from: `"Street Match Africa" <${this.configService.get<string>('FROM_EMAIL')}>`,
-        to: email,
-        subject: 'Email Verification',
-        html,
-      });
-    } catch (error) {
-      console.error('Error sending email:', error);
-      throw new Error('Failed to send user registration email');
-    }
+  async sendOnEmailVerification(firstName: string, lastName: string, email: string, code: string) {
+    await this.send({
+      to: email,
+      subject: 'Verify your Prof Bioresearch email',
+      template: 'email-verification',
+      variables: { firstName, lastName, code },
+    });
   }
 
   async sendOnForgotPassword(name: string, email: string, code: string) {
-    try {
-      // Load the HTML template
-      const html = await this.loadTemplate('forgot-pwd', {
-        name,
-        code,
-        year: this.year,
-      });
+    await this.send({
+      to: email,
+      subject: 'Your PBMS password reset code',
+      template: 'forgot-pwd',
+      variables: { name, code },
+      // One email per code, even if the request is retried.
+      idempotencyKey: `pwd-reset/${createHash('sha256').update(`${email}:${code}`).digest('hex')}`,
+    });
+  }
 
-      await this.transporter.sendMail({
-        from: `"Street Match Africa" <${this.configService.get<string>('FROM_EMAIL')}>`,
-        to: email,
-        subject: 'Password Reset Request',
-        html,
-      });
+  async sendOnAccountVerification(firstName: string, lastName: string, email: string) {
+    await this.send({
+      to: email,
+      subject: 'Your Prof Bioresearch account is active',
+      template: 'email-verified',
+      variables: { firstName, lastName },
+    });
+  }
+
+  /** Sends ready-made HTML (used by the Monk Loyalty Club notices). */
+  async sendHtml(to: string, subject: string, html: string, idempotencyKey?: string) {
+    await this.deliver(to, subject, html, subject, idempotencyKey);
+  }
+
+  private async send({ to, subject, template, variables, idempotencyKey }: SendOptions) {
+    const html = await this.render(template, { ...variables, year: new Date().getFullYear() });
+    await this.deliver(to, subject, html, template, idempotencyKey);
+  }
+
+  private async deliver(to: string, subject: string, html: string, template: string, idempotencyKey?: string) {
+    const apiKey = this.config.getOrThrow<string>('RESEND_API_KEY');
+    const from = this.config.getOrThrow<string>('RESEND_FROM');
+
+    try {
+      const res = await firstValueFrom(
+        this.http.post<{ id: string }>(
+          RESEND_API_URL,
+          { from, to: [to], subject, html },
+          {
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+              'Content-Type': 'application/json',
+              ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey.slice(0, 256) } : {}),
+            },
+            timeout: 10000,
+          },
+        ),
+      );
+      this.logger.log(`Email "${template}" accepted by Resend (id ${res.data?.id})`);
     } catch (error) {
-      console.error('Error sending email:', error);
-      throw new Error('Failed to send user registration email');
+      // Resend returns { name, message } on errors; never log the API key or the email body.
+      const detail = isAxiosError(error)
+        ? `${error.response?.status ?? 'no response'} ${JSON.stringify(error.response?.data ?? error.message)}`
+        : String(error);
+      this.logger.error(`Resend failed to send "${template}": ${detail}`);
+      throw new Error(`Failed to send "${template}" email`);
     }
   }
 
-  async sendOnAccountVerification(name: string, email: string) {
-    try {
-      // Load the HTML template
-      const html = await this.loadTemplate('forgot-pwd', {
-        name,
-        year: this.year,
-      });
-
-      await this.transporter.sendMail({
-        from: `"Street Match Africa" <${this.configService.get<string>('FROM_EMAIL')}>`,
-        to: email,
-        subject: 'Your Account has been verified',
-        html,
-      });
-    } catch (error) {
-      console.error('Error sending email:', error);
-      throw new Error('Failed to send user registration email');
+  private async render(name: TemplateName, variables: Record<string, unknown>): Promise<string> {
+    let compiled = this.templates.get(name);
+    if (!compiled) {
+      const file = path.join(__dirname, 'templates', `${name}.hbs`);
+      compiled = Handlebars.compile(await readFile(file, 'utf-8'));
+      this.templates.set(name, compiled);
     }
+    return compiled(variables);
   }
 }

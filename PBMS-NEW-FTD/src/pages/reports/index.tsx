@@ -1,179 +1,92 @@
-import { useState } from 'react';
-import { 
-  FaBoxes, 
-  FaChartLine, 
-  FaMoneyBillWave, 
-  FaImages, 
-  FaChevronDown,
-  FaFileAlt,
-  FaUsers
-} from 'react-icons/fa';
-import { useNavigate } from 'react-router-dom';
+import { useMemo, useState, type ComponentType } from "react";
+import { Link } from "react-router-dom";
+import { FiBarChart2, FiBox, FiChevronRight, FiCreditCard, FiImage, FiUsers } from "react-icons/fi";
+import { SearchBox } from "../../ui/Field";
+import { EmptyState, PageHeader } from "../../ui/Page";
 
+type Report = { name: string; path: string; about: string };
+type Group = { name: string; icon: ComponentType<{ className?: string }>; reports: Report[] };
+
+const GROUPS: Group[] = [
+  {
+    name: "Sales",
+    icon: FiBarChart2,
+    reports: [
+      { name: "Daily sales summary", path: "/reports/daily-sales-summary", about: "One store, one day: takings, payment methods, every sale." },
+      { name: "Period sales summary", path: "/reports/period-sales-summary", about: "Sales for a store over any period, day by day." },
+      { name: "Store sales comparison", path: "/reports/store-sales-comparison", about: "How each store did over the same period." },
+      { name: "Product performance", path: "/reports/product-performance", about: "Units, revenue and price for one product." },
+      { name: "Massage services", path: "/reports/massage-services-report", about: "Service sales and the best-performing services." },
+    ],
+  },
+  {
+    name: "Inventory",
+    icon: FiBox,
+    reports: [
+      { name: "Stock levels", path: "/reports/store-stock-level-analysis", about: "Low, healthy and overstocked items in a store." },
+      { name: "Stock movement", path: "/reports/store-stock-movement-analysis", about: "Stock in, out, transfers and adjustments." },
+      { name: "Suppliers", path: "/reports/supplier-analysis", about: "What each supplier delivered, what's paid and owed." },
+    ],
+  },
+  {
+    name: "Expenses",
+    icon: FiCreditCard,
+    reports: [{ name: "Expense report", path: "/reports/expense-report", about: "Branch spending by category for any period." }],
+  },
+  {
+    name: "Exhibitions",
+    icon: FiImage,
+    reports: [
+      { name: "Exhibition revenue comparison", path: "/reports/exhibition-revenue-comparison", about: "Revenue across exhibitions side by side." },
+      { name: "Exhibition sales", path: "/reports/exhibition-sales-summary", about: "Every sale made at an exhibition." },
+      { name: "Exhibition expenses", path: "/reports/exhibition-expenses-summary", about: "What an exhibition cost, by category." },
+    ],
+  },
+  {
+    name: "People",
+    icon: FiUsers,
+    reports: [{ name: "Attendance", path: "/hr/attendance", about: "Who was in, late or absent, per day." }],
+  },
+];
+
+/** All reports, grouped, with search. Every report can be exported as a branded PDF. */
 const ReportsComponent = () => {
-  const [openCategories, setOpenCategories] = useState(new Set());
-  const navigate = useNavigate()
-
-  const toggleCategory = (categoryName) => {
-    const newOpenCategories = new Set(openCategories);
-    if (newOpenCategories.has(categoryName)) {
-      newOpenCategories.delete(categoryName);
-    } else {
-      newOpenCategories.add(categoryName);
-    }
-    setOpenCategories(newOpenCategories);
-  };
-
-  const reportsData = [
-    {
-      name: 'Inventory Reports',
-      icon: <FaBoxes className="mr-3" />,
-      reports: [
-        'Store Stock Level Analysis',
-        'Store Stock Movement Analysis',
-        'Supplier Analysis'
-      ]
-    },
-    {
-      name: 'Sales Reports',
-      icon: <FaChartLine className="mr-3" />,
-      reports: [
-        'Daily Sales Summary',
-        'Product Performance',
-        'Store Sales Comparison',
-        'Massage Services Report',
-      ]
-    },
-    {
-      name: 'Human Resource Reports',
-      icon: <FaUsers className="mr-3" />,
-      reports: [
-        'Attendance Report',
-        // 'Payroll Summary',
-      ]
-    },
-    {
-      name: 'Expenditure Reports',
-      icon: <FaMoneyBillWave className="mr-3" />,
-      reports: [
-        'Expense Report',
-        // 'Vendor Payment Summary',
-        // 'Monthly Expense Trend',
-       // 'Budget vs Actual Expense'
-      ]
-    },
-    {
-      name: 'Exhibition Reports',
-      icon: <FaImages className="mr-3" />,
-      reports: [
-        'Exhibition Revenue Comparison',
-        'Exhibition Sales Summary',
-        'Exhibition Expenses Summary',
-      ]
-    },
-    // {
-    //   name: 'Projects Reports',
-    //   icon: <FaTasks className="mr-3" />,
-    //   reports: [
-    //     'Project Status Summary',
-    //     'Project Timeline',
-    //     'Resource Allocation',
-    //     'Budget vs Actual Cost',
-    //     'Milestone Completion',
-    //     'Project Risk Assessment'
-    //   ]
-    // },
-    // {
-    //   name: 'Events Reports',
-    //   icon: <FaCalendarAlt className="mr-3" />,
-    //   reports: [
-    //     'Event Attendance',
-    //     'Event Revenue',
-    //     'Participant Feedback',
-    //     'Event Cost Analysis',
-    //     'Speaker Performance',
-    //     'Event ROI Analysis'
-    //   ]
-    // },
-    // {
-    //   name: 'Budget Reports',
-    //   icon: <FaChartPie className="mr-3" />,
-    //   reports: [
-    //     'Departmental Budget',
-    //     'Budget vs Actual',
-    //     'Budget Variance Analysis',
-    //     'Quarterly Budget Forecast',
-    //     'Capital Expenditure Budget',
-    //     'Annual Budget Summary'
-    //   ]
-    // },
-    // {
-    //   name: 'Procurement Reports',
-    //   icon: <FaShoppingCart className="mr-3" />,
-    //   reports: [
-    //     'Purchase Order Status',
-    //     'Vendor Performance',
-    //     'Procurement Timeline',
-    //     'Spend Analysis',
-    //     'Contract Compliance',
-    //     'Supplier Evaluation'
-    //   ]
-    // }
-  ];
+  const [q, setQ] = useState("");
+  const groups = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    if (!s) return GROUPS;
+    return GROUPS.map((g) => ({ ...g, reports: g.reports.filter((r) => `${g.name} ${r.name} ${r.about}`.toLowerCase().includes(s)) })).filter((g) => g.reports.length);
+  }, [q]);
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
-      <div className="max-w-6xl mx-auto">
-        <p className="text-gray-600 mb-8">Browse and access all system reports by category</p>
-        
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          <div className="divide-y divide-gray-200">
-            {reportsData.map((category, index) => (
-              <div key={category.name} className="report-category">
-                <div 
-                  className="category-header flex justify-between items-center p-4 bg-gray-700 text-white cursor-pointer hover:bg-gray-800 transition-colors"
-                  onClick={() => toggleCategory(category.name)}
-                >
-                  <div className="flex items-center">
-                    {category.icon}
-                    <h2 className="text-lg font-semibold">{category.name}</h2>
-                  </div>
-                  <FaChevronDown 
-                    className={`transition-transform duration-300 ${
-                      openCategories.has(category.name) ? 'rotate-180' : ''
-                    }`} 
-                  />
-                </div>
-                
-                {openCategories.has(category.name) && (
-                  <div className="category-content p-4 bg-gray-50">
-                    <ul className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {category.reports.map((report, reportIndex) => (
-                        <li 
-                          key={reportIndex}
-                          className="p-2 hover:bg-gray-200 rounded cursor-pointer transition-colors flex items-center"
-                          onClick={() => {
-                            const route = report.toLowerCase().replace(/ /g, '-');
-                            navigate(`/reports/${route}`)
-                            console.log(`Navigating to /reports/${route}`);
-                          }}
-                        >
-                          <FaFileAlt className="mr-2 text-gray-700" />
-                          {report}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+    <div className="mx-auto max-w-6xl font-inter">
+      <PageHeader title="Reports" description="Pick a report, set the filters, and export it as a PDF with the company letterhead." actions={<SearchBox value={q} onChange={setQ} placeholder="Find a report" label="Find a report" />} />
+      {!groups.length ? (
+        <EmptyState title={`No report matches “${q}”`} />
+      ) : (
+        <div className="space-y-6">
+          {groups.map((g) => (
+            <section key={g.name} aria-labelledby={`rg-${g.name}`}>
+              <h2 id={`rg-${g.name}`} className="m-0 mb-2.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-brand-muted">
+                <g.icon className="h-4 w-4" aria-hidden="true" /> {g.name}
+              </h2>
+              <ul className="m-0 grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2 lg:grid-cols-3">
+                {g.reports.map((r) => (
+                  <li key={r.path}>
+                    <Link to={r.path} className="group flex h-full items-start gap-3 rounded-xl border border-line bg-surface p-4 no-underline shadow-card transition-colors hover:border-brand/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand">
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-semibold text-brand-ink">{r.name}</span>
+                        <span className="mt-1 block text-sm text-brand-muted">{r.about}</span>
+                      </span>
+                      <FiChevronRight aria-hidden="true" className="mt-1 flex-none text-brand-muted transition-transform group-hover:translate-x-0.5 group-hover:text-brand-text" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
         </div>
-        
-        <div className="mt-8 text-center text-gray-600">
-          <p>Click on any category to view available reports</p>
-        </div>
-      </div>
+      )}
     </div>
   );
 };

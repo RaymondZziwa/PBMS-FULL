@@ -12,8 +12,11 @@ import {
   UpdateExhibitionStoreDto,
 } from 'src/dto/exhibition.dto';
 import { ExhibitionStoreService } from './exhibitionStore.service';
+import { RequirePermissions } from 'src/auth/decorators';
+import { PERMISSIONS } from 'src/auth/permissions';
 
 @Controller('api/exhibition-stores')
+@RequirePermissions(PERMISSIONS.EXHIBITION)
 export class ExhibitionStoreController {
   constructor(private svc: ExhibitionStoreService) {}
 

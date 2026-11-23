@@ -1,18 +1,23 @@
-// CheckoutModal.tsx (corrected)
 import React, { useState, useEffect, useRef } from 'react';
-import { FaTimes, FaUserPlus, FaPrint, FaCheck, FaSpinner } from 'react-icons/fa';
+import { FiAlertCircle, FiCheck, FiPrinter, FiTrash2, FiUser } from 'react-icons/fi';
 import { useReactToPrint } from 'react-to-print';
 import useClients from '../../../hooks/sales/useClients';
 import type { ICartItem, IClient, IPaymentMethod } from '../../../redux/types/sales';
 import { PrintableContent } from './receipt';
-import CustomDropdown from '../../../custom/inputs/customDropdown';
+import Modal from '../../../ui/Modal';
+import Button from '../../../ui/Button';
+import Combobox from '../../../ui/Combobox';
+import { TextField } from '../../../ui/Field';
+import { ugx } from '../../../ui/Page';
+import { AmountInput } from '../shared/NumberInputs';
+import { CustomerPicker, OrderSummary, PaymentStatusPicker, SummaryRow } from '../shared/CheckoutParts';
+import AddOrModifyClient from '../customers/AddorModify';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../../redux/store';
 import { toast } from 'sonner';
 import { apiRequest } from '../../../libs/apiConfig';
 import { SALESENDPOINTS } from '../../../endpoints/sales/salesEndpoints';
 import PaymentWaitingModal from './paymentWaitingModal';
-import { AlertCircle, Badge, CheckCircle, DollarSign, User } from 'lucide-react';
 
 interface CheckoutModalProps {
   visible: boolean;
@@ -61,6 +66,19 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [pendingReference, setPendingReference] = useState<string | null>(null);
 
+  // "New" customer from the till: open the form, then pick them once saved.
+  const [newCustomer, setNewCustomer] = useState(false);
+  const [pendingPhone, setPendingPhone] = useState<string | null>(null);
+  useEffect(() => {
+    if (!pendingPhone) return;
+    const digits = (s?: string) => (s ?? '').replace(/\D/g, '').slice(-9);
+    const found = clients?.find(c => digits(c.phone) === digits(pendingPhone));
+    if (found) {
+      setSelectedCustomer(String(found.id));
+      setPendingPhone(null);
+    }
+  }, [clients, pendingPhone]);
+
   const receiptRef = useRef<HTMLDivElement>(null);
   const handlePrint = useReactToPrint({
     contentRef: receiptRef,
@@ -103,7 +121,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   useEffect(() => {
     const client = clients.find(c => c.id === selectedCustomer);
-    console.log(client)
     setClient(client)
   }, [clients, selectedCustomer])
   // Get selected customer name for receipt
@@ -363,9 +380,13 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     return null;
   }
 
+  const momo = hasMobileMoneyPayments();
+  const charges = momo ? Number(amountPaid) * chargePercentage : 0;
+  const account = client?.PatientAccount?.[0];
+
   return (
     <>
-      {/* Payment Waiting Modal */}
+      {/* Mobile money: waits for the customer to approve on their phone */}
       <PaymentWaitingModal
         visible={showPaymentModal}
         reference={pendingReference}
@@ -378,418 +399,164 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         onPaymentFailed={handlePaymentFailed}
       />
 
-      {/* Main Checkout Modal */}
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
-          {/* Header */}
-          <div className="flex justify-between items-center p-6 border-b">
-            <h2 className="text-2xl font-bold text-gray-800">Checkout</h2>
-            <button
-              onClick={onClose}
-              className="text-gray-500 hover:text-gray-700 transition-colors"
-              disabled={isSubmitting}
-            >
-              <FaTimes size={20} />
-            </button>
-          </div>
+      <Modal
+        open={visible}
+        onClose={onClose}
+        locked={isSubmitting}
+        size="xl"
+        title="Checkout"
+        description={`${cart.length} ${cart.length === 1 ? 'line' : 'lines'} · ${ugx(total)}`}
+        footer={
+          <>
+            <Button variant="ghost" icon={<FiPrinter aria-hidden="true" />} onClick={() => handlePrint()} disabled={isSubmitting} className="sm:mr-auto">
+              Print receipt
+            </Button>
+            <Button variant="secondary" onClick={onClose} disabled={isSubmitting}>
+              Cancel
+            </Button>
+            <Button onClick={handleCompleteSale} loading={isSubmitting} icon={<FiCheck aria-hidden="true" />}>
+              {isSubmitting ? 'Processing…' : 'Complete sale'}
+            </Button>
+          </>
+        }
+      >
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="space-y-5">
+            <CustomerPicker clients={clients ?? []} value={selectedCustomer} onChange={setSelectedCustomer} onNew={() => setNewCustomer(true)} />
 
-          <div className="overflow-auto max-h-[70vh] p-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Left Column - Customer & Payment Info */}
-              <div className="space-y-6">
-                {/* Customer Selection */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Customer
-                  </label>
-                  <div className="flex gap-2">
-                    <CustomDropdown
-                      options={[
-                        ...(clients?.map(client => ({
-                          value: client.id,
-                          label: `${client.firstName || ''} ${client.lastName || ''} - ${client.phone || ''}`
-                        })) || [])
-                      ]}
-                      value={[selectedCustomer]}
-                      onChange={(selectedValues) => setSelectedCustomer(selectedValues[0] || '')}
-                      placeholder="Select customer..."
-                      searchPlaceholder="Search customers..."
-                      singleSelect={true}
-                      maxHeight={200}
-                    />
-                    <button
-                      className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 flex items-center transition-colors"
-                    >
-                      <FaUserPlus className="mr-2" />
-                      New
-                    </button>
+            {client && (
+              account ? (
+                <div className="flex items-center gap-3 rounded-lg border border-[#C8EBD4] bg-[#E7F6EC] px-4 py-3 dark:border-[#24482F] dark:bg-[#15301F]">
+                  <FiUser aria-hidden="true" className="h-5 w-5 flex-none text-[#1E7B43] dark:text-[#8FD6A8]" />
+                  <div className="min-w-0 flex-1">
+                    <p className="m-0 text-sm font-medium text-brand-ink">Patient account</p>
+                    <p className="m-0 text-xs text-brand-muted">Can pay with “Patient Account”.</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="m-0 text-[11px] uppercase tracking-wide text-brand-muted">Balance</p>
+                    <p className="m-0 font-display font-semibold tabular-nums text-brand-ink">{ugx(parseFloat(String(account.balance ?? 0)))}</p>
                   </div>
                 </div>
-               {
-  !client ? (
-    <div className="bg-gray-50 rounded-lg border border-gray-200 p-6 text-center">
-      <div className="flex flex-col items-center gap-3">
-        <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center">
-          <User className="h-7 w-7 text-gray-400" />
-        </div>
-        <div>
-          <h4 className="text-sm font-semibold text-gray-700">Selected Client Account Details</h4>
-          <p className="text-sm text-gray-500 mt-1">Please select a client to preview account details</p>
-        </div>
-      </div>
-    </div>
-  ) : client?.PatientAccount?.length > 0 ? (
-    <div className="bg-gradient-to-br from-white to-teal-50/30 rounded-xl border border-teal-100 p-6 shadow-sm">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center">
-          <User className="h-5 w-5 text-teal-600" />
-        </div>
-        <div>
-          <h4 className="text-sm font-semibold text-gray-700">Selected Client Account Details</h4>
-          <p className="text-xs text-gray-500">Account Information</p>
-        </div>
-        <Badge className="ml-auto bg-green-100 text-green-700 border-green-200">
-          <CheckCircle className="h-3 w-3 mr-1" />
-          Active
-        </Badge>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-1 gap-2">
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="flex items-center gap-2 mb-1">
-            <User className="h-4 w-4 text-gray-400" />
-            <span className="text-xs text-gray-500">Account Holder</span>
-          </div>
-          <p className="text-base font-semibold text-gray-900">
-            {client?.firstName} {client?.lastName}
-          </p>
-          {client?.email && (
-            <p className="text-sm text-gray-500 mt-1">{client.email}</p>
-          )}
-        </div>
-        
-        <div className="bg-gradient-to-br from-teal-50 to-teal-100/50 rounded-lg border border-teal-200 p-4">
-          <div className="flex items-center gap-2 mb-1">
-            <DollarSign className="h-4 w-4 text-teal-600" />
-            <span className="text-xs text-teal-600 font-medium">Current Balance</span>
-          </div>
-          <p className="text-2xl font-bold text-teal-700">
-            UGX {parseFloat(client.PatientAccount[0]?.balance || 0).toLocaleString()}
-          </p>
-          <div className="flex items-center gap-2 mt-2">
-            <div className="w-2 h-2 rounded-full bg-green-500"></div>
-            <span className="text-xs text-green-600">Balance in good standing</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  ) : (
-    <div className="bg-amber-50 rounded-xl border border-amber-200 p-6">
-      <div className="flex items-start gap-4">
-        <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
-          <AlertCircle className="h-6 w-6 text-amber-600" />
-        </div>
-        <div className="flex-1">
-          <h4 className="text-sm font-semibold text-amber-800">Selected Client Account Details</h4>
-          <p className="text-sm text-amber-700 mt-1">
-            Client <span className="font-medium">{client?.firstName} {client?.lastName}</span> has no patient account.
-          </p>
-         
-        </div>
-      </div>
-    </div>
-  )
-}
-                {/* Payment Status */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Payment Status
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { value: 'FULLY_PAID', label: 'FULLY PAID' },
-                      { value: 'PARTIALLY_PAID', label: 'PARTIAL' },
-                      { value: 'UNPAID', label: 'UNPAID' }
-                    ].map(status => (
-                      <button
-                        key={status.value}
-                        onClick={() => setPaymentStatus(status.value as any)}
-                        className={`p-3 border rounded-lg text-center transition-colors ${
-                          paymentStatus === status.value
-                            ? 'border-blue-500 bg-blue-50 text-blue-700 font-semibold'
-                            : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
-                        }`}
-                      >
-                        {status.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+              ) : (
+                <p className="m-0 flex items-center gap-2 text-sm text-brand-muted">
+                  <FiAlertCircle aria-hidden="true" className="h-4 w-4 flex-none" />
+                  {client.firstName} has no patient account.
+                </p>
+              )
+            )}
 
-                {/* Amount Paid */}
-                {paymentStatus !== 'UNPAID' && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Amount Paid (UGX)
-                    </label>
-                    <input
-                      type="number"
-                      value={hasMobileMoneyPayments() ? ((Number(amountPaid) * chargePercentage) + amountPaid): amountPaid}
-                      onChange={(e) => handleAmountPaidChange(Number(e.target.value))}
-                      disabled={paymentStatus === 'FULLY_PAID'}
-                      className="w-full p-3 border border-gray-300 rounded-lg text-lg font-semibold disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      min="0"
-                      max={total}
-                    />
-                    <div className="text-xs text-gray-500 mt-1">
-                      Total due: {total.toLocaleString()} UGX
-                    </div>
-                  </div>
-                )}
+            <PaymentStatusPicker
+              value={paymentStatus}
+              onChange={(v) => {
+                setPaymentStatus(v);
+                // Part payment: start from nothing so the cashier types what was actually paid.
+                if (v === 'PARTIALLY_PAID') {
+                  // Coming from "On credit" there is no payment method yet.
+                  setPaymentMethods(prev => (prev.length ? prev.map((m, i) => (i === 0 ? { ...m, amount: 0 } : m)) : [{ type: 'CASH', amount: 0 }]));
+                  setAmountPaid(0);
+                }
+              }}
+            />
 
-                {/* Payment Methods */}
-                {paymentStatus !== 'UNPAID' && amountPaid > 0 && (
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <label className="block text-sm font-medium text-gray-700">
-                        Payment Methods
-                      </label>
-                      {/* {paymentMethods.length < 3 && (
-                        <button
-                          onClick={addPaymentMethod}
-                          className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-                        >
-                          + Add Method
+            {paymentStatus === 'PARTIALLY_PAID' && (
+              <div>
+                <p className="m-0 mb-1.5 text-[13px] font-medium text-ink-soft">Amount paid now</p>
+                <AmountInput size="lg" label="Amount paid now" value={amountPaid} max={total} onChange={handleAmountPaidChange} />
+                <p className="m-0 mt-1.5 text-xs text-brand-muted">Total due {ugx(total)}. The rest is recorded as owed.</p>
+              </div>
+            )}
+
+            {paymentStatus !== 'UNPAID' && amountPaid > 0 && (
+              <div>
+                <p className="m-0 mb-1.5 text-[13px] font-medium text-ink-soft">Paid with</p>
+                <ul className="m-0 list-none space-y-2 p-0">
+                  {paymentMethods.map((method, index) => (
+                    <li key={index} className="flex flex-wrap items-end gap-2">
+                      <Combobox
+                        label={`Payment method ${index + 1}`}
+                        hideLabel
+                        className="min-w-[180px] flex-1"
+                        value={method.type}
+                        onChange={(v) => handlePaymentMethodChange(index, 'type', v || 'CASH')}
+                        options={PAYMENT_METHOD_OPTIONS}
+                        searchPlaceholder="Search methods"
+                      />
+                      {paymentMethods.length > 1 && (
+                        <AmountInput label={`Amount for method ${index + 1}`} className="w-40" value={method.amount} max={amountPaid} onChange={(v) => handlePaymentMethodChange(index, 'amount', v)} />
+                      )}
+                      {paymentMethods.length > 1 && (
+                        <button type="button" onClick={() => removePaymentMethod(index)} aria-label="Remove this payment method" className="flex h-11 w-11 items-center justify-center rounded-lg text-brand-muted hover:bg-[#FDECEA] hover:text-[#B42318] dark:hover:bg-[#381B19]">
+                          <FiTrash2 aria-hidden="true" />
                         </button>
-                      )} */}
-                    </div>
-                    
-                    <div className="space-y-3">
-                      {paymentMethods.map((method, index) => (
-                        <div key={index} className="flex gap-2 items-start">
-                          <div className="flex-1">
-                            <CustomDropdown
-                              options={PAYMENT_METHOD_OPTIONS}
-                              value={[method.type]}
-                              onChange={(selectedValues) => handlePaymentMethodChange(index, 'type', selectedValues[0] || 'CASH')}
-                              placeholder="Select payment method..."
-                              searchPlaceholder="Search payment methods..."
-                              singleSelect={true}
-                              maxHeight={200}
-                            />
-                          </div>
-                          
-                          <input
-                            type="number"
-                            value={method.amount}
-                            onChange={(e) => handlePaymentMethodChange(index, 'amount', Number(e.target.value))}
-                            className="w-32 p-2 border border-gray-300 rounded-lg"
-                            placeholder="Amount"
-                            min="0"
-                            max={amountPaid}
-                          />
-                          
-                          {/* {requiresTransactionId(method.type) && (
-                            <input
-                              type="text"
-                              value={method.transactionId || ''}
-                              onChange={(e) => handlePaymentMethodChange(index, 'transactionId', e.target.value)}
-                              className="flex-1 p-2 border border-gray-300 rounded-lg"
-                              placeholder="Transaction ID"
-                            />
-                          )} */}
-                          
-                          {paymentMethods.length > 1 && (
-                            <button
-                              onClick={() => removePaymentMethod(index)}
-                              className="p-2 text-red-600 hover:text-red-800 transition-colors"
-                              title="Remove payment method"
-                            >
-                              <FaTimes size={14} />
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                    
-                    {paymentMethods.length > 0 && (
-                      <div className="mt-2 text-xs text-gray-500">
-                        Total from payment methods: {paymentMethods.reduce((sum, method) => sum + method.amount, 0).toLocaleString()} UGX
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Phone Number for Mobile Money */}
-                {hasMobileMoneyPayments() && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Phone Number for Mobile Money
-                    </label>
-                    <input
-                      type="tel"
-                      value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter phone number (e.g., 07xx... or +256xxx...)"
-                    />
-                    <div className="text-xs text-gray-500 mt-1">
-                      Phone number will be formatted to +256 format
-                    </div>
-                  </div>
-                )}
-
-                {/* Notes */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Notes (Optional)
-                  </label>
-                  <textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    rows={3}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Add any notes about this sale..."
-                  />
-                </div>
-              </div>
-
-              {/* Right Column - Order Summary */}
-              <div className="bg-gray-50 p-6 rounded-lg border">
-                <h3 className="text-lg font-semibold mb-4">Order Summary</h3>
-                
-                {/* Cart Items */}
-                <div className="space-y-3 mb-4 max-h-60 overflow-y-auto">
-                  {cart.map(item => (
-                    <div key={item.id} className="flex justify-between text-sm pb-2 border-b border-gray-200">
-                      <div className="flex-1">
-                        <div className="font-medium">
-                          <span className="text-gray-600">{item.quantity}x </span>
-                          {item.name}
-                        </div>
-                        {item.discount > 0 && (
-                          <div className="text-red-600 text-xs">
-                            Discount: -{item.discount.toLocaleString()} UGX
-                          </div>
-                        )}
-                      </div>
-                      <div className="text-right">
-                        <div className="font-medium">
-                          {item.total.toLocaleString()} UGX
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {item.price.toLocaleString()} UGX each
-                        </div>
-                      </div>
-                    </div>
+                      )}
+                    </li>
                   ))}
-                </div>
-
-                {/* Totals */}
-                <div className="border-t pt-4 space-y-2">
-                  {/* <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Subtotal:</span>
-                    <span className="font-medium">{total.toLocaleString()} UGX</span>
-                  </div> */}
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Amount To Be Paid:</span>
-                    <span className="font-medium text-green-600">
-                      {hasMobileMoneyPayments() ? ((Number(amountPaid) * chargePercentage) + Number(amountPaid)) : `${ amountPaid.toLocaleString() } UGX`}
-                    </span>
-                  </div>
-                  {
-                    hasMobileMoneyPayments() && (
-                      <span className="text-gray-600 italic text-center text-sm">(Mobile Money Charges Inclusive)</span>
-                    )
-                  }
-                  <div className="flex justify-between text-lg font-bold border-t pt-2">
-                    <span>Balance:</span>
-                    <span className={balance === 0 ? 'text-green-600' : 'text-orange-600'}>
-                      {balance.toLocaleString()} UGX
-                    </span>
-                  </div>
-                </div>
-
-                {/* Payment Status Summary */}
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                  <div className="text-sm text-blue-800">
-                    <div className="font-semibold">Payment Status: {paymentStatus.replace('_', ' ')}</div>
-                    {paymentStatus !== 'UNPAID' && (
-                      <div className="mt-1">
-                        Methods: {paymentMethods.map(method => {
-                          const methodOption = PAYMENT_METHOD_OPTIONS.find(opt => opt.value === method.type);
-                          return `${methodOption?.label} (${method.amount.toLocaleString()} UGX)`;
-                        }).join(', ')}
-                      </div>
-                    )}
-                  </div>
-                </div>
+                </ul>
               </div>
-            </div>
-          </div>
+            )}
 
-          {/* Footer Actions */}
-          <div className="flex justify-between items-center p-6 border-t bg-gray-50">
-            <button
-              onClick={handlePrint}
-              className="flex items-center px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
-              disabled={isSubmitting}
-            >
-              <FaPrint className="mr-2" />
-              Print Receipt
-            </button>
-            
-            <div className="flex gap-3">
-              <button
-                onClick={onClose}
-                className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
-                disabled={isSubmitting}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCompleteSale}
-                disabled={isSubmitting}
-                className={`flex items-center px-6 py-3 rounded-lg transition-colors font-semibold ${
-                  isSubmitting 
-                    ? 'bg-gray-400 cursor-not-allowed' 
-                    : 'bg-green-600 hover:bg-green-700'
-                } text-white`}
-              >
-                {isSubmitting ? (
-                  <>
-                    <FaSpinner className="mr-2 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <FaCheck className="mr-2" />
-                    Complete Sale
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
+            {momo && (
+              <TextField
+                label="Customer's mobile money number"
+                required
+                type="tel"
+                inputMode="tel"
+                value={phoneNumber}
+                onChange={setPhoneNumber}
+                placeholder="07XX XXX XXX"
+                hint={`They'll get a prompt on their phone. A ${Math.round(chargePercentage * 100)}% mobile money charge is added.`}
+              />
+            )}
 
-          {/* Hidden receipt for printing */}
-          <div style={{ display: 'none' }}>
-            <div ref={receiptRef}>
-              <PrintableContent
-                client_names={selectedCustomerName}
-                cart={cart}
-                total={total}
-                status={paymentStatus}
-                balance={balance}
-                branch={user.branch?.name || 'Unknown Branch'}
-                department={user.department?.name || 'Unknown Department'}
-                user={user.lastName}
-                paymentMethod={getPaymentMethodForReceipt()}
-                transactionId={getTransactionIdForReceipt()}
+            <div>
+              <label htmlFor="sale-notes" className="mb-1.5 block text-[13px] font-medium text-ink-soft">
+                Notes <span className="font-normal text-brand-muted">(optional)</span>
+              </label>
+              <textarea
+                id="sale-notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={2}
+                placeholder="Anything to remember about this sale"
+                className="themed w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-brand-ink outline-none placeholder:text-brand-muted/70 focus:border-brand focus:shadow-[0_0_0_3px_rgb(57_89_165/0.18)]"
               />
             </div>
           </div>
+
+          <OrderSummary cart={cart}>
+            <SummaryRow label="Total" value={ugx(total)} />
+            {paymentStatus !== 'UNPAID' && <SummaryRow label="Paying now" value={ugx(amountPaid)} />}
+            {momo && <SummaryRow label="Mobile money charge" value={`+ ${ugx(charges)}`} />}
+            {momo && <SummaryRow label="Customer pays" value={ugx(Number(amountPaid) + charges)} />}
+            <SummaryRow strong label="Balance owed" value={ugx(balance)} tone={balance > 0 ? 'warn' : 'good'} />
+            {paymentStatus !== 'UNPAID' && paymentMethods.length > 0 && (
+              <p className="m-0 pt-1 text-xs text-brand-muted">
+                {paymentMethods.map(m => `${PAYMENT_METHOD_OPTIONS.find(o => o.value === m.type)?.label ?? m.type} ${ugx(m.amount)}`).join(' + ')}
+              </p>
+            )}
+          </OrderSummary>
         </div>
-      </div>
+
+        {/* Hidden receipt for printing */}
+        <div style={{ display: 'none' }}>
+          <div ref={receiptRef}>
+            <PrintableContent
+              client_names={selectedCustomerName}
+              cart={cart}
+              total={total}
+              status={paymentStatus}
+              balance={balance}
+              branch={user.branch?.name || 'Unknown Branch'}
+              department={user.department?.name || 'Unknown Department'}
+              user={user.lastName}
+              paymentMethod={getPaymentMethodForReceipt()}
+              transactionId={getTransactionIdForReceipt()}
+            />
+          </div>
+        </div>
+      </Modal>
+
+      <AddOrModifyClient visible={newCustomer} client={null} onCancel={() => setNewCustomer(false)} onSaved={setPendingPhone} />
     </>
   );
 };

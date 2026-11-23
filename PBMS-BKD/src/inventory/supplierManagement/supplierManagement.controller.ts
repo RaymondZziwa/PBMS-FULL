@@ -12,6 +12,7 @@ import {
   UseInterceptors,
   ParseUUIDPipe,
 } from '@nestjs/common';
+import { PdfResponseInterceptor } from 'src/utils/pdfGenerator/pdf-response.interceptor';
 import {
   CreateSupplierDto,
   SupplierPaymentDto,
@@ -23,8 +24,11 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import path, { join, extname } from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import { RequirePermissions } from 'src/auth/decorators';
+import { PERMISSIONS } from 'src/auth/permissions';
 
 @Controller('api/suppliers')
+@RequirePermissions(PERMISSIONS.INVENTORY)
 export class SupplierController {
   constructor(private readonly supplierService: SupplierService) {}
 
@@ -206,6 +210,7 @@ export class SupplierController {
   }
 
   @Get('report/export')
+  @UseInterceptors(PdfResponseInterceptor)
   @HttpCode(HttpStatus.OK)
   async exportSuppliersReportPDF() {
     return await this.supplierService.exportSuppliersReportPDF();

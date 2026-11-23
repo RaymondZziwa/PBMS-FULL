@@ -1,115 +1,87 @@
-import React, { useState, useEffect } from 'react';
-import CustomTextInput from '../../../custom/inputs/customTextInput';
-import { apiRequest } from '../../../libs/apiConfig';
-import { branchEndpoints } from '../../../endpoints/settings/branch/branchEndpoints';
-import CustomButton from '../../../custom/buttons/customButton';
-import { toast } from 'sonner';
-import useBranches from '../../../hooks/settings/useBranches';
+import { useEffect, useState, type FormEvent } from "react";
+import Modal from "../../../ui/Modal";
+import Button from "../../../ui/Button";
+import { TextField } from "../../../ui/Field";
+import { useConfirm } from "../../../ui/ConfirmDialog";
+import { apiRequest } from "../../../libs/apiConfig";
+import { branchEndpoints } from "../../../endpoints/settings/branch/branchEndpoints";
+import type { IBranch } from "../../../redux/types/systemSettings";
 
-interface Branch {
-  id?: string;
-  name: string;
-  location: string;
-}
+type Props = {
+  open: boolean;
+  branch: IBranch | null;
+  onClose: () => void;
+  onSaved: (branch: IBranch) => void;
+};
 
-interface AddorModifyBranchProps {
-  visible: boolean;
-  branch: Branch | null;
-  onCancel: () => void;
-}
+/** Add a branch, or rename / move one (with a confirmation listing the change). */
+const AddorModifyBranch = ({ open, branch, onClose, onSaved }: Props) => {
+  const confirm = useConfirm();
+  const [name, setName] = useState("");
+  const [location, setLocation] = useState("");
+  const [errors, setErrors] = useState<{ name?: string; location?: string }>({});
+  const [saving, setSaving] = useState(false);
 
-const AddorModifyBranch: React.FC<AddorModifyBranchProps> = ({
-  visible,
-  branch,
-  onCancel
-}) => {
-  const {refresh} = useBranches()
-  const [formData, setFormData] = useState({
-    name: '',
-    location: ''
-  });
-
-  // Update form data when branch prop changes
   useEffect(() => {
-    if (branch) {
-      setFormData({
-        name: branch.name || '',
-        location: branch.location || ''
-      });
-    } else {
-      setFormData({
-        name: '',
-        location: ''
-      });
-    }
-  }, [branch]);
+    if (!open) return;
+    setName(branch?.name ?? "");
+    setLocation(branch?.location ?? "");
+    setErrors({});
+  }, [open, branch]);
 
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
+    const n = name.trim();
+    const l = location.trim();
+    const errs = { name: n ? undefined : "Enter the branch name.", location: l ? undefined : "Enter where the branch is." };
+    setErrors(errs);
+    if (errs.name || errs.location) return;
 
-    if (!formData.name && !formData.location) {
-      toast.error("Please fill in all the fields")
-      return;
+    if (branch) {
+      const changes = [
+        n !== branch.name && `Name: ${branch.name} → ${n}`,
+        l !== branch.location && `Location: ${branch.location} → ${l}`,
+      ].filter(Boolean) as string[];
+      if (!changes.length) return onClose();
+      const ok = await confirm({ title: "Save branch?", message: "Receipts and reports will show the new details.", details: <ul className="m-0 list-disc pl-5">{changes.map((c) => <li key={c}>{c}</li>)}</ul>, confirmLabel: "Save" });
+      if (!ok) return;
     }
+
+    setSaving(true);
     try {
-      const endpoint = branch ? branchEndpoints.updateBranch(branch.id!) : branchEndpoints.createBranch;
-      const method = branch ? "PATCH" : "POST"
-      await apiRequest(endpoint, method, '', formData);
-      refresh();
-      setFormData({
-        name: '',
-        location: ''
-      });
-    } catch (error) {
-      toast.error(error?.response?.data?.message)
+      const res = await apiRequest<{ data: IBranch }>(
+        branch ? branchEndpoints.updateBranch(String(branch.id)) : branchEndpoints.createBranch,
+        branch ? "PATCH" : "POST",
+        { name: n, location: l },
+      );
+      onSaved(res.data);
+      onClose();
+    } catch {
+      // toast shown
+    } finally {
+      setSaving(false);
     }
   };
 
-  if (!visible) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl w-full max-w-md p-6">
-        <h3 className="text-xl font-semibold text-gray-800 mb-4">
-          {branch ? 'Edit Branch' : 'Add New Branch'}
-        </h3>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Branch Name *
-              </label>
-              <CustomTextInput
-                type="text"
-                name="name"
-                value={formData.name}
-                onChange={(val) => setFormData(prev => ({ ...prev, name: val }))}
-                placeholder="Enter branch name"
-                required
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Location
-              </label>
-              <CustomTextInput
-                type="text"
-                name="location"
-                value={formData.location}
-                onChange={(val) => setFormData(prev => ({ ...prev, location: val }))}
-                placeholder="Enter branch location"
-              />
-            </div>
-          </div>
-          
-          <div className="flex justify-end space-x-3 mt-6">
-            <CustomButton type='negative' fn={onCancel}/>
-            <CustomButton autoCloseModal={onCancel} label={branch ? 'Update Branch' : 'Create Branch'} fn={handleSubmit}/>
-           
-          </div>
-      </div>
-    </div>
+    <Modal
+      open={open}
+      onClose={onClose}
+      locked={saving}
+      size="sm"
+      title={branch ? "Edit branch" : "Add branch"}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button type="submit" form="branch-form" loading={saving}>{branch ? "Save" : "Add branch"}</Button>
+        </>
+      }
+    >
+      <form id="branch-form" onSubmit={submit} noValidate className="space-y-4">
+        <TextField label="Branch name" required data-autofocus value={name} onChange={(v) => { setName(v); setErrors((x) => ({ ...x, name: undefined })); }} error={errors.name} placeholder="e.g. Kampala Main" maxLength={120} />
+        <TextField label="Location" required value={location} onChange={(v) => { setLocation(v); setErrors((x) => ({ ...x, location: undefined })); }} error={errors.location} placeholder="e.g. Plot 12, Kampala Road" maxLength={120} />
+      </form>
+    </Modal>
   );
 };
 

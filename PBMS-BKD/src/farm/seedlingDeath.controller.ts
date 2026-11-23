@@ -12,8 +12,11 @@ import {
   UpdateSeedlingDeathDto,
 } from 'src/dto/farm.dto';
 import { SeedlingDeathService } from './seedlingDeath.service';
+import { RequirePermissions } from 'src/auth/decorators';
+import { PERMISSIONS } from 'src/auth/permissions';
 
 @Controller('api/seedling-death')
+@RequirePermissions(PERMISSIONS.FARM)
 export class SeedlingDeathController {
   constructor(private readonly service: SeedlingDeathService) {}
 

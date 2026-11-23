@@ -3,9 +3,12 @@ import type { IBranch, IRole } from "./systemSettings";
 export interface IDepartment {
     id: number;
     name: string;
-    branchId: string;
-    branch: IBranch;
+    branchId: string | number;
+    branch: Pick<IBranch, "id" | "name"> & { location?: string };
+    /** How many people and stores belong to it. */
+    _count?: { Employee: number; Store: number };
     createdAt: string;
+    updatedAt?: string;
 }
 
 export interface IEmployee {
@@ -15,18 +18,24 @@ export interface IEmployee {
     gender: "MALE" | "FEMALE";
     email?: string | null;
     tel: string;
-    password: string;
-    salary: number;
+    /** Never sent by the API any more; kept optional for older screens. */
+    password?: string;
+    /** Whether a password is set (people who don't sign in have none). */
+    hasPassword?: boolean;
+    /** null when the viewer may see names but not pay (attendance-only users). */
+    salary: number | string | null;
     hasAccess: boolean;
     hasPrescriptionAccess: boolean;
     isActive: boolean;
     profileImage?: string | null;
-    roleId: string;
-    role: IRole;
-    branchId?: string | null;
-    branch: IBranch;
-    deptId?: string | null;
-    department: IDepartment;
+    roleId: string | number;
+    role: Pick<IRole, "id" | "name">;
+    branchId?: string | number | null;
+    branch: Pick<IBranch, "id" | "name"> | null;
+    deptId?: string | number | null;
+    dept?: { id: number; name: string } | null;
+    /** @deprecated the API returns `dept` */
+    department?: IDepartment;
     updatedAt: Date;
     createdAt: Date;
 }
@@ -43,14 +52,26 @@ export interface IAttendance {
     createdAt: Date;
 }
 
+export interface IPayrollRecord {
+    id: number;
+    payrollPeriodId: number;
+    /** Everything about one person's pay (built by the payroll screen). */
+    paymentStructure: Record<string, unknown>;
+}
+
 export interface IPayrollPeriod {
     id: number;
-  startDate: string;
-  endDate: string;
+    periodStart: string;
+    periodEnd: string;
     payDate: string;
-    payroll: IPayrollDetail;
-  createdAt: string;
-  updatedAt: string;
+    totalSpent: number | string;
+    payrolls: IPayrollRecord[];
+    createdAt: string;
+    updatedAt: string;
+    /** @deprecated older shape */
+    startDate?: string;
+    /** @deprecated older shape */
+    endDate?: string;
 }
 
 export interface IPayrollDetail {

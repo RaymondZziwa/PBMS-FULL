@@ -56,6 +56,10 @@ export interface IClient {
     lastName: string;
     phone?: string;
     address?: string;
+    email?: string;
+    /** Prepaid patient account, if the client has one. */
+    PatientAccount?: { id?: number; balance: number | string; isActive?: boolean; status?: string }[];
+    hasAccount?: boolean;
     updatedAt: Date;
     createdAt: Date;
 }

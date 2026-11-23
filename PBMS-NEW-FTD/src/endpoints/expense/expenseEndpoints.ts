@@ -26,6 +26,9 @@ export const BILLING_CHANNELS = {
     MODIFY: (id: number) => `/api/billing-channels/update/${id}`,
     DELETE: (id: number) => `/api/billing-channels/delete/${id}`,
     FETCH_ALL: "/api/billing-channels/all",
-  VERIFY: "/api/billing-channels/verify",
-    NWSC_AREAS:"/api/billing-channels/nwsc-areas"
+    /** Verify a saved channel with MarzPay. Body: { area?: string } (NWSC only). */
+    VERIFY_CHANNEL: (id: number) => `/api/billing-channels/verify/${id}`,
+    /** @deprecated Old route, no longer served. Still referenced by the utility payment modal, which needs its own rework. */
+    VERIFY: "/api/billing-channels/verify",
+    NWSC_AREAS: "/api/billing-channels/nwsc-areas"
     }

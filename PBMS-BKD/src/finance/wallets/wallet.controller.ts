@@ -9,8 +9,11 @@ import {
 } from '@nestjs/common';
 import { WalletService } from './wallet.service';
 import { CreateWalletDto, UpdateWalletDto } from './dto';
+import { RequirePermissions } from 'src/auth/decorators';
+import { PERMISSIONS } from 'src/auth/permissions';
 
 @Controller('api/wallets')
+@RequirePermissions(PERMISSIONS.FINANCE)
 export class WalletController {
   constructor(private readonly walletService: WalletService) {}
 
@@ -19,6 +22,7 @@ export class WalletController {
     return this.walletService.create(createWalletDto);
   }
 
+  @RequirePermissions(PERMISSIONS.FINANCE, PERMISSIONS.SALES, PERMISSIONS.EXHIBITION)
   @Get('all')
   findAll() {
     return this.walletService.findAll();

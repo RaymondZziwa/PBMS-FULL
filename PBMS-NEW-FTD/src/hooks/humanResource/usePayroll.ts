@@ -1,47 +1,12 @@
-import { useEffect } from "react";
-import { useDispatch, useSelector } from 'react-redux';
-import { fetchDataStart, fetchDataSuccess, fetchDataFailure } from "../../redux/slices/humanResource/payrollSlice";
-import { apiRequest } from "../../libs/apiConfig";
-import type { RootState } from "../../redux/store";
+import * as actions from "../../redux/slices/humanResource/payrollSlice";
 import { PayrollEndpoints } from "../../endpoints/humanResource/payroll";
+import type { IPayrollPeriod } from "../../redux/types/hr";
+import type { RootState } from "../../redux/store";
+import { useListResource } from "./useListResource";
 
-const usePayroll = () => {
-  const dispatch = useDispatch();
-  //const { token, isFetchingLocalToken } = useAuth();
+const select = (state: RootState) => state.payroll;
 
-  const fetchDataFromApi = async () => {
-    //if (isFetchingLocalToken || !token?.access_token) return;
-      dispatch(fetchDataStart());
-    try {
-      const response = await apiRequest(
-          PayrollEndpoints.PAYROLL.fetch_all,
-          "GET",
-            '',
-      );
-      //console.log(response)
-      if (response.status == 200) {
-        dispatch(fetchDataSuccess(response.data)); // Dispatch action with fetched data
-      } else {
-        throw new Error("Failed to fetch payrolls.");
-      }
-    } catch (error) {
-      console.error("Failed to fetch payrolls:", error);
-      dispatch(
-        fetchDataFailure(
-          error instanceof Error ? error.message : "An unknown error occurred."
-        )
-      );
-    }
-  };
+/** Saved payroll periods, newest first. */
+const usePayroll = () => useListResource<IPayrollPeriod>(PayrollEndpoints.PAYROLL.fetch_all, select, actions);
 
-  useEffect(()=> {
-    fetchDataFromApi()
-  }, [])
-
-
-const data = useSelector((state: RootState) => state.payroll);
-
-return { ...data, refresh: fetchDataFromApi };
-};
-
-export default usePayroll
+export default usePayroll;

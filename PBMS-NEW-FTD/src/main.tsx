@@ -6,15 +6,21 @@ import { BrowserRouter } from 'react-router-dom'
 import { Provider } from 'react-redux'
 import { persistor, store } from './redux/store.ts'
 import { PersistGate } from 'redux-persist/integration/react'
+import { ThemeProvider } from './theme/ThemeProvider.tsx'
+import { ConfirmProvider } from './ui/ConfirmDialog.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <Provider store={store}>
-      <PersistGate loading={null} persistor={persistor}>
-          <BrowserRouter>
-            <App />
-          </BrowserRouter>
-      </PersistGate>
-    </Provider>
+    <ThemeProvider>
+      <Provider store={store}>
+        <PersistGate loading={null} persistor={persistor}>
+            <BrowserRouter>
+              <ConfirmProvider>
+                <App />
+              </ConfirmProvider>
+            </BrowserRouter>
+        </PersistGate>
+      </Provider>
+    </ThemeProvider>
   </StrictMode>,
 )

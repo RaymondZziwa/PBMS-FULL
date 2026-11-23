@@ -195,7 +195,7 @@ const PaymentWaitingModal: React.FC<PaymentWaitingModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60]">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+      <div className="bg-white rounded-2xl border border-line shadow-pop w-full max-w-md mx-4 font-inter overflow-hidden">
         
         {/* Pending State */}
         {status === 'pending' && (
@@ -204,14 +204,14 @@ const PaymentWaitingModal: React.FC<PaymentWaitingModalProps> = ({
             <div className="relative mb-6">
               <div className="w-24 h-24 mx-auto">
                 <div className="absolute w-24 h-24 rounded-full border-4 border-gray-200"></div>
-                <div className="absolute w-24 h-24 rounded-full border-4 border-teal-500 border-t-transparent animate-spin"></div>
+                <div className="absolute w-24 h-24 rounded-full border-4 border-brand border-t-transparent animate-spin"></div>
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <FaMobileAlt className="text-3xl text-teal-500 animate-pulse" />
+                  <FaMobileAlt className="text-3xl text-brand-text animate-pulse" />
                 </div>
               </div>
             </div>
             
-            <h3 className="text-xl font-bold text-gray-800 mb-2">
+            <h3 className="font-display text-xl font-semibold text-brand-ink mb-2">
               Processing Payment
             </h3>
             
@@ -219,16 +219,16 @@ const PaymentWaitingModal: React.FC<PaymentWaitingModalProps> = ({
               {getStatusMessage()}
             </p>
             
-            <div className="bg-blue-50 rounded-lg p-3 mb-4">
+            <div className="bg-subtle rounded-lg p-3 mb-4">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600">Reference:</span>
-                <span className="font-mono text-blue-600 font-medium">
+                <span className="font-mono text-brand-text font-medium">
                   {reference?.slice(0, 8)}...{reference?.slice(-8)}
                 </span>
               </div>
               <div className="flex items-center justify-between text-sm mt-2">
                 <span className="text-gray-600">Waiting time:</span>
-                <span className="font-mono text-teal-600 font-medium">
+                <span className="font-mono text-brand-text font-medium">
                   {formatTime(elapsedTime)}
                 </span>
               </div>
@@ -244,7 +244,7 @@ const PaymentWaitingModal: React.FC<PaymentWaitingModalProps> = ({
             <div className="mb-6">
               <div className="h-1 bg-gray-200 rounded-full overflow-hidden">
                 <div 
-                  className="h-full bg-teal-500 transition-all duration-1000 ease-linear"
+                  className="h-full bg-brand transition-all duration-1000 ease-linear"
                   style={{ width: `${Math.min((elapsedTime / 300) * 100, 100)}%` }}
                 />
               </div>

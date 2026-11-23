@@ -32,16 +32,19 @@ export class CreateEmployeeDto {
   @IsString()
   gender: string;
 
+  /** Required only when hasAccess is true (they sign in). */
+  @IsOptional()
   @IsEmail()
-  email: string;
+  email?: string | null;
 
   @IsNotEmpty()
   @IsString()
   tel: string;
 
-  @IsNotEmpty()
+  /** Required only when hasAccess is true (they sign in). */
+  @IsOptional()
   @IsString()
-  password: string;
+  password?: string;
 
   @IsNotEmpty()
   salary: number;

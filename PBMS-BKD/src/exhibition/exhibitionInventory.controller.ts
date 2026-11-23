@@ -1,8 +1,11 @@
 import { Body, Controller, Post, Get, Param } from '@nestjs/common';
 import { CreateExpoStockMovementDto } from 'src/dto/exhibition.dto';
 import { ExhibitionStockMovementService } from './exhibitionInventory.service';
+import { RequirePermissions } from 'src/auth/decorators';
+import { PERMISSIONS } from 'src/auth/permissions';
 
 @Controller('api/expo-stock-movement')
+@RequirePermissions(PERMISSIONS.EXHIBITION)
 export class ExhibitionStockMovementController {
   constructor(
     private readonly expoStockMovementService: ExhibitionStockMovementService,

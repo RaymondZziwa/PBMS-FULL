@@ -1,398 +1,195 @@
-import React, { useEffect, useState } from 'react';
-import { FaUpload, FaEdit, FaPhone, FaPlus, FaTimes, FaSave } from 'react-icons/fa';
-import CustomTextArea from '../../custom/inputs/customTextArea';
-import CustomTextInput from '../../custom/inputs/customTextInput';
-import CustomNumberInput from '../../custom/inputs/customNumberInput';
-import { baseURL } from '../../libs/apiConfig';
-import axios from 'axios';
-import { toast } from 'sonner';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { FiImage, FiRotateCcw, FiSave, FiUpload } from "react-icons/fi";
+import { apiRequest, baseURL } from "../../libs/apiConfig";
+import { CompanyProfileEndpoints } from "../../endpoints/settings/company_profile/companyProfileEndpoints";
+import Button from "../../ui/Button";
+import { FieldShell, TextField, CONTROL } from "../../ui/Field";
+import { Card, PageHeader, SkeletonRows } from "../../ui/Page";
+import { useConfirm } from "../../ui/ConfirmDialog";
 
-interface CompanyProfileType {
-  id: string;
-  logo: File | string | null;
+type Profile = {
+  id?: number;
   name: string;
   email: string;
-  website: string;
   tel1: string;
   tel2: string;
-  phoneNumbers: string[];
   address: string;
+  website: string;
   tinNumber: string;
   description: string;
-  foundedYear: number;
+  foundedYear: string;
   industry: string;
-  workHours: number;
   employees: string;
-}
+  workHours: string;
+  logo?: string | null;
+};
+const EMPTY: Profile = { name: "", email: "", tel1: "", tel2: "", address: "", website: "", tinNumber: "", description: "", foundedYear: "", industry: "", employees: "", workHours: "8" };
+const LABELS: Record<keyof Omit<Profile, "id" | "logo">, string> = {
+  name: "Company name", email: "Email", tel1: "Main phone", tel2: "Other phone", address: "Address", website: "Website",
+  tinNumber: "TIN", description: "About the company", foundedYear: "Founded", industry: "Industry", employees: "Team size", workHours: "Working hours a day",
+};
+const fromApi = (d: Record<string, unknown> | null): Profile => {
+  if (!d) return EMPTY;
+  const s = (k: string) => (d[k] === null || d[k] === undefined ? "" : String(d[k]));
+  return { id: Number(d.id) || undefined, name: s("name"), email: s("email"), tel1: s("tel1"), tel2: s("tel2"), address: s("address"), website: s("website"), tinNumber: s("tinNumber"), description: s("description"), foundedYear: s("foundedYear"), industry: s("industry"), employees: s("employees"), workHours: s("workHours") || "8", logo: (d.logo as string) ?? null };
+};
+const logoUrl = (p?: string | null) => (!p ? "" : p.startsWith("http") || p.startsWith("blob:") ? p : `${baseURL}${p}`);
 
+/** Company details used on receipts, payslips, reports and exported PDFs. */
 const CompanyProfile = () => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [profile, setProfile] = useState<CompanyProfileType>({
-    id: '',
-    logo: null,
-    name: 'Company Name',
-    email: 'contact@company.com',
-    website: 'www.company.com',
-    tel1: '07 (555) 123-4567',
-    tel2: '07 (555) 987-6543',
-    phoneNumbers: ['07 (555) 123-4567', '07 (555) 987-6543'],
-    address: '123 Business Street, City, State 12345',
-    tinNumber: '12-3456789',
-    description: 'We provide excellent products and services to our customers.',
-    foundedYear: 2010,
-    workHours: 10,
-    industry: 'Technology',
-    employees: '50-100',
-  });
-
-  const [newPhoneNumber, setNewPhoneNumber] = useState('');
-
-  // Sync tel1 and tel2 with phoneNumbers array
-  const syncTelWithArray = (numbers: string[]) => {
-    return {
-      tel1: numbers[0] || '07 (555) 123-4567',
-      tel2: numbers[1] || '07 (555) 987-6543',
-      phoneNumbers: numbers,
-    };
-  };
+  const confirm = useConfirm();
+  const [saved, setSaved] = useState<Profile | null>(null);
+  const [form, setForm] = useState<Profile>(EMPTY);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState("");
+  const [errors, setErrors] = useState<Partial<Record<keyof Profile, string>>>({});
+  const [saving, setSaving] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const response = await axios.get(`${baseURL}/api/company/profile`);
-        if (response.data) {
-          const data = response.data;
-          setProfile({
-            id: data.id,
-            logo: data.logo || null,
-            name: data.name || 'Company Name',
-            email: data.email || 'contact@company.com',
-            website: data.website || 'www.company.com',
-            tel1: data.tel1 || '07 (555) 123-4567',
-            tel2: data.tel2 || '07 (555) 987-6543',
-            phoneNumbers: [
-              data.tel1 || '07 (555) 123-4567',
-              data.tel2 || '07 (555) 987-6543'
-            ],
-            address: data.address || '123 Business Street, City, State 12345',
-            tinNumber: data.tinNumber || '12-3456789',
-            description: data.description || '',
-            foundedYear: data.foundedYear || 2010,
-            workHours: data.workHours || 10,
-            industry: data.industry || '',
-            employees: data.employees || '',
-          });
-        }
-      } catch (error: any) {
-        console.error('Error fetching profile:', error);
-        toast.error('Failed to load company profile. Using default info.');
-      }
-    };
-    
-
-    fetchProfile();
+    apiRequest<Record<string, unknown> | null>("/api/company/profile")
+      .then((d) => {
+        const p = fromApi(d);
+        setSaved(p);
+        setForm(p);
+      })
+      .catch(() => setSaved(EMPTY));
   }, []);
+  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
 
-  const handleInputChange = (field: string, value: any) => {
-    setProfile(prev => ({
-      ...prev,
-      [field]: value,
-    }));
+  const set = (k: keyof Profile) => (v: string) => {
+    setForm((f) => ({ ...f, [k]: v }));
+    setErrors((e) => ({ ...e, [k]: undefined }));
   };
 
-  const handlePhoneNumberChange = (index: number, value: string) => {
-    const updatedNumbers = [...profile.phoneNumbers];
-    updatedNumbers[index] = value;
-    setProfile(prev => ({
-      ...prev,
-      ...syncTelWithArray(updatedNumbers),
-    }));
+  const changes = useMemo(() => {
+    if (!saved) return [] as string[];
+    const list = (Object.keys(LABELS) as (keyof typeof LABELS)[]).filter((k) => form[k].trim() !== saved[k].trim()).map((k) => LABELS[k]);
+    if (logoFile) list.push("Logo");
+    return list;
+  }, [form, saved, logoFile]);
+
+  const pickLogo = (f?: File) => {
+    if (!f) return;
+    if (!/^image\//.test(f.type)) return setErrors((e) => ({ ...e, logo: "Choose an image file (PNG, JPG, SVG or WebP)." }));
+    if (f.size > 3 * 1024 * 1024) return setErrors((e) => ({ ...e, logo: "The logo must be smaller than 3 MB." }));
+    setErrors((e) => ({ ...e, logo: undefined }));
+    setLogoFile(f);
+    setPreview(URL.createObjectURL(f));
   };
 
-  const addPhoneNumber = () => {
-    if (newPhoneNumber.trim()) {
-      const updatedNumbers = [...profile.phoneNumbers, newPhoneNumber];
-      setProfile(prev => ({
-        ...prev,
-        ...syncTelWithArray(updatedNumbers),
-      }));
-      setNewPhoneNumber('');
-    }
+  const validate = () => {
+    const e: typeof errors = {};
+    if (!form.name.trim()) e.name = "Enter the company name.";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) e.email = "Enter a valid email address.";
+    if (form.tel1.replace(/\D/g, "").length < 9) e.tel1 = "Enter a phone number.";
+    if (form.tel2 && form.tel2.replace(/\D/g, "").length < 9) e.tel2 = "Check this number, or leave it empty.";
+    if (!form.address.trim()) e.address = "Enter the address.";
+    const y = Number(form.foundedYear);
+    if (form.foundedYear && (!Number.isInteger(y) || y < 1800 || y > new Date().getFullYear())) e.foundedYear = "Enter a year like 2010.";
+    const h = Number(form.workHours);
+    if (!form.workHours || !(h > 0 && h <= 24)) e.workHours = "Between 1 and 24.";
+    setErrors(e);
+    return Object.keys(e).length === 0;
   };
 
-  const removePhoneNumber = (index: number) => {
-    const updatedNumbers = profile.phoneNumbers.filter((_, i) => i !== index);
-    setProfile(prev => ({
-      ...prev,
-      ...syncTelWithArray(updatedNumbers),
-    }));
-  };
-
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setProfile(prev => ({
-        ...prev,
-        logo: file,
-      }));
-    }
-  };
-
-  const handleSave = async () => {
-    try {
-      const formData = new FormData();
-      if (profile.logo instanceof File) formData.append('logo', profile.logo);
-      formData.append('name', profile.name);
-      formData.append('email', profile.email);
-      formData.append('website', profile.website);
-      formData.append('address', profile.address);
-      formData.append('tinNumber', profile.tinNumber);
-      formData.append('description', profile.description);
-      formData.append('foundedYear', profile.foundedYear.toString());
-      formData.append('industry', profile.industry);
-      formData.append('workHours', profile.workHours.toString());
-      formData.append('employees', profile.employees);
-      profile.phoneNumbers.forEach((num, idx) => formData.append(`phoneNumbers[${idx}]`, num));
-
-      await axios.patch(`${baseURL}/api/company/modify/${profile.id}`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+  const save = async (ev: FormEvent) => {
+    ev.preventDefault();
+    if (!validate() || changes.length === 0) return;
+    if (saved?.id) {
+      const ok = await confirm({
+        title: "Save company profile?",
+        message: <>This updates <strong>{changes.join(", ")}</strong>. Receipts, payslips and reports use these details from now on.</>,
+        confirmLabel: "Save changes",
       });
-
-      toast.success('Profile saved successfully');
-      setIsEditing(false);
-    } catch (error: any) {
-      console.error(error);
-      toast.error(error.response?.data?.message || error.message);
+      if (!ok) return;
+    }
+    setSaving(true);
+    try {
+      const fd = new FormData();
+      (Object.keys(LABELS) as (keyof typeof LABELS)[]).forEach((k) => fd.append(k, form[k].trim()));
+      if (logoFile) fd.append("logo", logoFile);
+      const res = await apiRequest<{ data: Record<string, unknown> }>(CompanyProfileEndpoints.modify(String(saved?.id ?? 0)), "PATCH", fd);
+      const p = fromApi(res.data);
+      setSaved(p);
+      setForm(p);
+      setLogoFile(null);
+      setPreview("");
+      window.dispatchEvent(new Event("pbms:company-updated")); // let the header/logo refresh
+    } catch {
+      // error toast shown
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleCancel = () => setIsEditing(false);
+  const reset = () => {
+    if (saved) setForm(saved);
+    setLogoFile(null);
+    setPreview("");
+    setErrors({});
+  };
+
+  if (!saved) return <div className="mx-auto max-w-4xl"><PageHeader title="Company profile" /><Card><SkeletonRows rows={8} /></Card></div>;
+  const shownLogo = preview || logoUrl(form.logo);
 
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-white rounded-xl shadow-md">
-      {/* Header Buttons */}
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">Company Profile</h2>
-        {!isEditing ? (
-          <button
-            onClick={() => setIsEditing(true)}
-            className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-800 transition-colors"
-          >
-            <FaEdit className="mr-2" /> Edit Profile
-          </button>
-        ) : (
-          <div className="flex space-x-2">
-            <button
-              onClick={handleCancel}
-              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-            >
-              <FaSave className="mr-2" /> Save Changes
-            </button>
-          </div>
-        )}
-      </div>
+    <form onSubmit={save} noValidate className="mx-auto max-w-4xl font-inter">
+      <PageHeader title="Company profile" description="These details appear on receipts, payslips, reports and exported PDFs." />
 
-      {/* Profile Form */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Logo Section */}
-        <div className="md:col-span-1 flex flex-col items-center">
-          <div className="w-32 h-32 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden mb-4">
-            {profile.logo ? (
-              <img
-                src={
-                  profile.logo instanceof File
-                    ? URL.createObjectURL(profile.logo)
-                    : `${baseURL}${profile.logo}`
-                }
-                alt="Company Logo"
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <span className="text-gray-400">No Logo</span>
-            )}
+      <Card className="mb-4 p-4 sm:p-5">
+        <h2 className="m-0 mb-4 text-base font-semibold text-brand-ink">Brand</h2>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+          <div className="flex h-24 w-40 flex-none items-center justify-center overflow-hidden rounded-xl border border-dashed border-line bg-surface-2 p-2">
+            {shownLogo ? <img src={shownLogo} alt="Company logo" className="max-h-full max-w-full object-contain" /> : <FiImage className="h-7 w-7 text-brand-muted" aria-hidden="true" />}
           </div>
-          {isEditing && (
-            <label className="flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg cursor-pointer hover:bg-gray-200 transition-colors">
-              <FaUpload className="mr-2" /> Upload Logo
-              <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
-            </label>
-          )}
-        </div>
-
-        {/* Profile Details */}
-        <div className="md:col-span-2 space-y-4">
-          {/* Company Name */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
-            {isEditing ? (
-              <CustomTextInput value={profile.name} onChange={val => handleInputChange('name', val)} />
-            ) : (
-              <p className="text-lg font-semibold text-gray-800">{profile.name}</p>
-            )}
-          </div>
-
-          {/* Email & Website */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-              {isEditing ? (
-                <CustomTextInput type="email" value={profile.email} onChange={val => handleInputChange('email', val)} />
-              ) : (
-                <p className="text-gray-800">{profile.email}</p>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
-              {isEditing ? (
-                <CustomTextInput type="url" value={profile.website} onChange={val => handleInputChange('website', val)} />
-              ) : (
-                <p className="text-gray-600 hover:underline">{profile.website}</p>
-              )}
-            </div>
-          </div>
-
-          {/* Phone Numbers */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
-              <FaPhone className="mr-2" /> Phone Numbers
-            </label>
-            <div className="space-y-2">
-              <div className="flex items-center">
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={profile.tel1}
-                    onChange={e => handlePhoneNumberChange(0, e.target.value)}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2"
-                  />
-                ) : (
-                  <p className="text-gray-800">{profile.tel1}</p>
-                )}
-              </div>
-              <div className="flex items-center">
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={profile.tel2}
-                    onChange={e => handlePhoneNumberChange(1, e.target.value)}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2"
-                  />
-                ) : (
-                  <p className="text-gray-800">{profile.tel2}</p>
-                )}
-              </div>
-
-              {/* Additional Numbers */}
-              {profile.phoneNumbers.slice(2).map((num, idx) => (
-                <div key={idx + 2} className="flex items-center">
-                  {isEditing ? (
-                    <>
-                      <input
-                        type="text"
-                        value={num}
-                        onChange={e => handlePhoneNumberChange(idx + 2, e.target.value)}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2"
-                      />
-                      <button onClick={() => removePhoneNumber(idx + 2)} className="ml-2 text-red-500">
-                        <FaTimes />
-                      </button>
-                    </>
-                  ) : (
-                    <p className="text-gray-800">{num}</p>
-                  )}
-                </div>
-              ))}
-
-              {isEditing && (
-                <div className="flex items-center">
-                  <input
-                    value={newPhoneNumber}
-                    onChange={e => setNewPhoneNumber(e.target.value)}
-                    placeholder="Add new phone number"
-                    className="w-full border border-gray-300 rounded-md px-3 py-2"
-                  />
-                  <button onClick={addPhoneNumber} className="ml-2 p-2 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition-colors">
-                    <FaPlus />
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Address */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-            {isEditing ? (
-              <CustomTextArea value={profile.address} onChange={val => handleInputChange('address', val)} rows={2} />
-            ) : (
-              <p className="text-gray-800">{profile.address}</p>
-            )}
-          </div>
-
-          {/* TIN */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">TIN Number</label>
-            {isEditing ? (
-              <CustomTextInput value={profile.tinNumber} onChange={val => handleInputChange('tinNumber', val)} />
-            ) : (
-              <p className="text-gray-800">{profile.tinNumber}</p>
-            )}
-          </div>
-
-          {/* Additional Info */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Founded Year</label>
-              {isEditing ? (
-                <CustomNumberInput value={profile.foundedYear} onChange={val => handleInputChange('foundedYear', val)} />
-              ) : (
-                <p className="text-gray-800">{profile.foundedYear}</p>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Industry</label>
-              {isEditing ? (
-                <CustomTextInput value={profile.industry} onChange={val => handleInputChange('industry', val)} />
-              ) : (
-                <p className="text-gray-800">{profile.industry}</p>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Employees</label>
-              {isEditing ? (
-                <CustomTextInput value={profile.employees} onChange={val => handleInputChange('employees', val)} />
-              ) : (
-                <p className="text-gray-800">{profile.employees}</p>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Work Hours</label>
-              {isEditing ? (
-                <CustomNumberInput value={profile.workHours} onChange={val => handleInputChange('workHours', val)} />
-              ) : (
-                <p className="text-gray-800">{profile.workHours} hrs/day</p>
-              )}
-            </div>
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-            {isEditing ? (
-              <CustomTextArea value={profile.description} onChange={val => handleInputChange('description', val)} rows={3} />
-            ) : (
-              <p className="text-gray-800">{profile.description}</p>
-            )}
+            <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp,image/gif" className="sr-only" onChange={(e) => { pickLogo(e.target.files?.[0]); e.target.value = ""; }} />
+            <Button variant="secondary" icon={<FiUpload aria-hidden="true" />} onClick={() => fileRef.current?.click()}>
+              {shownLogo ? "Change logo" : "Upload logo"}
+            </Button>
+            <p className="m-0 mt-2 text-xs text-brand-muted">PNG with a transparent background works best on PDFs. Up to 3 MB.</p>
+            {errors.logo && <p role="alert" className="m-0 mt-1 text-xs text-[#C0362C]">{errors.logo}</p>}
           </div>
         </div>
+      </Card>
+
+      <Card className="mb-4 p-4 sm:p-5">
+        <h2 className="m-0 mb-4 text-base font-semibold text-brand-ink">Contact details</h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <TextField className="sm:col-span-2" label="Company name" required value={form.name} onChange={set("name")} error={errors.name} />
+          <TextField label="Email" type="email" required value={form.email} onChange={set("email")} error={errors.email} autoComplete="off" />
+          <TextField label="Website" value={form.website} onChange={set("website")} placeholder="www.example.com" />
+          <TextField label="Main phone" type="tel" required value={form.tel1} onChange={set("tel1")} error={errors.tel1} placeholder="+256 7…" />
+          <TextField label="Other phone" type="tel" value={form.tel2} onChange={set("tel2")} error={errors.tel2} hint="Optional" />
+          <TextField className="sm:col-span-2" label="Address" required value={form.address} onChange={set("address")} error={errors.address} placeholder="Plot, street, town" />
+        </div>
+      </Card>
+
+      <Card className="p-4 sm:p-5">
+        <h2 className="m-0 mb-4 text-base font-semibold text-brand-ink">Business details</h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <TextField label="TIN" value={form.tinNumber} onChange={set("tinNumber")} hint="Printed on receipts and invoices" />
+          <TextField label="Industry" value={form.industry} onChange={set("industry")} placeholder="e.g. Herbal medicine" />
+          <TextField label="Founded" inputMode="numeric" maxLength={4} value={form.foundedYear} onChange={(v) => set("foundedYear")(v.replace(/\D/g, ""))} error={errors.foundedYear} placeholder="2010" />
+          <TextField label="Team size" value={form.employees} onChange={set("employees")} placeholder="e.g. 50–100" />
+          <TextField label="Working hours a day" inputMode="decimal" value={form.workHours} onChange={(v) => set("workHours")(v.replace(/[^\d.]/g, ""))} error={errors.workHours} hint="Used to work out attendance and overtime" required />
+          <FieldShell label="About the company" id="company-about" className="sm:col-span-2">
+            <textarea id="company-about" rows={4} value={form.description} onChange={(e) => set("description")(e.target.value)} className={`${CONTROL} h-auto border-line py-2.5`} />
+          </FieldShell>
+        </div>
+      </Card>
+
+      <div className="sticky bottom-0 z-20 -mx-3 mt-4 border-t border-line bg-surface/95 backdrop-blur sm:-mx-4 lg:-mx-6">
+        <div className="mx-auto flex max-w-4xl items-center gap-3 px-4 py-3">
+          <p className="m-0 min-w-0 flex-1 truncate text-sm text-brand-muted" aria-live="polite">
+            {changes.length ? `Unsaved: ${changes.join(", ")}` : "All changes saved"}
+          </p>
+          <Button variant="secondary" icon={<FiRotateCcw aria-hidden="true" />} onClick={reset} disabled={!changes.length || saving}>Discard</Button>
+          <Button type="submit" icon={<FiSave aria-hidden="true" />} loading={saving} disabled={!changes.length}>Save</Button>
+        </div>
       </div>
-    </div>
+    </form>
   );
 };
 

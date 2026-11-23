@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { FaTimes, FaCheck, FaMoneyBillWave } from 'react-icons/fa';
-import CustomDropdown from '../../../custom/inputs/customDropdown';
-import CustomButton from '../../../custom/buttons/customButton';
+import { FiCheckCircle, FiPlus, FiTrash2 } from 'react-icons/fi';
+import Modal from '../../../ui/Modal';
+import Button from '../../../ui/Button';
+import Combobox from '../../../ui/Combobox';
+import { TextField } from '../../../ui/Field';
+import { ugx } from '../../../ui/Page';
+import { AmountInput } from '../shared/NumberInputs';
 import { toast } from 'sonner';
 import { apiRequest } from '../../../libs/apiConfig';
 import { SALESENDPOINTS } from '../../../endpoints/sales/salesEndpoints';
 import type { ISale, IPaymentMethod } from '../../../redux/types/sales';
-import CustomTextInput from '../../../custom/inputs/customTextInput';
 
 interface CollectCreditPaymentModalProps {
   visible: boolean;
@@ -144,199 +147,95 @@ const CollectCreditPaymentModal: React.FC<CollectCreditPaymentModalProps> = ({
   if (!visible) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-        {/* Header */}
-        <div className="flex justify-between items-center p-6 border-b flex-shrink-0">
+    <Modal
+      open={visible}
+      onClose={onClose}
+      locked={loading}
+      size="lg"
+      title={`Collect payment from ${sale.client?.firstName ?? ''} ${sale.client?.lastName ?? ''}`}
+      description={`Sale #${(sale as { saleNumber?: string }).saleNumber || String(sale.id).slice(-8)} · owes ${ugx(currentBalance)}`}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={loading}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} loading={loading} disabled={amountPaid <= 0}>
+            Collect {ugx(amountPaid)}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-5">
+        <div className="grid grid-cols-3 gap-2 rounded-xl border border-line bg-surface-2 p-3 text-sm">
           <div>
-            <h2 className="text-2xl font-bold text-gray-800">Collect Credit Payment</h2>
-            <p className="text-sm text-gray-600 mt-1">
-              Sale #{sale.saleNumber || sale.id.toString().slice(-8)}
-            </p>
+            <p className="m-0 text-xs text-brand-muted">Sale total</p>
+            <p className="m-0 font-medium tabular-nums text-brand-ink">{ugx(sale.total)}</p>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 transition-colors"
-            disabled={loading}
-          >
-            <FaTimes size={20} />
-          </button>
+          <div>
+            <p className="m-0 text-xs text-brand-muted">Paid so far</p>
+            <p className="m-0 font-medium tabular-nums text-brand-ink">{ugx(Number(sale.total || 0) - Number(sale.balance || 0))}</p>
+          </div>
+          <div>
+            <p className="m-0 text-xs text-brand-muted">Still owed</p>
+            <p className="m-0 font-semibold tabular-nums text-[#B54708] dark:text-[#F0CF85]">{ugx(currentBalance)}</p>
+          </div>
         </div>
 
-        <div className="overflow-auto p-6 flex-1">
-          <div className="space-y-6">
-            {/* Sale Information */}
-            <div className="bg-gray-50 p-4 rounded-lg border">
-              <h3 className="font-semibold text-gray-700 mb-3">Sale Information</h3>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-gray-600">Client:</span>
-                  <p className="font-medium">
-                    {sale.client?.firstName} {sale.client?.lastName}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-gray-600">Total Due:</span>
-                  <p className="font-medium">{(sale.total || 0).toLocaleString()} UGX</p>
-                </div>
-                <div>
-                  <span className="text-gray-600">Paid So Far:</span>
-                  <p className="font-medium text-green-600">
-                    {(Number(sale.total || 0) - Number(sale.balance || 0)).toLocaleString()} UGX
-                  </p>
-                </div>
-                <div>
-                  <span className="text-gray-600">Current Balance:</span>
-                  <p className="font-medium text-orange-600">{currentBalance.toLocaleString()} UGX</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Payment Methods */}
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <label className="block text-sm font-medium text-gray-700">
-                  Payment Methods
-                </label>
-                {paymentMethods.length < 3 && (
-                  <button
-                    onClick={addPaymentMethod}
-                    className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-                    type="button"
-                  >
-                    + Add Method
+        <div>
+          <div className="mb-1.5 flex items-center justify-between">
+            <p className="m-0 text-[13px] font-medium text-ink-soft">Paid with</p>
+            {paymentMethods.length < 3 && (
+              <button type="button" onClick={addPaymentMethod} className="flex items-center gap-1 rounded-md px-1 text-sm font-medium text-brand-text hover:underline">
+                <FiPlus aria-hidden="true" /> Add method
+              </button>
+            )}
+          </div>
+          <ul className="m-0 list-none space-y-2 p-0">
+            {paymentMethods.map((method, index) => (
+              <li key={index} className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-surface-2 p-2">
+                <Combobox
+                  label={`Payment method ${index + 1}`}
+                  hideLabel
+                  className="min-w-[160px] flex-1"
+                  value={method.type}
+                  onChange={(v) => handlePaymentMethodChange(index, 'type', v || 'CASH')}
+                  options={PAYMENT_METHOD_OPTIONS}
+                  searchPlaceholder="Search methods"
+                />
+                <AmountInput label={`Amount for method ${index + 1}`} className="w-44" value={method.amount} max={currentBalance} onChange={(v) => handlePaymentMethodChange(index, 'amount', v)} />
+                {requiresTransactionId(method.type) && (
+                  <input
+                    aria-label={`Transaction ID for method ${index + 1}`}
+                    value={method.transactionId || ''}
+                    onChange={(e) => handlePaymentMethodChange(index, 'transactionId', e.target.value)}
+                    placeholder="Transaction ID (required)"
+                    className="themed h-10 min-w-[180px] flex-1 rounded-lg border border-line bg-surface px-3 text-sm text-brand-ink outline-none focus:border-brand"
+                  />
+                )}
+                {paymentMethods.length > 1 && (
+                  <button type="button" onClick={() => removePaymentMethod(index)} aria-label="Remove this payment method" className="flex h-10 w-10 items-center justify-center rounded-lg text-brand-muted hover:bg-[#FDECEA] hover:text-[#B42318] dark:hover:bg-[#381B19]">
+                    <FiTrash2 aria-hidden="true" />
                   </button>
                 )}
-              </div>
-              
-              <div className="space-y-4">
-                {paymentMethods.map((method, index) => (
-                  <div key={index} className="flex gap-3 items-start p-4 border border-gray-200 rounded-lg">
-                    <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <CustomDropdown
-                        label="Payment Method"
-                        options={PAYMENT_METHOD_OPTIONS}
-                        value={[method.type]}
-                        onChange={(selectedValues) => handlePaymentMethodChange(index, 'type', selectedValues[0] || 'CASH')}
-                        placeholder="Select payment method..."
-                        searchPlaceholder="Search payment methods..."
-                        singleSelect={true}
-                        maxHeight={200}
-                      />
-
-                      <CustomTextInput
-                        type="number"
-                        value={(method.amount || 0).toString()}
-                        onChange={(value) => handlePaymentMethodChange(index, 'amount', parseFloat(value) || 0)}
-                        placeholder="Enter amount"
-                        min="0"
-                        max={currentBalance.toString()}
-                      />
-
-                      {requiresTransactionId(method.type) && (
-                        <div className="md:col-span-2">
-                          <CustomTextInput
-                            label="Transaction ID"
-                            type="text"
-                            value={method.transactionId || ''}
-                            onChange={(value) => handlePaymentMethodChange(index, 'transactionId', value)}
-                            placeholder="Enter transaction ID"
-                            required
-                          />
-                        </div>
-                      )}
-                    </div>
-                    
-                    {paymentMethods.length > 1 && (
-                      <button
-                        onClick={() => removePaymentMethod(index)}
-                        className="p-2 text-red-600 hover:text-red-800 transition-colors mt-6"
-                        type="button"
-                        title="Remove payment method"
-                      >
-                        <FaTimes size={16} />
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Payment Summary */}
-            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-              <h3 className="font-semibold text-blue-800 mb-3">Payment Summary</h3>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-blue-700">Amount Being Paid:</span>
-                  <p className="font-bold text-lg text-blue-800">
-                    {amountPaid.toLocaleString()} UGX
-                  </p>
-                </div>
-                <div>
-                  <span className="text-blue-700">New Balance:</span>
-                  <p className={`font-bold text-lg ${
-                    newBalance === 0 ? 'text-green-600' : 'text-orange-600'
-                  }`}>
-                    {newBalance.toLocaleString()} UGX
-                  </p>
-                </div>
-              </div>
-              {newBalance === 0 && (
-                <div className="mt-2 text-green-600 text-sm font-medium">
-                  <FaCheck className="inline mr-1" />
-                  This payment will fully settle the credit
-                </div>
-              )}
-            </div>
-
-            {/* Reference and Notes */}
-            <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
-              <CustomTextInput
-                label="Reference ID (Optional)"
-                type="text"
-                value={referenceId}
-                onChange={setReferenceId}
-                placeholder="Enter reference number"
-              />
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Notes (Optional)
-                </label>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={3}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Add any notes about this payment..."
-                />
-              </div>
-            </div>
-          </div>
+              </li>
+            ))}
+          </ul>
         </div>
 
-        {/* Footer Actions */}
-        <div className="flex justify-end gap-3 p-6 border-t bg-gray-50 flex-shrink-0">
-          <CustomButton
-            type="negative"
-            label="Cancel"
-            fn={onClose}
-            disabled={loading}
-          />
-          <CustomButton
-            label={
-              <span className="flex items-center">
-                <FaMoneyBillWave className="mr-2" />
-                Collect Payment
-              </span>
-            }
-            fn={handleSubmit}
-            loading={loading}
-            disabled={loading || amountPaid <= 0}
-          />
+        <div className={`flex items-center justify-between rounded-xl px-4 py-3 ${newBalance === 0 ? 'bg-[#E7F6EC] dark:bg-[#15301F]' : 'bg-subtle'}`}>
+          <span className="flex items-center gap-2 text-sm font-medium text-brand-ink">
+            {newBalance === 0 && <FiCheckCircle aria-hidden="true" className="text-[#1E7B43] dark:text-[#8FD6A8]" />}
+            {newBalance === 0 ? 'This settles the debt in full' : 'Still owed after this'}
+          </span>
+          <span className="font-display text-lg font-semibold tabular-nums text-brand-ink">{ugx(newBalance)}</span>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <TextField label="Reference" value={referenceId} onChange={setReferenceId} placeholder="Optional" />
+          <TextField label="Notes" value={notes} onChange={setNotes} placeholder="Optional" />
         </div>
       </div>
-    </div>
+    </Modal>
   );
 };
 

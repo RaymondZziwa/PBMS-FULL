@@ -1,159 +1,108 @@
-import React, { useEffect, useState } from "react";
-import { FaEdit, FaTrash, FaPlus } from "react-icons/fa";
-import CustomTable from "../../../custom/table/customTable";
-import type { IRole } from "../../../redux/types/systemSettings";
-import AddorModifyRole from "./AddorModify";
-import CustomDeleteModal from "../../../custom/modals/customDeleteModal";
-import { FaKey, FaUsers } from "react-icons/fa6";
-import RoleUsersModal from "./viewUsers";
-import RolePermissionsModal from "./viewPermissions";
+import { useMemo, useState } from "react";
+import { useSelector } from "react-redux";
+import { FiEdit2, FiEye, FiPlus, FiShield, FiTrash2, FiUsers } from "react-icons/fi";
 import useRoles from "../../../hooks/settings/useRoles";
 import { apiRequest } from "../../../libs/apiConfig";
 import { RoleEndpoints } from "../../../endpoints/settings/role/roleEndpoints";
-import { toast } from "sonner";
+import type { RootState } from "../../../redux/store";
+import type { IRole } from "../../../redux/types/systemSettings";
+import { isFullAccessRole } from "../../../layout/navigation";
+import Button from "../../../ui/Button";
+import { SearchBox } from "../../../ui/Field";
+import { Badge, Card, EmptyState, PageHeader, SkeletonRows } from "../../../ui/Page";
+import { useConfirm } from "../../../ui/ConfirmDialog";
+import AddorModifyRole from "./AddorModify";
+import RoleUsersModal from "./viewUsers";
+import RolePermissionsModal from "./viewPermissions";
 
-// Define Role type
-interface Role {
-  id: string;
-  name: string;
-  Employee: string[];
-}
+type Panel = { kind: "edit" | "people" | "perms"; role: IRole | null } | null;
 
-const RoleManagement: React.FC = () => {
+/** Roles decide what each person can see and do. */
+const RoleManagement = () => {
+  const { data, loading, upsert, remove } = useRoles();
+  const roles = (data ?? []) as IRole[];
+  const myRoleId = useSelector((s: RootState) => (s.userAuth?.data as { roleId?: number; role?: { id?: number } } | null)?.role?.id ?? (s.userAuth?.data as { roleId?: number } | null)?.roleId);
+  const confirm = useConfirm();
+  const [query, setQuery] = useState("");
+  const [panel, setPanel] = useState<Panel>(null);
 
-  const [modalProps, setModalProps] = useState<{
-    isOpen: boolean;
-    mode: 'create' | 'edit' | '';
-    role: IRole | null;
-  }>({
-    isOpen: false,
-    mode: 'create',
-    role: null
-  });
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [showModal, setShowModal] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<IRole>()
-  const [showPermModal, setShowPermModal] = useState(false);
-  const {data: roles, refresh} = useRoles()
-  
-  const handleDeleteRole = async (roleId: string) => {
-   try {
-     await apiRequest(RoleEndpoints.delete(roleId), "DELETE", '');
-     refresh()
-   } catch (error) {
-    toast.error(error?.response?.data?.message)
-   }
+  const shown = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return roles.filter((r) => !q || r.name.toLowerCase().includes(q));
+  }, [roles, query]);
+
+  const del = async (r: IRole) => {
+    const people = r.Employee?.length ?? 0;
+    if (String(r.id) === String(myRoleId)) {
+      await confirm({ title: "This is your own role", message: "You can't delete the role you're signed in with.", confirmLabel: "OK" });
+      return;
+    }
+    if (people) {
+      await confirm({ title: `${r.name} is still in use`, message: `${people} ${people === 1 ? "person has" : "people have"} this role. Give them another role first, then delete it.`, confirmLabel: "OK" });
+      return;
+    }
+    await confirm({
+      title: `Delete ${r.name}?`,
+      message: "This can't be undone.",
+      tone: "danger",
+      onConfirm: async () => {
+        await apiRequest(RoleEndpoints.delete(String(r.id)), "DELETE");
+        remove(r.id);
+      },
+    });
   };
 
-  // Columns for the table
-  const columns = [
-    { key: "name", label: "Role Name", sortable: true },
-    {
-      key: "actions",
-      label: "Actions",
-      sortable: false,
-    },
-  ];
-
-// Transform roles into table rows
-const tableData = roles.map((role) => ({
-  ...role,
-  actions: (
-    <div className="flex items-center gap-2">
-      {/* View Users */}
-      <button
-        onClick={() => {
-          setShowModal(true);
-          setSelectedRole(role);
-        }}
-        className="px-3 py-1.5 bg-gray-500 text-white rounded-lg flex items-center gap-2 shadow-sm hover:bg-gray-600 transition"
-      >
-        <FaUsers className="w-4 h-4" />
-        <span>View Users</span>
-      </button>
-
-      {/* View Permissions */}
-      <button
-        onClick={() => {
-          setShowPermModal(true);
-          setSelectedRole(role);
-        }}
-        className="px-3 py-1.5 bg-gray-500 text-white rounded-lg flex items-center gap-2 shadow-sm hover:bg-gray-600 transition"
-      >
-        <FaKey className="w-4 h-4" />
-        <span>View Permissions</span>
-      </button>
-
-      {role.name.toLowerCase() !== 'administrator' && (
-        <div className="flex gap-3">
-          {/* Edit Button */}
-          <div className="relative group">
-            <button
-              className="text-blue-600 hover:text-blue-800 transition-colors"
-              onClick={() =>
-                setModalProps({ isOpen: true, mode: 'edit', role })
-              }
-            >
-              <FaEdit />
-            </button>
-            <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-              Edit
-            </span>
-          </div>
-
-          {/* Delete Button */}
-          <div className="relative group">
-            <button
-              className="text-red-600 hover:text-red-800 transition-colors"
-              onClick={() => {
-                setModalProps({ isOpen: false, mode: '', role });
-                setIsDeleteModalOpen(true);
-              }}
-            >
-              <FaTrash />
-            </button>
-            <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-              Delete
-            </span>
-          </div>
-        </div>
-      )}
-    </div>
-  ),
-}));
-
-
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-800">Roles</h2>
-              <button
-                onClick={()=> setModalProps({ isOpen: true, mode: 'create', role: null })}
-                className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-              >
-                <FaPlus className="mr-2" />
-                Add New Role
-              </button>
+    <div className="mx-auto max-w-6xl font-inter">
+      <PageHeader
+        title="Roles & permissions"
+        description="Each employee has one role. A role's permissions decide which modules and actions they can use."
+        actions={<Button icon={<FiPlus aria-hidden="true" />} onClick={() => setPanel({ kind: "edit", role: null })}>New role</Button>}
+      />
+      <Card>
+        <div className="border-b border-line p-3 sm:p-4">
+          <SearchBox value={query} onChange={setQuery} placeholder="Search roles" label="Search roles" />
         </div>
-      <CustomTable columns={columns} data={tableData} pageSize={5} />
-      <AddorModifyRole
-        visible={modalProps.isOpen}
-        role={modalProps.role}
-        onCancel={() => setModalProps({ isOpen: false, mode: "create", role: null })} onSubmit={()=> {} } />
-       <CustomDeleteModal
-        visible={isDeleteModalOpen}
-        onCancel={() => setIsDeleteModalOpen(false)}
-        onConfirm={() => handleDeleteRole(modalProps.role?.id)} />
-      <RoleUsersModal
-        visible={showModal}
-        onClose={() => setShowModal(false)}
-        role={selectedRole}
-      />
-       <RolePermissionsModal
-        visible={showPermModal}
-        onClose={() => setShowPermModal(false)}
-        role={selectedRole}
-      />
+        {loading && !roles.length ? (
+          <SkeletonRows rows={5} />
+        ) : !shown.length ? (
+          <EmptyState icon={<FiShield className="h-5 w-5" />} title={roles.length ? "No role matches your search" : "No roles yet"} />
+        ) : (
+          <ul className="m-0 grid list-none grid-cols-1 gap-3 p-3 sm:grid-cols-2 sm:p-4 xl:grid-cols-3">
+            {shown.map((r) => {
+              const people = r.Employee?.length ?? 0;
+              const full = isFullAccessRole(r);
+              const mine = String(r.id) === String(myRoleId);
+              return (
+                <li key={r.id} className="flex flex-col rounded-xl border border-line bg-surface p-4">
+                  <div className="flex items-start gap-3">
+                    <span aria-hidden="true" className="flex h-10 w-10 flex-none items-center justify-center rounded-lg bg-subtle text-brand-text"><FiShield /></span>
+                    <div className="min-w-0 flex-1">
+                      <p className="m-0 truncate font-semibold text-brand-ink">{r.name}</p>
+                      <div className="mt-1 flex flex-wrap gap-1.5">
+                        {full ? <Badge tone="brand">Full access</Badge> : <Badge tone="neutral">{r.permissions.length} permission(s)</Badge>}
+                        {mine && <Badge tone="good">Your role</Badge>}
+                      </div>
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => setPanel({ kind: "people", role: r })} className="mt-3 flex items-center gap-2 self-start rounded-md text-sm text-brand-muted hover:text-brand-ink">
+                    <FiUsers aria-hidden="true" /> {people} {people === 1 ? "person" : "people"}
+                  </button>
+                  <div className="mt-4 flex gap-2 border-t border-line pt-3">
+                    <Button variant="secondary" size="sm" icon={<FiEye aria-hidden="true" />} onClick={() => setPanel({ kind: "perms", role: r })} aria-label={`View ${r.name} permissions`}>View</Button>
+                    <Button variant="secondary" size="sm" icon={<FiEdit2 aria-hidden="true" />} onClick={() => setPanel({ kind: "edit", role: r })} className="flex-1">Edit</Button>
+                    <Button variant="secondary" size="sm" icon={<FiTrash2 aria-hidden="true" />} onClick={() => del(r)} aria-label={`Delete ${r.name}`} className="text-[#C0362C]" />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Card>
+
+      <AddorModifyRole open={panel?.kind === "edit"} role={panel?.kind === "edit" ? panel.role : null} onClose={() => setPanel(null)} onSaved={upsert} />
+      <RoleUsersModal visible={panel?.kind === "people"} role={panel?.role ?? null} onClose={() => setPanel(null)} />
+      <RolePermissionsModal visible={panel?.kind === "perms"} role={panel?.role ?? null} onClose={() => setPanel(null)} onEdit={() => setPanel((p) => (p ? { kind: "edit", role: p.role } : p))} />
     </div>
   );
 };

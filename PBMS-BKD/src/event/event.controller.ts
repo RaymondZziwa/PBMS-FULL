@@ -15,6 +15,7 @@ import {
   //UpdateParticipantDto,
 } from 'src/dto/event.dto';
 import { EventsService } from './event.service';
+import { Public } from 'src/auth/decorators';
 
 @Controller('api/events')
 export class EventsController {
@@ -31,6 +32,7 @@ export class EventsController {
     return this.eventsService.findAll();
   }
 
+  @Public()
   @Get(':id')
   async findOneEvent(@Param('id') id: number) {
     return this.eventsService.findOne(id);
@@ -49,6 +51,7 @@ export class EventsController {
     return this.eventsService.remove(id);
   }
 
+  @Public()
   @Get('upcoming/all')
   async getUpcomingEvents() {
     return this.eventsService.getUpcomingEvents();
@@ -81,6 +84,7 @@ export class EventsController {
   //   return this.eventsService.makePayment();
   // }
 
+  @Public()
   @Post(':eventId/tickets/:ticketId/complete-payment')
   async completeTicketPayment(
     @Param('eventId') eventId: string,
@@ -94,6 +98,7 @@ export class EventsController {
     );
   }
 
+  @Public()
   @Get('tickets/check-reservation/:eventId/:reservationCode')
   async checkReservation(
     @Param('reservationCode') reservationCode: string,
@@ -106,6 +111,7 @@ export class EventsController {
   }
 
   // ========== Participant Management ==========
+  @Public()
   @Post(':eventId/participants')
   async addParticipant(
     @Param('eventId') eventId: string,

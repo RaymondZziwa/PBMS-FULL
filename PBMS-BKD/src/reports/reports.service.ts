@@ -277,10 +277,13 @@ export class ReportService {
     });
 
     // Enhanced movement classification
+    // Must match the InventoryRecordCategory enum. (The old names here, e.g.
+    // 'DEPLETE', never matched, so "total out" was always 0.)
+    // Records are filtered by the store stock leaves from, so a TRANSFER is stock out.
     const movementTypes = {
-      IN: ['RESTOCK', 'STOCK_TRANSFER'], // Transfer can be IN depending on context
-      OUT: ['DEPLETE'],
-      ADJUSTMENT: ['STOCK_ADJUSTMENT'],
+      IN: ['RESTOCK', 'MANUFACTURING'],
+      OUT: ['DEPLETION', 'TRANSFER'],
+      ADJUSTMENT: ['ADJUSTMENT'],
     };
 
     const totalIn = movements
@@ -301,6 +304,7 @@ export class ReportService {
         stockOut: movements.filter((m) => m.category === 'DEPLETION').length,
         adjustments: movements.filter((m) => m.category === 'ADJUSTMENT')
           .length,
+        transfers: movements.filter((m) => m.category === 'TRANSFER').length,
       },
       quantityBreakdown: {
         stockIn: movements
@@ -311,6 +315,9 @@ export class ReportService {
           .reduce((sum, m) => sum + m.qty, 0),
         adjustments: movements
           .filter((m) => m.category === 'ADJUSTMENT')
+          .reduce((sum, m) => sum + m.qty, 0),
+        transfers: movements
+          .filter((m) => m.category === 'TRANSFER')
           .reduce((sum, m) => sum + m.qty, 0),
       },
     };
@@ -375,10 +382,12 @@ export class ReportService {
     if (endDate)
       filterDescriptions['End Date'] = new Date(endDate).toLocaleDateString();
     if (movementType) {
-      const movementLabels = {
+      const movementLabels: Record<string, string> = {
         RESTOCK: 'Stock In',
         DEPLETION: 'Stock Out',
         ADJUSTMENT: 'Adjustment',
+        TRANSFER: 'Transfer out',
+        MANUFACTURING: 'Manufacturing',
       };
       filterDescriptions['Movement Type'] =
         movementLabels[movementType] || movementType;
@@ -479,6 +488,8 @@ export class ReportService {
                   RESTOCK: 'Stock In',
                   DEPLETION: 'Stock Out',
                   ADJUSTMENT: 'Adjustment',
+                  TRANSFER: 'Transfer out',
+                  MANUFACTURING: 'Manufacturing',
                 };
                 return typeMap[value] || value;
               },
@@ -998,20 +1009,17 @@ export class ReportService {
           (a: any, b: any) => b.totalRevenue - a.totalRevenue,
         ),
         period: {
+          // With no sales and no dates, Math.min() of nothing made an invalid date and the report crashed.
           startDate:
             startDate ||
-            new Date(
-              Math.min(...massageSales.map((s) => s.createdAt.getTime())),
-            )
-              .toISOString()
-              .split('T')[0],
+            (massageSales.length
+              ? new Date(Math.min(...massageSales.map((s) => s.createdAt.getTime()))).toISOString().split('T')[0]
+              : 'N/A'),
           endDate:
             endDate ||
-            new Date(
-              Math.max(...massageSales.map((s) => s.createdAt.getTime())),
-            )
-              .toISOString()
-              .split('T')[0],
+            (massageSales.length
+              ? new Date(Math.max(...massageSales.map((s) => s.createdAt.getTime()))).toISOString().split('T')[0]
+              : 'N/A'),
         },
         service: serviceId ? servicePerformance[serviceId] || null : null,
       },
@@ -2097,14 +2105,12 @@ export class ReportService {
 
   async exhibitionSalesSummary(expoId?: number) {
     // Build where condition
-    const store = await this.prisma.exhibitionStore.findMany({
-      where: { exhibitionId: expoId },
-    });
-
-    if (!store && expoId) {
-      throw new NotFoundException(`Exhibition with ID ${expoId} not found`);
-    }
-    const whereCondition = expoId ? { exhibitionStoreId: store[0]?.id } : {};
+    // An exhibition can have several stores: include sales from all of them
+    // (the old code only looked at the first store).
+    const stores = expoId
+      ? await this.prisma.exhibitionStore.findMany({ where: { exhibitionId: expoId }, select: { id: true } })
+      : [];
+    const whereCondition = expoId ? { exhibitionStoreId: { in: stores.map((x) => x.id) } } : {};
 
     // Get sales data
     const sales = await this.prisma.exhibitionSales.findMany({
