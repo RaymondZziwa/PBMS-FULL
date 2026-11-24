@@ -82,7 +82,7 @@ const AddOrModifyAttendance = ({ open, date, record, employeeId, employees, take
         await apiRequest(PayrollEndpoints.Attendance.modify(record.id), "PUT", "", { timeOut: toEAT(date, timeOut), notes });
       } else {
         await apiRequest(PayrollEndpoints.Attendance.create, "POST", "", {
-          employeeId: emp,
+          employeeId: Number(emp),
           date,
           timeIn: toEAT(date, timeIn),
           timeOut: timeOut ? toEAT(date, timeOut) : undefined,

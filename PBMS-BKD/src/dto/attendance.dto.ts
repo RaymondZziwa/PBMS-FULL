@@ -1,12 +1,12 @@
 // src/dto/attendance.dto.ts
-import { IsString, IsDateString, IsOptional, IsUUID } from 'class-validator';
+import { IsString, IsDateString, IsOptional } from 'class-validator';
 
 export class CreateAttendanceDto {
   @IsString()
   date: string;
 
-  @IsUUID()
-  employeeId: number;
+  /** Employee id; the screen may send it as text. */
+  employeeId: number | string;
 
   @IsDateString()
   timeIn: string;

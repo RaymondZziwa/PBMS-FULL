@@ -1,16 +1,16 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { PayrollService } from './payroll.service';
 import { CreateAttendanceDto, UpdateAttendanceDto } from 'src/dto/attendance.dto';
-import { RequirePermissions } from 'src/auth/decorators';
-import { PERMISSIONS } from 'src/auth/permissions';
+import { JwtAuthGuard } from 'src/guards/authGuard.guard';
+import { PermissionsGuard } from 'src/guards/permissions.guard';
 
 /**
- * Recording attendance has its own permission ("Record Attendance"), separate
- * from HR, so a supervisor can clock people in and out without seeing salaries.
- * HR users can do it too. Payroll stays in PayrollController.
+ * Recording attendance is everyday work, not HR work: any signed-in user may
+ * clock people in and out and see the day's sheet. No HR permission needed.
+ * Payroll (salaries, period summaries) stays in PayrollController behind HR.
  */
 @Controller('api/employees')
-@RequirePermissions(PERMISSIONS.ATTENDANCE, PERMISSIONS.HR)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class AttendanceController {
   constructor(private readonly payrollService: PayrollService) {}
 

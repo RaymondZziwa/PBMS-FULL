@@ -20,7 +20,10 @@ export class PayrollService {
   constructor(private readonly prisma: PrismaService) {}
 
   async createAttendance(createAttendanceDto: CreateAttendanceDto) {
-    const { date, employeeId, timeIn, timeOut, notes } = createAttendanceDto;
+    const { date, timeIn, timeOut, notes } = createAttendanceDto;
+    // The screen sends the id as text; the column is an integer.
+    const employeeId = Number(createAttendanceDto.employeeId);
+    if (!Number.isInteger(employeeId) || employeeId <= 0) throw new BadRequestException('Choose an employee');
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date ?? ''))) throw new BadRequestException('Choose a valid date');
     const tIn = new Date(timeIn);
@@ -48,7 +51,7 @@ export class PayrollService {
 
     if (existingAttendance) {
       throw new ConflictException(
-        `Attendance already recorded for this employee on date ${date}`,
+        `${employee.firstName} is already clocked in for ${date}`,
       );
     }
 

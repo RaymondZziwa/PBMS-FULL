@@ -71,7 +71,7 @@ const AttendanceManagement = () => {
   const quickIn = async (e: IEmployee) => {
     setBusyId(`e${e.id}`);
     try {
-      await apiRequest(PayrollEndpoints.Attendance.create, "POST", "", { employeeId: String(e.id), date, timeIn: toEAT(date, nowHHMM()) });
+      await apiRequest(PayrollEndpoints.Attendance.create, "POST", "", { employeeId: Number(e.id), date, timeIn: toEAT(date, nowHHMM()) });
       await refresh();
     } catch {
       // toast shown
@@ -156,7 +156,7 @@ const AttendanceManagement = () => {
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-4 text-sm tabular-nums">
+                  <div className="flex w-[110px] items-center gap-4 text-sm tabular-nums">
                     <span><span className="block text-[11px] uppercase tracking-wide text-brand-muted">In</span><span className="font-medium text-brand-ink">{hhmmEAT(r.timeIn)}</span></span>
                     <span><span className="block text-[11px] uppercase tracking-wide text-brand-muted">Out</span><span className="font-medium text-brand-ink">{r.timeOut ? hhmmEAT(r.timeOut) : "—"}</span></span>
                   </div>
@@ -171,7 +171,7 @@ const AttendanceManagement = () => {
                     </div>
                   </div>
 
-                  <div className="ml-auto flex items-center gap-1.5">
+                  <div className="ml-auto flex items-center justify-end gap-1.5 md:w-[200px]">
                     {!r.timeOut && isToday ? (
                       <Button size="sm" icon={<FiLogOut aria-hidden="true" />} loading={busyId === String(r.id)} onClick={() => quickOut(r)}>Clock out</Button>
                     ) : (
