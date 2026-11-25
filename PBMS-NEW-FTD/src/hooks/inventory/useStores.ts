@@ -1,50 +1,12 @@
-import { useEffect } from "react";
-import { useDispatch, useSelector } from 'react-redux';
-import { fetchDataStart, fetchDataSuccess, fetchDataFailure } from "../../redux/slices/inventory/storeSlice";
-import { apiRequest } from "../../libs/apiConfig";
-import type { RootState } from "../../redux/store";
+import * as actions from "../../redux/slices/inventory/storeSlice";
 import { InventoryEndpoints } from "../../endpoints/inventory/inventory";
+import type { IStore } from "../../redux/types/inventory";
+import type { RootState } from "../../redux/store";
+import { useListResource } from "../humanResource/useListResource";
 
-const useStores = () => {
-  const dispatch = useDispatch();
-  //const { token, isFetchingLocalToken } = useAuth();
+const select = (state: RootState) => state.store;
 
-  const fetchDataFromApi = async () => {
-    //if (isFetchingLocalToken || !token?.access_token) return;
-
-    dispatch(fetchDataStart()); // Dispatch action to indicate data fetching has started
-
-    try {
-      const response = await apiRequest(
-          InventoryEndpoints.STORE.fetch_all,
-          "GET",
-            '',
-      );
-      //console.log(response)
-      if (response.status == 200) {
-        //console.log('subs data', response.data)
-        dispatch(fetchDataSuccess(response.data)); // Dispatch action with fetched data
-      } else {
-        throw new Error("Failed to fetch stores.");
-      }
-    } catch (error) {
-      console.error("Failed to fetch stores:", error);
-      dispatch(
-        fetchDataFailure(
-          error instanceof Error ? error.message : "An unknown error occurred."
-        )
-      );
-    }
-  };
-
-  useEffect(()=> {
-    fetchDataFromApi()
-  }, [])
-
-
-const data = useSelector((state: RootState) => state.store);
-
-return { ...data, refresh: fetchDataFromApi };
-};
+/** Stores, with the people allowed to work in each. Loaded once and shared; upsert/remove update every screen at once. */
+const useStores = () => useListResource<IStore>(InventoryEndpoints.STORE.fetch_all, select, actions);
 
 export default useStores;

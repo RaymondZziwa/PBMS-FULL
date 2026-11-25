@@ -1,34 +1,34 @@
 export const InventoryEndpoints = {
     ITEM_CATEGORIES: {
         create: '/api/item-categories/create',
-        modify: (id: string) => `/api/item-categories/modify/${id}`,
+        modify: (id: string | number) => `/api/item-categories/modify/${id}`,
         fetch_all: '/api/item-categories/fetch-all',
-        delete: (id: string) => `/api/item-categories/delete/${id}`
+        delete: (id: string | number) => `/api/item-categories/delete/${id}`
     },
     ITEM: {
         create: '/api/item/create',
-        modify: (id: string) => `/api/item/modify/${id}`,
+        modify: (id: string | number) => `/api/item/modify/${id}`,
         fetch_all: '/api/item/fetch-all',
-        delete: (id: string) => `/api/item/delete/${id}`,
-        fetch_store_inventory: (storeId: string) => `/api/item/fetch-store-inventory/${storeId}`
+        delete: (id: string | number) => `/api/item/delete/${id}`,
+        fetch_store_inventory: (storeId: string | number) => `/api/item/fetch-store-inventory/${storeId}`
     },
     STORE: {
         create: '/api/store/create',
-        modify: (id: string) => `/api/store/modify/${id}`,
+        modify: (id: string | number) => `/api/store/modify/${id}`,
         fetch_all: '/api/store/fetch-all',
-        delete: (id: string) => `/api/store/delete/${id}`
+        delete: (id: string | number) => `/api/store/delete/${id}`
     },
     SERVICE: {
         create: '/api/services/create',
-        modify: (id: string) => `/api/services/modify/${id}`,
+        modify: (id: string | number) => `/api/services/modify/${id}`,
         fetch_all: '/api/services/fetch-all',
-        delete: (id: string) => `/api/services/delete/${id}`
+        delete: (id: string | number) => `/api/services/delete/${id}`
     },
     UNITS: {
         create: '/api/units/create',
-        modify: (id: string) => `/api/units/modify/${id}`,
+        modify: (id: string | number) => `/api/units/modify/${id}`,
         fetch_all: '/api/units/fetch-all',
-        delete: (id: string) => `/api/units/delete/${id}`
+        delete: (id: string | number) => `/api/units/delete/${id}`
     },
     STOCK_MVT: {
         create: '/api/stock-movement/create',
@@ -36,26 +36,26 @@ export const InventoryEndpoints = {
         CONFIRM_STOCK_TRANSFER: '/api/stock-movement/confirm-transfer',
         REJECT_STOCK_TRANSFER: '/api/stock-movement/reject-transfer',
         CREATE_DNS: '/api/stock-movement/delivery-note/create',
-        delete_DN: (id: string) => `/api/stock-movement/delete-dn/${id}`,
+        delete_DN: (id: string | number) => `/api/stock-movement/delivery-note/${id}`,
         get_all_dns: '/api/stock-movement/fetch-all-dns',
-        resolve_transfer_conflict: (id: string) => `/api/stock-movement/resolve-stock-transfer-conflict/${id}`
+        resolve_transfer_conflict: (id: string | number) => `/api/stock-movement/resolve-stock-transfer-conflict/${id}`
     },
     SUPPLY: {
         SUPPLIER: {
-        Create_supplier: '/api/suppliers/save-supplier',
-        modify: (id: string) => `/api/suppliers/update/${id}`,
-        fetch_all: '/api/suppliers/fetch-suppliers',
-        delete: (id: string) => `/api/suppliers/delete/${id}`
+            Create_supplier: '/api/suppliers/save-supplier',
+            modify: (id: string | number) => `/api/suppliers/update/${id}`,
+            fetch_all: '/api/suppliers/fetch-suppliers',
+            fetch_one: (id: string | number) => `/api/suppliers/get-supplier/${id}`,
+            delete: (id: string | number) => `/api/suppliers/delete/${id}`
         },
         SUPPLIES: {
-        Create_supply: '',
-        modify: (id: string) => `/api/suppliers/supplies/modify/${id}`,
-        fetch_all: '/api/units/fetch-all',
-        delete: (id: string) => `/api/suppliers/supplies/delete/${id}`
+            create: (supplierId: string | number) => `/api/suppliers/${supplierId}/save-supply`,
+            modify: (id: string | number) => `/api/suppliers/supplies/modify/${id}`,
+            delete: (id: string | number) => `/api/suppliers/supplies/delete/${id}`
         },
         SUPPLY_PAYMENTS: {
             PAY: '/api/suppliers/payments',
-            DELETE: (id: string) => `/api/suppliers/payments/delete/${id}`
+            DELETE: (id: string | number) => `/api/suppliers/payments/delete/${id}`
         }
     }
 }

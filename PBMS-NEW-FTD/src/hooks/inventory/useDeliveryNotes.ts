@@ -1,50 +1,12 @@
-import { useEffect } from "react";
-import { useDispatch, useSelector } from 'react-redux';
-import { fetchDataStart, fetchDataSuccess, fetchDataFailure } from "../../redux/slices/inventory/deliveryNoteSlice";
-import { apiRequest } from "../../libs/apiConfig";
-import type { RootState } from "../../redux/store";
+import * as actions from "../../redux/slices/inventory/deliveryNoteSlice";
 import { InventoryEndpoints } from "../../endpoints/inventory/inventory";
+import type { IDeliveryNote } from "../../redux/types/inventory";
+import type { RootState } from "../../redux/store";
+import { useListResource } from "../humanResource/useListResource";
 
-const useDeliveryNotes = () => {
-  const dispatch = useDispatch();
-  //const { token, isFetchingLocalToken } = useAuth();
+const select = (state: RootState) => state.deliveryNotes;
 
-  const fetchDataFromApi = async () => {
-    //if (isFetchingLocalToken || !token?.access_token) return;
-
-    dispatch(fetchDataStart()); // Dispatch action to indicate data fetching has started
-
-    try {
-      const response = await apiRequest(
-          InventoryEndpoints.STOCK_MVT.get_all_dns,
-          "GET",
-            '',
-      );
-      //console.log(response)
-      if (response.status == 200) {
-        //console.log('subs data', response.data)
-        dispatch(fetchDataSuccess(response.data)); // Dispatch action with fetched data
-      } else {
-        throw new Error("Failed to fetch delivery notes.");
-      }
-    } catch (error) {
-      console.error("Failed to fetch delivery notes:", error);
-      dispatch(
-        fetchDataFailure(
-          error instanceof Error ? error.message : "An unknown error occurred."
-        )
-      );
-    }
-  };
-
-  useEffect(()=> {
-    fetchDataFromApi()
-  }, [])
-
-
-const data = useSelector((state: RootState) => state.deliveryNotes);
-
-return { ...data, refresh: fetchDataFromApi };
-};
+/** Delivery notes. Loaded once and shared; upsert/remove update every screen at once. */
+const useDeliveryNotes = () => useListResource<IDeliveryNote>(InventoryEndpoints.STOCK_MVT.get_all_dns, select, actions);
 
 export default useDeliveryNotes;

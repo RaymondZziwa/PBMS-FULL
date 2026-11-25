@@ -1,31 +1,24 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Put,
-  Delete,
   Body,
-  Param,
+  Controller,
+  Delete,
+  Get,
   HttpCode,
   HttpStatus,
+  Param,
+  ParseIntPipe,
+  Post,
+  Put,
   UploadedFile,
   UseInterceptors,
-  ParseUUIDPipe,
 } from '@nestjs/common';
-import { PdfResponseInterceptor } from 'src/utils/pdfGenerator/pdf-response.interceptor';
-import {
-  CreateSupplierDto,
-  SupplierPaymentDto,
-  UpdateSupplierDto,
-} from 'src/dto/supplier.dto';
-import { Prisma } from '@prisma/client';
-import { SupplierService } from './supplierManagement.service';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import path, { join, extname } from 'path';
-import { v4 as uuidv4 } from 'uuid';
-import { RequirePermissions } from 'src/auth/decorators';
+import { PdfResponseInterceptor } from 'src/utils/pdfGenerator/pdf-response.interceptor';
+import { SupplierService } from './supplierManagement.service';
+import { CurrentUser, RequirePermissions } from 'src/auth/decorators';
 import { PERMISSIONS } from 'src/auth/permissions';
+import type { AuthenticatedUser } from 'src/auth/permissions';
+import { imageUpload } from '../inventory.helpers';
 
 @Controller('api/suppliers')
 @RequirePermissions(PERMISSIONS.INVENTORY)
@@ -34,185 +27,84 @@ export class SupplierController {
 
   @Post('save-supplier')
   @HttpCode(HttpStatus.OK)
-  async create(@Body() createSupplierDto: CreateSupplierDto) {
-    return await this.supplierService.create(createSupplierDto);
+  create(@Body() body: Record<string, unknown>) {
+    return this.supplierService.create(body);
   }
 
   @Get('fetch-suppliers')
-  @HttpCode(HttpStatus.OK)
-  async findAll() {
-    return await this.supplierService.findAll();
+  findAll() {
+    return this.supplierService.findAll();
   }
 
   @Get('get-supplier/:id')
-  @HttpCode(HttpStatus.OK)
-  async findOne(@Param('id') id: string) {
-    return await this.supplierService.findOne(Number(id));
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.supplierService.findOne(id);
   }
 
   @Put('update/:id')
-  @HttpCode(HttpStatus.OK)
-  async update(
-    @Param('id') id: string,
-    @Body() updateSupplierDto: UpdateSupplierDto,
-  ) {
-    return await this.supplierService.update(Number(id), updateSupplierDto);
+  update(@Param('id', ParseIntPipe) id: number, @Body() body: Record<string, unknown>) {
+    return this.supplierService.update(id, body);
   }
 
   @Delete('delete/:id')
-  @HttpCode(HttpStatus.OK)
-  async remove(@Param('id') id: string) {
-    return await this.supplierService.remove(Number(id));
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.supplierService.remove(id);
   }
 
-  // ✅ FIXED SUPPLY CREATION WITH FILE UPLOAD
+  /** Goods received from a supplier (multipart; optional photo in `proofImage`). */
   @Post(':id/save-supply')
-  @UseInterceptors(
-    FileInterceptor('proofImage', {
-      storage: diskStorage({
-        destination: join(process.cwd(), 'uploads/supply-evidence'),
-        filename: (req, file, cb) => {
-          const uniqueName = `supply-${uuidv4()}${extname(file.originalname)}`;
-          cb(null, uniqueName);
-        },
-      }),
-      fileFilter: (req, file, cb) => {
-        if (!file.mimetype.match(/\/(jpg|jpeg|png|gif)$/)) {
-          return cb(new Error('Only image files are allowed!'), false);
-        }
-        cb(null, true);
-      },
-      limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
-    }),
-  )
-  async saveSupply(
-    @Param('id') supplierId: number,
-    @UploadedFile() proofImage: Express.Multer.File,
-    @Body()
-    body: {
-      itemId: number;
-      qty: number;
-      value: number;
-      unitId: number;
-      recievedBy: number;
-      destinationStoreId: number;
-    },
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(FileInterceptor('proofImage', imageUpload('supply-evidence', 'supply')))
+  saveSupply(
+    @Param('id') supplierId: string,
+    @UploadedFile() proofImage: Express.Multer.File | undefined,
+    @Body() body: Record<string, unknown>,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return await this.supplierService.createSupply(proofImage, {
-      ...body,
-      supplierId,
-    });
+    return this.supplierService.createSupply(user, supplierId, proofImage ?? null, body);
   }
 
   @Put('supplies/modify/:supplyId')
-  @HttpCode(HttpStatus.OK)
-  @UseInterceptors(
-    FileInterceptor('attachment', {
-      storage: diskStorage({
-        destination: './uploads/supplies',
-        filename: (req, file, callback) => {
-          const uniqueSuffix =
-            Date.now() + '-' + Math.round(Math.random() * 1e9);
-          const ext = path.extname(file.originalname);
-          callback(null, `supply-${uniqueSuffix}${ext}`);
-        },
-      }),
-    }),
-  )
-  async modifySupply(
-    @Param('supplyId', ParseUUIDPipe) id: number,
-    @UploadedFile() file: Express.Multer.File,
-    @Body()
-    body: {
-      itemId: number;
-      qty: number;
-      value: number;
-      unitId: number;
-      recievedBy: number;
-      destinationStoreId: number;
-    },
+  @UseInterceptors(FileInterceptor('proofImage', imageUpload('supply-evidence', 'supply')))
+  modifySupply(
+    @Param('supplyId') id: string,
+    @UploadedFile() proofImage: Express.Multer.File | undefined,
+    @Body() body: Record<string, unknown>,
   ) {
-    // Prepare update payload
-    const updateData: {
-      itemId: number;
-      qty: number;
-      value: number;
-      unitId: number;
-      recievedBy: number;
-      destinationStoreId: number;
-    } = {
-      itemId: body.itemId,
-      qty: Number(body.qty),
-      value: Number(body.value),
-      unitId: body.unitId,
-      recievedBy: body.recievedBy,
-      destinationStoreId: body.destinationStoreId,
-      ...(file ? { proofImage: file.filename } : {}), // add file if uploaded
-    };
-
-    return await this.supplierService.modifySupply(id, updateData);
+    return this.supplierService.modifySupply(id, proofImage ?? null, body);
   }
 
   @Delete('supplies/delete/:supplyId')
-  @HttpCode(HttpStatus.OK)
-  async deleteSupply(@Param('supplyId') id: number) {
-    return await this.supplierService.deleteSupply(id);
+  deleteSupply(@Param('supplyId') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.supplierService.deleteSupply(user, id);
   }
 
-  // ✅ SUPPLIER PAYMENTS
   @Post('payments')
-  @UseInterceptors(
-    FileInterceptor('proofImage', {
-      storage: diskStorage({
-        destination: join(process.cwd(), 'uploads/supply-payment-evidence'),
-        filename: (req, file, cb) => {
-          const uniqueName = `supply-${uuidv4()}${extname(file.originalname)}`;
-          cb(null, uniqueName);
-        },
-      }),
-      fileFilter: (req, file, cb) => {
-        if (!file.mimetype.match(/\/(jpg|jpeg|png|gif)$/)) {
-          return cb(new Error('Only image files are allowed!'), false);
-        }
-        cb(null, true);
-      },
-      limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
-    }),
-  )
   @HttpCode(HttpStatus.OK)
-  async processSupplierPayment(
-    @Body() body: SupplierPaymentDto,
-    @UploadedFile() proofImage?: Express.Multer.File,
+  @UseInterceptors(FileInterceptor('proofImage', imageUpload('supply-payment-evidence', 'payment')))
+  processSupplierPayment(
+    @Body() body: Record<string, unknown>,
+    @UploadedFile() proofImage: Express.Multer.File | undefined,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    const fileToSend = proofImage ?? null;
-    return await this.supplierService.processSupplierPayment(fileToSend, body);
-  }
-
-  @Put('payments/:paymentId')
-  @HttpCode(HttpStatus.OK)
-  async modifyPayment(
-    @Param('paymentId') id: number,
-    @Body() updatePaymentDto: Prisma.SupplyPaymentsUpdateInput,
-  ) {
-    return await this.supplierService.modifyPayment(id, updatePaymentDto);
+    return this.supplierService.processSupplierPayment(user, proofImage ?? null, body);
   }
 
   @Delete('payments/delete/:paymentId')
-  @HttpCode(HttpStatus.OK)
-  async deletePayment(@Param('paymentId') id: number) {
-    return await this.supplierService.deletePayment(Number(id));
+  deletePayment(@Param('paymentId', ParseIntPipe) id: number) {
+    return this.supplierService.deletePayment(id);
   }
 
+  @RequirePermissions(PERMISSIONS.INVENTORY, PERMISSIONS.REPORTS)
   @Get('report')
-  @HttpCode(HttpStatus.OK)
-  async getSupplierReport() {
-    return await this.supplierService.getAllSuppliersReport();
+  getSupplierReport() {
+    return this.supplierService.getAllSuppliersReport();
   }
 
+  @RequirePermissions(PERMISSIONS.INVENTORY, PERMISSIONS.REPORTS)
   @Get('report/export')
   @UseInterceptors(PdfResponseInterceptor)
-  @HttpCode(HttpStatus.OK)
-  async exportSuppliersReportPDF() {
-    return await this.supplierService.exportSuppliersReportPDF();
+  exportSuppliersReportPDF() {
+    return this.supplierService.exportSuppliersReportPDF();
   }
 }

@@ -1,462 +1,250 @@
-import { useState } from "react";
-import CustomTable from "../../../custom/table/customTable";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { FiAlertTriangle, FiCheck, FiEye, FiPlus, FiRepeat, FiX } from "react-icons/fi";
 import useStockMovement from "../../../hooks/inventory/useStockMovement";
-import type { IStockMovement } from "../../../redux/types/inventory";
-import {
-  FaPlus,
-  FaCheckCircle,
-  FaTimesCircle,
-  FaExclamationTriangle,
-  FaImages,
-  FaEye,
-} from "react-icons/fa";
-import StockMovementForm from "./StockMovementForm";
-import { useSelector } from "react-redux";
-import type { RootState } from "../../../redux/store";
-import { Modal } from "antd";
-import ImagePreviewModal from "../../../custom/modals/imagePreviewModal";
-import CustomTextarea from "../../../custom/inputs/customTextArea";
-import CustomNumberInput from "../../../custom/inputs/customNumberInput";
+import useStores from "../../../hooks/inventory/useStores";
 import { apiRequest } from "../../../libs/apiConfig";
 import { InventoryEndpoints } from "../../../endpoints/inventory/inventory";
-import { toast } from "sonner";
-import NotesPreviewModal from "../../../custom/modals/notesPreviewModal";
+import type { IStockMovement } from "../../../redux/types/inventory";
+import Button from "../../../ui/Button";
+import Modal from "../../../ui/Modal";
+import Combobox from "../../../ui/Combobox";
+import { SearchBox, TextField } from "../../../ui/Field";
+import { Badge, Card, EmptyState, PageHeader, SkeletonRows, StatTile } from "../../../ui/Page";
+import { apiError, Facts, imagesOf, MovementBadge, num, Pager, personName, Photos, qty, Table, Tabs, Td, TextArea, Th, usePaged, when } from "../shared";
+import StockMovementForm from "./StockMovementForm";
 
+type View = "all" | "RESTOCK" | "DEPLETION" | "TRANSFER" | "ADJUSTMENT" | "pending" | "mismatch";
+type Action = { kind: "confirm" | "reject" | "resolve"; rec: IStockMovement } | null;
+
+const sent = (r: IStockMovement) => num(r.initiatedQty ?? r.qty);
+const isPending = (r: IStockMovement) => r.category === "TRANSFER" && r.transferStatus === "PENDING";
+const isMismatch = (r: IStockMovement) => r.category === "TRANSFER" && r.transferStatus === "CONFIRMED" && r.initiatedQty != null && num(r.qty) !== num(r.initiatedQty);
+
+const Status = ({ r }: { r: IStockMovement }) => {
+  if (r.category !== "TRANSFER") return null;
+  if (r.transferStatus === "PENDING") return <Badge tone="warn">Awaiting receipt</Badge>;
+  if (r.transferStatus === "REJECTED") return <Badge tone="bad">Rejected</Badge>;
+  if (isMismatch(r)) return r.isResolved ? <Badge tone="good">Mismatch resolved</Badge> : <Badge tone="bad"><FiAlertTriangle aria-hidden="true" /> Short by {qty(sent(r) - num(r.qty))}</Badge>;
+  return <Badge tone="good">Received</Badge>;
+};
+
+/** Every change to stock, with transfers to confirm and mismatches to resolve. */
 const StockMovementRecords = () => {
-  const user = useSelector((state: RootState) => state.userAuth.data.id);
-  const { data: records, refresh } = useStockMovement();
-  const [formData, setFormData] = useState({ confirmedQty: "", notes: "" });
-  const [notesModal, setNotesModal] = useState<{
-  visible: boolean;
-  notesData: {
-    description?: string | null;
-    resolveNotes?: string | null;
-    extraNote?: string | null;
-  };
-}>({ visible: false, notesData: {} });
+  const { data, loading, upsert, refresh } = useStockMovement();
+  const { data: stores } = useStores();
+  const records = (data ?? []) as IStockMovement[];
+  const [view, setView] = useState<View>("all");
+  const [query, setQuery] = useState("");
+  const [store, setStore] = useState("");
+  const [formOpen, setFormOpen] = useState(false);
+  const [viewing, setViewing] = useState<IStockMovement | null>(null);
+  const [action, setAction] = useState<Action>(null);
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
+  const [errors, setErrors] = useState<Record<string, string | undefined>>({});
+  const [busy, setBusy] = useState(false);
 
+  useEffect(() => {
+    void refresh();
+    // always show the latest on opening this page
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  const pending = records.filter(isPending).length;
+  const mismatches = records.filter((r) => isMismatch(r) && !r.isResolved).length;
 
-  const [bulkRestockModal, setBulkRestockModal] = useState(false);
-
-  const [confirmModal, setConfirmModal] = useState<{
-    visible: boolean;
-    record: IStockMovement | null;
-    action: "confirm" | "reject" | "resolve" | "";
-  }>({ visible: false, record: null, action: "" });
-
-  const [previewModal, setPreviewModal] = useState<{
-    visible: boolean;
-    images: string[];
-    index: number;
-    title: string;
-  }>({ visible: false, images: [], index: 0, title: "" });
-
-  const formatDate = (date: string) =>
-    new Date(date).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return records.filter((r) => {
+      if (view === "pending" && !isPending(r)) return false;
+      if (view === "mismatch" && !(isMismatch(r) && !r.isResolved)) return false;
+      if (!["all", "pending", "mismatch"].includes(view) && r.category !== view) return false;
+      if (store && String(r.store?.id ?? r.storeId) !== store && String(r.toStore?.id ?? r.toStoreId ?? "") !== store) return false;
+      if (!q) return true;
+      return `${r.item?.name ?? ""} ${r.store?.name ?? ""} ${r.toStore?.name ?? ""} ${personName(r.employee)} ${r.transferId ?? ""} ${r.source ?? ""} ${r.deliveryNote?.deliveryNoteNumber ?? ""}`.toLowerCase().includes(q);
     });
+  }, [records, view, store, query]);
+  const paged = usePaged(filtered);
 
-  const columns = [
-    { key: "category", label: "Category", sortable: true },
-    { key: "item", label: "Item", sortable: true, filterable: true },
-    { key: "store", label: "Store", sortable: true, filterable: true },
-    { key: "toStore", label: "Destination Store", sortable: true, filterable: true },
-    {
-      key: "transferStatus",
-      label: "Status",
-      sortable: true,
-      filterable: true,
-      render: (value: string) => {
-        let color = "text-gray-700 bg-gray-100";
-        if (value === "PENDING") color = "text-yellow-800 bg-yellow-100";
-        if (value === "CONFIRMED") color = "text-green-800 bg-green-100";
-        if (value === "REJECTED") color = "text-red-800 bg-red-100";
-        return (
-          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${color}`}>
-            {value}
-          </span>
-        );
-      },
-    },
-    { key: "unit", label: "Unit", sortable: true },
-    {
-      key: "qty",
-      label: "TRANSFERRED QTY",
-      sortable: true,
-      render: (_: any, row: IStockMovement) => {
-        if (row.category === "TRANSFER" && row.initiatedQty !== undefined && row.qty !== row.initiatedQty) {
-          return (
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-1 text-red-600 font-semibold">
-                {row.qty} 
-                <FaExclamationTriangle className="w-4 h-4" title="Quantity mismatch" />
-                <span className="text-xs font-medium ml-1">Mismatch!</span>
-              </div>
-              {row.isResolved && (
-                <span className="inline-block px-2 py-0.5 text-xs text-center font-semibold text-green-800 bg-green-100 rounded-full w-[100px]">
-                  Resolved
-                </span>
-              )}
-            </div>
+  const openAction = (kind: "confirm" | "reject" | "resolve", rec: IStockMovement) => {
+    setAction({ kind, rec });
+    setAmount(kind === "confirm" ? String(sent(rec)) : "");
+    setNote("");
+    setErrors({});
+  };
 
-          );
-        }
-        return <span>{row.qty}</span>;
-      },
-    },
-    { key: "initiatedQty", label: "Initiated Qty", sortable: true },
-    { key: "remainingQuantity", label: "Rem. Qty", sortable: true },
-    { key: "employee", label: "Recorded By", sortable: true },
-    { key: "createdAt", label: "Created At", sortable: true },
+  const doAction = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!action) return;
+    const { kind, rec } = action;
+    const errs: Record<string, string> = {};
+    if (kind === "confirm") {
+      const n = Number(amount);
+      if (amount === "" || !Number.isFinite(n) || n < 0) errs.confirmedQty = "Enter how much arrived.";
+      else if (n > sent(rec)) errs.confirmedQty = `No more than the ${qty(sent(rec))} sent.`;
+      else if (n < sent(rec) && !note.trim()) errs.notes = "Less arrived than was sent: explain the difference.";
+    } else if (!note.trim()) errs.notes = kind === "reject" ? "Say why you're rejecting it." : "Explain how it was resolved.";
+    setErrors(errs);
+    if (Object.keys(errs).length) return;
 
-    // Evidence Column
-    {
-  key: "images",
-  label: "Evidence",
-  sortable: false,
-  render: (_: any, row: IStockMovement) => {
-    // Combine images from record and delivery note
-    const evidenceImages =
-      row?.images?.length > 0
-        ? row.images
-        : row?.deliveryNote?.images?.length > 0
-        ? row.deliveryNote.images
-        : [];
-
-    // If no evidence found anywhere
-    if (evidenceImages.length === 0) {
-      return (
-        <div className="flex items-center gap-1 text-yellow-600">
-          <FaExclamationTriangle className="w-4 h-4" />
-          <span className="text-xs font-medium">No Evidence</span>
-        </div>
-      );
+    setBusy(true);
+    try {
+      const res =
+        kind === "confirm"
+          ? await apiRequest<{ data: IStockMovement }>(InventoryEndpoints.STOCK_MVT.CONFIRM_STOCK_TRANSFER, "POST", { transferId: rec.id, confirmedQty: Number(amount), notes: note.trim() })
+          : kind === "reject"
+            ? await apiRequest<{ data: IStockMovement }>(InventoryEndpoints.STOCK_MVT.REJECT_STOCK_TRANSFER, "POST", { transferId: rec.id, reason: note.trim() })
+            : await apiRequest<{ data: IStockMovement }>(InventoryEndpoints.STOCK_MVT.resolve_transfer_conflict(rec.id), "POST", { notes: note.trim() });
+      if (res?.data) upsert(res.data);
+      setAction(null);
+    } catch (err) {
+      const { field, message } = apiError(err);
+      if (field && message) setErrors({ [field === "reason" ? "notes" : field]: message });
+    } finally {
+      setBusy(false);
     }
+  };
 
-    // Show Preview button
-    return (
-      <button
-        onClick={() =>
-          setPreviewModal({
-            visible: true,
-            images: evidenceImages,
-            index: 0,
-            title: `Evidence for ${row.item?.name || "Record"}`,
-          })
-        }
-        className="flex items-center gap-1 px-2 py-1 text-xs bg-gray-600 text-white rounded-md hover:bg-gray-700"
-      >
-        <FaImages className="w-4 h-4" /> Preview
-      </button>
-    );
-  },
-},
-
-{
-  key: "actions",
-  label: "Actions",
-  render: (_: any, row: IStockMovement) => {
-    return (
-      <div className="flex gap-2 flex-wrap">
-        {/* Case 1: Pending Transfer → Show Confirm/Reject buttons */}
-        {row.category === "TRANSFER" && row.transferStatus === "PENDING" && (
-          <>
-            <button
-              onClick={() =>
-                setConfirmModal({ visible: true, record: row, action: "confirm" })
-              }
-              className="flex items-center gap-1 px-2 py-1 text-xs bg-green-600 text-white rounded-md hover:bg-green-700"
-            >
-              <FaCheckCircle /> Confirm
-            </button>
-
-            <button
-              onClick={() =>
-                setConfirmModal({ visible: true, record: row, action: "reject" })
-              }
-              className="flex items-center gap-1 px-2 py-1 text-xs bg-red-600 text-white rounded-md hover:bg-red-700"
-            >
-              <FaTimesCircle /> Reject
-            </button>
-          </>
-        )}
-
-        {/* Case 2: Transfer mismatch (unresolved) → Show Resolve button */}
-        {row.category?.toLowerCase() === "transfer" &&
-          row.qty !== row.initiatedQty &&
-          !row.isResolved && (
-            <button
-              onClick={() =>
-                setConfirmModal({ visible: true, record: row, action: "resolve" })
-              }
-              className="flex items-center gap-1 px-2 py-1 text-xs bg-orange-600 text-white rounded-md hover:bg-orange-700"
-            >
-              <FaExclamationTriangle /> Resolve
-            </button>
-          )}
-
-        {/* Always show View Notes button */}
-        <button
-          onClick={() =>
-            setNotesModal({
-              visible: true,
-              notesData: {
-                description: row.description,
-                resolveNotes: row.resolveNotes,
-                extraNote: row.extraNote,
-              },
-            })
-          }
-          className="flex items-center gap-1 px-2 py-1 text-xs bg-gray-600 text-white rounded-md hover:bg-gray-700"
-        >
-          <FaEye/> Notes
-        </button>
-      </div>
-    );
-  },
-}
-
-
-
+  const tabs: Array<{ value: View; label: string; count?: number }> = [
+    { value: "all", label: "All" },
+    { value: "RESTOCK", label: "Restocks" },
+    { value: "DEPLETION", label: "Depletions" },
+    { value: "TRANSFER", label: "Transfers" },
+    { value: "ADJUSTMENT", label: "Stock counts" },
+    { value: "pending", label: "Awaiting receipt", count: pending },
+    { value: "mismatch", label: "Mismatches", count: mismatches },
   ];
 
-  const tableData = records.map((rec) => ({
-    ...rec,
-    item: rec.item?.name || "—",
-    store: rec.store?.name || "—",
-    toStore: rec.toStore?.name || "—",
-    transferStatus: rec.transferStatus,
-    unit: rec.unit?.name || "—",
-    qty: rec.qty,
-    initiatedQty: rec.initiatedQty ?? "—",
-    remainingQuantity: rec.remainingQuantity ?? "—",
-    category: rec.category,
-    employee:
-      `${rec.employee?.firstName || ""} ${rec.employee?.lastName || ""}`.trim() ||
-      rec.employee?.id,
-    createdAt: formatDate(rec.createdAt),
-  }));
-
-  const getRowClass = (row: IStockMovement) => {
-    if (row.category === "TRANSFER" && row.initiatedQty !== undefined && row.qty !== row.initiatedQty && !row.isResolved) {
-      return "bg-red-100"; 
-    }
-     // Yellow if BOTH images and delivery note are missing
-  const noImages = !row.images || row.images.length === 0;
-  const noDeliveryNote = !row.deliveryNote;
-
-  if (noImages && noDeliveryNote) return "bg-yellow-100"; // missing evidence
-    if (row.category === "TRANSFER" && row.transferStatus === "PENDING")
-      return "bg-yellow-50"; // pending transfer
-    return "";
-  };
-
-  const handleConfirmAction = async () => {
-    const { record, action } = confirmModal;
-    if (!record) return;
-    setConfirmModal({ visible: false, record: null, action: "" });
-
-    if (action === "confirm") {
-      const payload = {
-        transferId: record.id,
-        confirmedQty: parseFloat(formData.confirmedQty),
-        notes: formData.notes,
-      };
-      if (parseFloat(formData.confirmedQty) > record.initiatedQty) {
-        toast.error("You cant confirm quantity that is greater that the initiated quantity")
-        return;
-      }
-      await apiRequest(
-        InventoryEndpoints.STOCK_MVT.CONFIRM_STOCK_TRANSFER,
-        "POST",
-        "",
-        payload
-      );
-    } else if (action === 'resolve') {
-      const payload = {
-        notes: formData.notes,
-      };
-
-      await apiRequest(
-        InventoryEndpoints.STOCK_MVT.resolve_transfer_conflict(record.id),
-        "POST",
-        "",
-        payload
-      );
-    } else {
-      const payload = {
-        transferId: record.id,
-        reason: formData.notes,
-      };
-      await apiRequest(
-        InventoryEndpoints.STOCK_MVT.REJECT_STOCK_TRANSFER,
-        "POST",
-        "",
-        payload
-      );
-    }
-    refresh();
-    setFormData({
-      confirmedQty: '',
-      notes: ''
-    })
-  };
-
+  const a = action?.rec;
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">
-          Stock Movement Records
-        </h2>
-        <button
-          onClick={() => setBulkRestockModal(true)}
-          className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-        >
-          <FaPlus className="mr-2" />
-          Add Movement
-        </button>
+    <div className="mx-auto max-w-7xl font-inter">
+      <PageHeader title="Stock movement" description="Restocks, depletions, transfers and stock counts. Transfers wait for the receiving store to confirm." actions={<Button icon={<FiPlus aria-hidden="true" />} onClick={() => setFormOpen(true)}>Record movement</Button>} />
+
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <StatTile label="Movements" value={records.length} />
+        <StatTile label="Transfers awaiting receipt" value={pending} />
+        <StatTile label="Unresolved mismatches" value={mismatches} />
       </div>
 
-      <CustomTable
-        columns={columns}
-        data={tableData}
-        pageSize={10}
-        getRowClass={getRowClass}
-      />
+      <Card>
+        <div className="flex flex-col gap-3 border-b border-line p-3 sm:p-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+            <SearchBox value={query} onChange={setQuery} placeholder="Item, store, person, transfer code" label="Search movements" className="lg:max-w-sm" />
+            <Combobox label="Store" hideLabel clearable value={store} onChange={setStore} options={stores.map((s) => ({ value: String(s.id), label: s.name }))} placeholder="All stores" searchPlaceholder="Search stores" className="lg:w-56" />
+          </div>
+          <Tabs label="Movement type" value={view} onChange={setView} options={tabs} />
+        </div>
 
-      <StockMovementForm
-        visible={bulkRestockModal}
-        employeeId={user}
-        onCancel={() => setBulkRestockModal(false)}
-      />
-
-      <Modal
-        open={confirmModal.visible}
-        onCancel={() =>
-          setConfirmModal({ visible: false, record: null, action: "" })
-        }
-        onOk={handleConfirmAction}
-        okText={
-          confirmModal.action === "confirm"
-            ? "Confirm Transfer" : confirmModal.action === "reject"
-            ? "Reject Transfer" : "Resolve"
-        }
-        okButtonProps={{
-          className:
-            confirmModal.action === "confirm"
-              ? "bg-green-600 !hover:bg-green-700"
-              : "bg-red-600 hover:bg-red-700",
-        }}
-        title={
-          confirmModal.action === "confirm"
-            ? "Confirm Stock Transfer"
-            : confirmModal.action === "reject" ? "Reject Stock Transfer" : "Resolve Transfer Conflict"
-        }
-      >
-        {confirmModal.record?.category === "TRANSFER" &&
-          confirmModal.record.initiatedQty !== undefined &&
-          confirmModal.record.qty !== confirmModal.record.initiatedQty && (
-            <div className="mb-2 p-2 bg-red-100 text-red-700 rounded-md text-sm font-medium">
-              Attention: Initiated quantity ({confirmModal.record.initiatedQty}) and current quantity ({confirmModal.record.qty}) do not match.
-            </div>
-        )}
-
-        {confirmModal.record && (
+        {loading && !records.length ? (
+          <SkeletonRows rows={8} />
+        ) : !filtered.length ? (
+          <EmptyState icon={<FiRepeat className="h-5 w-5" />} title={records.length ? "Nothing matches" : "No stock movements yet"} action={!records.length && <Button icon={<FiPlus aria-hidden="true" />} onClick={() => setFormOpen(true)}>Record movement</Button>} />
+        ) : (
           <>
-            {/* Transfer Record Details */}
-            <div className="mb-4 p-4 bg-gray-50 rounded-md border border-gray-200">
-              <h3 className="text-gray-700 font-semibold mb-2">
-                Transfer Details
-              </h3>
-              <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
-                <div>
-                  <strong>Item:</strong>{" "}
-                  {confirmModal.record.item|| "—"}
-                </div>
-                <div>
-                  <strong>From Store:</strong>{" "}
-                  {confirmModal.record.store || "—"}
-                </div>
-                <div>
-                  <strong>To Store:</strong>{" "}
-                  {confirmModal.record.toStore || "—"}
-                </div>
-                <div>
-                  <strong>Unit:</strong> {confirmModal.record.unit || "—"}
-                </div>
-                <div>
-                  <strong>Initiated Qty:</strong>{" "}
-                  {confirmModal.record.initiatedQty ?? "—"}
-                </div>
-                <div>
-                  <strong>Category:</strong> {confirmModal.record.category}
-                </div>
-                <div>
-                  <strong>Recorded By:</strong>{" "}
-                  {`${confirmModal.record.employee || ""} ${confirmModal.record.employee?.lastName || ""}`.trim() ||
-                    confirmModal.record.employee?.id}
-                </div>
-                <div>
-                  <strong>Created At:</strong>{" "}
-                  {formatDate(confirmModal.record.createdAt)}
-                </div>
-              </div>
-            </div>
-
-            {/* Confirm Quantity and Notes */}
-            {confirmModal.action === "confirm" && (
-              <>
-                <div className="mb-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Quantity *
-                  </label>
-                  <CustomNumberInput
-                    value={formData.confirmedQty}
-                    onChange={(val) =>
-                      setFormData((prev) => ({ ...prev, confirmedQty: val }))
-                    }
-                    max={confirmModal.record?.qty}
-                    placeholder="Enter quantity"
-                  />
-                </div>
-              </>
-            )}
-             <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Notes
-                  </label>
-                  <CustomTextarea
-                    value={formData.notes}
-                    onChange={(val) =>
-                      setFormData((prev) => ({ ...prev, notes: val }))
-                    }
-                    placeholder="Enter notes (optional)"
-                  />
-                </div>
+            <Table head={<><Th>When</Th><Th>Type</Th><Th>Item</Th><Th>Store</Th><Th className="text-right">Qty</Th><Th className="text-right">Left</Th><Th>By</Th><Th className="w-px text-right">Actions</Th></>}>
+              {paged.shown.map((r) => {
+                const pend = isPending(r);
+                const mis = isMismatch(r) && !r.isResolved;
+                return (
+                  <tr key={r.id} className={`hover:bg-surface-2/60 ${mis ? "bg-[#FDECEA]/50 dark:bg-[#381B19]/40" : pend ? "bg-[#FEF4E2]/50 dark:bg-[#33280F]/40" : ""}`}>
+                    <Td className="whitespace-nowrap text-brand-muted">{when(r.createdAt)}</Td>
+                    <Td><div className="flex flex-col items-start gap-1"><MovementBadge category={r.category} /><Status r={r} /></div></Td>
+                    <Td className="font-medium">{r.item?.name ?? "—"}</Td>
+                    <Td className="whitespace-nowrap">{r.store?.name ?? "—"}{r.toStore && <span className="text-brand-muted"> → {r.toStore.name}</span>}</Td>
+                    <Td className="whitespace-nowrap text-right tabular-nums">
+                      {r.category === "DEPLETION" || r.category === "TRANSFER" ? "−" : r.category === "RESTOCK" ? "+" : "="}
+                      {qty(r.category === "TRANSFER" ? sent(r) : r.qty)} <span className="text-brand-muted">{r.unit?.abr || r.unit?.name}</span>
+                    </Td>
+                    <Td className="text-right tabular-nums text-brand-muted">{r.remainingQuantity != null ? qty(r.remainingQuantity) : "—"}</Td>
+                    <Td className="whitespace-nowrap">{personName(r.employee)}</Td>
+                    <Td className="whitespace-nowrap text-right">
+                      <div className="flex justify-end gap-1">
+                        {pend && (
+                          <>
+                            <Button size="sm" icon={<FiCheck aria-hidden="true" />} onClick={() => openAction("confirm", r)}>Receive</Button>
+                            <Button size="sm" variant="ghost" icon={<FiX aria-hidden="true" />} onClick={() => openAction("reject", r)} className="text-[#C0362C]">Reject</Button>
+                          </>
+                        )}
+                        {mis && <Button size="sm" variant="secondary" icon={<FiAlertTriangle aria-hidden="true" />} onClick={() => openAction("resolve", r)}>Resolve</Button>}
+                        <Button size="sm" variant="ghost" icon={<FiEye aria-hidden="true" />} onClick={() => setViewing(r)} aria-label={`View ${r.item?.name ?? "movement"}`}>View</Button>
+                      </div>
+                    </Td>
+                  </tr>
+                );
+              })}
+            </Table>
+            <Pager {...paged} />
           </>
+        )}
+      </Card>
+
+      <StockMovementForm open={formOpen} onClose={() => setFormOpen(false)} onSaved={(recs) => recs.forEach((r) => upsert(r))} />
+
+      <Modal open={!!viewing} onClose={() => setViewing(null)} size="lg" title={viewing ? `${viewing.item?.name ?? "Movement"}` : ""} description={viewing ? when(viewing.createdAt) : undefined} footer={<Button variant="secondary" onClick={() => setViewing(null)}>Close</Button>}>
+        {viewing && (
+          <div className="space-y-5">
+            <div className="flex flex-wrap gap-2"><MovementBadge category={viewing.category} /><Status r={viewing} /></div>
+            <Facts
+              rows={[
+                ["Store", viewing.store?.name],
+                ...(viewing.toStore ? ([["Sent to", viewing.toStore.name]] as Array<[string, string]>) : []),
+                ["Quantity", `${qty(viewing.category === "TRANSFER" ? sent(viewing) : viewing.qty)} ${viewing.unit?.name ?? ""}`],
+                ...(viewing.category === "TRANSFER" && viewing.transferStatus === "CONFIRMED" ? ([["Received", `${qty(viewing.qty)} ${viewing.unit?.name ?? ""}`]] as Array<[string, string]>) : []),
+                ["Left in store after", viewing.remainingQuantity != null ? qty(viewing.remainingQuantity) : "—"],
+                ["Recorded by", personName(viewing.employee)],
+                ["Source / reason", viewing.source || "—"],
+                ...(viewing.transferId ? ([["Transfer code", viewing.transferId]] as Array<[string, string]>) : []),
+                ...(viewing.deliveryNote ? ([["Delivery note", `${viewing.deliveryNote.deliveryNoteNumber} · ${viewing.deliveryNote.name}`]] as Array<[string, string]>) : []),
+              ]}
+            />
+            {[["Notes", viewing.description], ["Receipt / rejection note", viewing.extraNote], ["How the mismatch was resolved", viewing.resolveNotes]].map(([k, v]) =>
+              v ? (
+                <div key={k as string}>
+                  <p className="m-0 text-xs font-medium uppercase tracking-wide text-brand-muted">{k}</p>
+                  <p className="m-0 mt-1 whitespace-pre-wrap text-sm text-brand-ink">{v}</p>
+                </div>
+              ) : null,
+            )}
+            <div>
+              <p className="m-0 mb-2 text-xs font-medium uppercase tracking-wide text-brand-muted">Evidence</p>
+              <Photos paths={imagesOf(viewing.images, viewing.deliveryNote?.images)} />
+            </div>
+          </div>
         )}
       </Modal>
 
-      {previewModal.visible && (
-        <ImagePreviewModal
-          imageUrl={previewModal.images[previewModal.index]}
-          title={previewModal.title}
-          onClose={() =>
-            setPreviewModal({ visible: false, images: [], index: 0, title: "" })
-          }
-        />
-      )}
-      <NotesPreviewModal
-        visible={notesModal.visible}
-        onClose={() => setNotesModal({ visible: false, notesData: {} })}
-        notesData={notesModal.notesData}
-      />
-
+      <Modal
+        open={!!action}
+        onClose={() => setAction(null)}
+        locked={busy}
+        size="md"
+        title={action?.kind === "confirm" ? "Receive transfer" : action?.kind === "reject" ? "Reject transfer" : "Resolve mismatch"}
+        description={a ? `${qty(sent(a))} ${a.unit?.name ?? ""} ${a.item?.name ?? ""} · ${a.store?.name ?? ""} → ${a.toStore?.name ?? ""}` : undefined}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setAction(null)} disabled={busy}>Cancel</Button>
+            <Button type="submit" form="transfer-action" loading={busy} variant={action?.kind === "reject" ? "danger" : "primary"}>
+              {action?.kind === "confirm" ? "Receive" : action?.kind === "reject" ? "Reject and return stock" : "Mark resolved"}
+            </Button>
+          </>
+        }
+      >
+        <form id="transfer-action" onSubmit={doAction} noValidate className="space-y-4">
+          {action?.kind === "confirm" && (
+            <TextField label="Quantity that arrived" required data-autofocus inputMode="decimal" value={amount} onChange={(v) => { setAmount(v.replace(/[^\d.]/g, "")); setErrors({}); }} error={errors.confirmedQty} hint={`${qty(sent(action.rec))} were sent. If less arrived, the difference is flagged as a mismatch.`} />
+          )}
+          {action?.kind === "reject" && <p className="m-0 text-sm text-ink-soft">The stock goes back to {a?.store?.name}.</p>}
+          {action?.kind === "resolve" && a && <p className="m-0 text-sm text-ink-soft">{qty(sent(a))} were sent and {qty(a.qty)} arrived. Explain what happened to the difference.</p>}
+          <TextArea
+            label={action?.kind === "confirm" ? "Notes" : action?.kind === "reject" ? "Reason" : "Explanation"}
+            required={action?.kind !== "confirm"}
+            value={note}
+            onChange={(v) => { setNote(v); setErrors({}); }}
+            error={errors.notes}
+            maxLength={1000}
+          />
+        </form>
+      </Modal>
     </div>
   );
 };

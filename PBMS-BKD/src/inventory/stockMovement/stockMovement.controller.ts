@@ -1,122 +1,82 @@
-import {
-  Body,
-  Controller,
-  Post,
-  Get,
-  UseInterceptors,
-  UploadedFiles,
-  Param,
-} from '@nestjs/common';
-import {
-  ConfirmStockMovementDto,
-  CreateDeliveryNoteDto,
-  CreateStockMovementDto,
-  RejectStockMovementDto,
-} from 'src/dto/stockMovement.dto';
-import { StockMovementService } from './stockMovement.service';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, UploadedFiles, UseInterceptors } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { join, extname } from 'path';
+import { StockMovementService } from './stockMovement.service';
 import { DeliveryNoteService } from './deliveryNotes.service';
-import { RequirePermissions } from 'src/auth/decorators';
+import { CurrentUser, RequirePermissions } from 'src/auth/decorators';
 import { PERMISSIONS } from 'src/auth/permissions';
+import type { AuthenticatedUser } from 'src/auth/permissions';
+import { imageUpload } from '../inventory.helpers';
+
+/**
+ * Stock movements and delivery notes. Who did it always comes from the
+ * signed-in account, never from the form.
+ */
 @Controller('api/stock-movement')
 @RequirePermissions(PERMISSIONS.INVENTORY)
 export class StockMovementController {
   constructor(
     private readonly stockMovementService: StockMovementService,
-    private readonly DeliveryNoteService: DeliveryNoteService,
+    private readonly deliveryNotes: DeliveryNoteService,
   ) {}
 
+  /** One or more items: send `items` as JSON [{itemId, unitId, qty}], plus optional photos in `files`. */
   @Post('create')
-  @UseInterceptors(
-    FilesInterceptor('files', 10, {
-      storage: diskStorage({
-        destination: join(process.cwd(), 'uploads/evidence'),
-        filename: (req, file, cb) => {
-          const uniqueSuffix =
-            Date.now() + '-' + Math.round(Math.random() * 1e9);
-          const ext = extname(file.originalname);
-          cb(null, `mvt-${uniqueSuffix}${ext}`);
-        },
-      }),
-      fileFilter: (req, file, cb) => {
-        if (!file.mimetype.match(/\/(jpg|jpeg|png|gif)$/)) {
-          cb(new Error('Only image files are allowed!'), false);
-        } else {
-          cb(null, true);
-        }
-      },
-      limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB per file
-    }),
-  )
-  async create(
+  @UseInterceptors(FilesInterceptor('files', 10, imageUpload('evidence', 'mvt')))
+  create(
     @UploadedFiles() files: Express.Multer.File[],
-    @Body() dto: CreateStockMovementDto,
+    @Body() body: Record<string, unknown>,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    console.log(dto);
-    return this.stockMovementService.create(files, dto);
+    return this.stockMovementService.create(user, files, body);
   }
 
   @Post('confirm-transfer')
-  async confirm(@Body() dto: ConfirmStockMovementDto) {
-    return this.stockMovementService.confirmStockTransfer(dto);
+  confirm(@Body() body: Record<string, unknown>, @CurrentUser() user: AuthenticatedUser) {
+    return this.stockMovementService.confirmStockTransfer(user, body);
   }
 
   @Post('reject-transfer')
-  async reject(@Body() dto: RejectStockMovementDto) {
-    return this.stockMovementService.rejectStockTransfer(dto);
+  reject(@Body() body: Record<string, unknown>, @CurrentUser() user: AuthenticatedUser) {
+    return this.stockMovementService.rejectStockTransfer(user, body);
   }
 
   @Get('fetch-all')
-  async fetchAll() {
+  fetchAll() {
     return this.stockMovementService.getAllStockMovementRecords();
   }
 
-  @Post('delivery-note/create')
-  @UseInterceptors(
-    FilesInterceptor('files', 10, {
-      storage: diskStorage({
-        destination: join(process.cwd(), 'uploads/dns'),
-        filename: (req, file, cb) => {
-          const uniqueSuffix =
-            Date.now() + '-' + Math.round(Math.random() * 1e9);
-          const ext = extname(file.originalname);
-          cb(null, `dn-${uniqueSuffix}${ext}`);
-        },
-      }),
-      fileFilter: (req, file, cb) => {
-        if (!file.mimetype.match(/\/(jpg|jpeg|png|gif)$/)) {
-          cb(new Error('Only image files are allowed!'), false);
-        } else {
-          cb(null, true);
-        }
-      },
-      limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB per file
-    }),
-  )
-  async createDeliveryNote(
-    @UploadedFiles() files: Express.Multer.File[],
-    @Body() dto: CreateDeliveryNoteDto,
-  ) {
-    return this.DeliveryNoteService.create(files, dto);
-  }
-
   @Post('resolve-stock-transfer-conflict/:id')
-  async resolveConflict(
-    @Param('id') id: string,
-    @Body() dto: { notes: string },
+  resolveConflict(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { notes?: string },
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.stockMovementService.resolveStockMvtConflict(Number(id), dto.notes);
+    return this.stockMovementService.resolveStockMvtConflict(user, id, body?.notes);
   }
 
-  @Post('delete-dn/:id')
-  async deleteDn(@Param('id') id: string) {
-    return this.DeliveryNoteService.deleteDeliveryNotes(Number(id));
+  @Post('delivery-note/create')
+  @UseInterceptors(FilesInterceptor('files', 10, imageUpload('dns', 'dn')))
+  createDeliveryNote(
+    @UploadedFiles() files: Express.Multer.File[],
+    @Body() body: Record<string, unknown>,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.deliveryNotes.create(user, files, body);
   }
 
   @Get('fetch-all-dns')
-  async fetchAllDeliveryNotes() {
-    return this.DeliveryNoteService.getAllDeliveryNotes();
+  fetchAllDeliveryNotes() {
+    return this.deliveryNotes.getAllDeliveryNotes();
+  }
+
+  /** Kept as POST for older screens; DELETE is the same. */
+  @Post('delete-dn/:id')
+  deleteDnLegacy(@Param('id', ParseIntPipe) id: number) {
+    return this.deliveryNotes.deleteDeliveryNotes(id);
+  }
+
+  @Delete('delivery-note/:id')
+  deleteDn(@Param('id', ParseIntPipe) id: number) {
+    return this.deliveryNotes.deleteDeliveryNotes(id);
   }
 }

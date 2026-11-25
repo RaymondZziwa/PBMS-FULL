@@ -116,10 +116,12 @@ export const NAVIGATION: NavSection[] = [
         icon: FiPackage,
         permission: "access_inventory_module",
         children: [
+          { label: "Stock Levels", path: "/inventory/stock-levels" },
+          { label: "Stock Movement", path: "/inventory/stock-movement" },
           { label: "Items", path: "/inventory/items" },
           { label: "Item Categories", path: "/inventory/items-categories" },
+          { label: "Units", path: "/inventory/units" },
           { label: "Services", path: "/inventory/services" },
-          { label: "Stock Movement", path: "/inventory/stock-movement" },
           { label: "Delivery Notes", path: "/inventory/delivery-notes" },
           { label: "Suppliers", path: "/inventory/suppliers" },
           { label: "Stores", path: "/inventory/stores", permission: "create_and_modify_stores" },

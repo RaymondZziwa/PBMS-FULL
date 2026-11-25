@@ -1,57 +1,20 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Patch,
-  Delete,
-  Body,
-  Param,
-  UseGuards,
-  Req,
-  ForbiddenException,
-} from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post } from '@nestjs/common';
 import { StoreService } from './stores.service';
-import { JwtAuthGuard } from 'src/guards/authGuard.guard';
-import type { Request } from 'express';
 import { RequirePermissions } from 'src/auth/decorators';
 import { PERMISSIONS } from 'src/auth/permissions';
 
+/** Creating, changing and deleting stores needs "Create and modify stores"; reading is wider. */
 @Controller('api/store')
-@RequirePermissions(PERMISSIONS.INVENTORY, PERMISSIONS.STORES)
+@RequirePermissions(PERMISSIONS.STORES)
 export class StoresController {
   constructor(private readonly storeService: StoreService) {}
 
   @Post('create')
-  //@UseGuards(JwtAuthGuard)
-  create(
-    @Body()
-    data: {
-      branchId: number;
-      deptId: number;
-      name: string;
-      authorizedPersonnel: number[];
-    },
-    @Req() req: Request,
-  ) {
-    console.log(req);
-    // const user = (req as any).user;
-    // console.log('user', user);
-    // if (
-    //   !user ||
-    //   !user.role ||
-    //   user.role.name?.toLowerCase() !== 'administrator'
-    // ) {
-    //   throw new ForbiddenException('Only administrators can create stores');
-    // }
-    return this.storeService.create({
-      ...data,
-      branchId: Number(data.branchId),
-      deptId: Number(data.deptId),
-      authorizedPersonnel: data.authorizedPersonnel.map((id) => Number(id)),
-    });
+  create(@Body() body: Record<string, unknown>) {
+    return this.storeService.create(body);
   }
 
-  @RequirePermissions(PERMISSIONS.INVENTORY, PERMISSIONS.SALES, PERMISSIONS.EXHIBITION, PERMISSIONS.STORES)
+  @RequirePermissions(PERMISSIONS.INVENTORY, PERMISSIONS.SALES, PERMISSIONS.EXHIBITION, PERMISSIONS.STORES, PERMISSIONS.REPORTS)
   @Get('fetch-all')
   findAll() {
     return this.storeService.findAll();
@@ -59,50 +22,17 @@ export class StoresController {
 
   @RequirePermissions(PERMISSIONS.INVENTORY, PERMISSIONS.SALES, PERMISSIONS.EXHIBITION, PERMISSIONS.STORES)
   @Get('fetch/:id')
-  findOne(@Param('id') id: string) {
-    return this.storeService.findOne(Number(id));
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.storeService.findOne(id);
   }
 
   @Patch('modify/:id')
-  //@UseGuards(JwtAuthGuard)
-  update(
-    @Param('id') id: string,
-    @Body()
-    data: {
-      branchId: number;
-      deptId: number;
-      name: string;
-      authorizedPersonnel: number[];
-    },
-    @Req() req: Request,
-  ) {
-    // const user = (req as any).user;
-    // if (
-    //   !user ||
-    //   !user.role ||
-    //   user.role.name?.toLowerCase() !== 'administrator'
-    // ) {
-    //   throw new ForbiddenException('Only administrators can modify stores');
-    // }
-    return this.storeService.update(Number(id), {
-      ...data,
-      branchId: data.branchId ? Number(data.branchId) : undefined,
-      deptId: data.deptId ? Number(data.deptId) : undefined,
-      authorizedPersonnel: data.authorizedPersonnel.map((id) => Number(id)),
-    });
+  update(@Param('id', ParseIntPipe) id: number, @Body() body: Record<string, unknown>) {
+    return this.storeService.update(id, body);
   }
 
   @Delete('delete/:id')
-  //@UseGuards(JwtAuthGuard)
-  remove(@Param('id') id: string, @Req() req: Request) {
-    // const user = (req as any).user;
-    // if (
-    //   !user ||
-    //   !user.role ||
-    //   user.role.name?.toLowerCase() !== 'administrator'
-    // ) {
-    //   throw new ForbiddenException('Only administrators can delete stores');
-    // }
-    return this.storeService.remove(Number(id));
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.storeService.remove(id);
   }
 }

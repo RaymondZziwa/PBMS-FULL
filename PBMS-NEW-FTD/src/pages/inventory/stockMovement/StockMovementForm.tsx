@@ -1,640 +1,302 @@
-import React, { useState, useEffect } from 'react';
-import { FaPlus, FaTrash, FaArrowLeft, FaArrowRight, FaCheck } from 'react-icons/fa';
-import CustomTextInput from '../../../custom/inputs/customTextInput';
-import { baseURL } from '../../../libs/apiConfig';
-import CustomButton from '../../../custom/buttons/customButton';
-import { toast } from 'sonner';
-import CustomDropdown from '../../../custom/inputs/customDropdown';
-import { InventoryEndpoints } from '../../../endpoints/inventory/inventory';
-import useItems from '../../../hooks/inventory/useItems';
-import useStores from '../../../hooks/inventory/useStores';
-import type { IItem, IStore, IUnit } from '../../../redux/types/inventory';
-import useUnits from '../../../hooks/inventory/useUnits';
-import CustomTextarea from '../../../custom/inputs/customTextArea';
-import useStockMovement from '../../../hooks/inventory/useStockMovement';
-import { useSelector } from 'react-redux';
-import type { RootState } from '../../../redux/store';
-import { FaUpload } from 'react-icons/fa';
-import axios from 'axios';
-import useDeliveryNotes from '../../../hooks/inventory/useDeliveryNotes';
-import type { IDeliveryNote } from '../../../redux/types/inventory';
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useSelector } from "react-redux";
+import { FiPlus, FiTrash2 } from "react-icons/fi";
+import useItems from "../../../hooks/inventory/useItems";
+import useStores from "../../../hooks/inventory/useStores";
+import useUnits from "../../../hooks/inventory/useUnits";
+import useDeliveryNotes from "../../../hooks/inventory/useDeliveryNotes";
+import { apiRequest } from "../../../libs/apiConfig";
+import { InventoryEndpoints } from "../../../endpoints/inventory/inventory";
+import type { IStockMovement, IStockStore, IStore } from "../../../redux/types/inventory";
+import type { RootState } from "../../../redux/store";
+import { roleHasPermission } from "../../../layout/navigation";
+import Button from "../../../ui/Button";
+import Modal from "../../../ui/Modal";
+import Combobox from "../../../ui/Combobox";
+import { Segmented, TextField } from "../../../ui/Field";
+import { useConfirm } from "../../../ui/ConfirmDialog";
+import { apiError, num, PhotoPicker, qty, TextArea } from "../shared";
 
-interface BulkItem {
-  id: string;
-  itemId: string;
-  itemName: string;
-  unitId: string;
-  unitName: string;
-  quantity: string;
-}
+type Kind = "RESTOCK" | "DEPLETION" | "TRANSFER" | "ADJUSTMENT";
+type Line = { key: number; itemId: string; unitId: string; qty: string };
 
-interface BulkRestockFormProps {
-  visible: boolean;
-  onCancel: () => void;
-  employeeId: string;
-}
+const KIND_HELP: Record<Kind, string> = {
+  RESTOCK: "Stock coming in: the quantities are added to the store.",
+  DEPLETION: "Stock going out (damaged, expired, used): the quantities are taken from the store.",
+  TRANSFER: "Send stock to another store. It leaves this store now and arrives when the other store confirms it.",
+  ADJUSTMENT: "Stock count: sets the store's quantity to exactly what you counted.",
+};
 
-const StockMovementForm: React.FC<BulkRestockFormProps> = ({
-  visible,
-  onCancel,
-  employeeId
-}) => {
-  const userRole = useSelector((state: RootState) => state.userAuth.data.role);
+let nextKey = 1;
+const blank = (): Line => ({ key: nextKey++, itemId: "", unitId: "", qty: "" });
+
+type Props = {
+  open: boolean;
+  onClose: () => void;
+  onSaved: (records: IStockMovement[]) => void;
+  /** Start as this kind (e.g. "TRANSFER"). */
+  initialKind?: Kind;
+};
+
+/** Record a restock, depletion, transfer or stock count for one or more items at once. */
+const StockMovementForm = ({ open, onClose, onSaved, initialKind = "RESTOCK" }: Props) => {
+  const confirm = useConfirm();
+  const user = useSelector((s: RootState) => s.userAuth.data) as { id?: string | number; role?: { name?: string; permissions?: unknown } } | null;
+  const managesStores = roleHasPermission(user?.role, "create_and_modify_stores");
   const { data: items } = useItems();
   const { data: stores } = useStores();
   const { data: units } = useUnits();
-  const { data: dns } = useDeliveryNotes();
-  const { refresh } = useStockMovement();
+  const { data: notes, refresh: refreshNotes } = useDeliveryNotes();
 
-  const categoryOptions = [
-    { label: 'Restock', value: 'RESTOCK' },
-    { label: 'Depletion', value: 'DEPLETION' },
-    { label: 'Transfer', value: 'TRANSFER' },
-    ...(userRole.name.toLowerCase() === 'administrator'
-      ? [{ label: 'Adjustment', value: 'ADJUSTMENT' }]
-      : []),
+  const [kind, setKind] = useState<Kind>(initialKind);
+  const [storeId, setStoreId] = useState("");
+  const [toStoreId, setToStoreId] = useState("");
+  const [lines, setLines] = useState<Line[]>([blank()]);
+  const [source, setSource] = useState("");
+  const [description, setDescription] = useState("");
+  const [noteId, setNoteId] = useState("");
+  const [photos, setPhotos] = useState<File[]>([]);
+  const [errors, setErrors] = useState<Record<string, string | undefined>>({});
+  const [stock, setStock] = useState<IStockStore[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setKind(initialKind);
+    setToStoreId("");
+    setLines([blank()]);
+    setSource("");
+    setDescription("");
+    setNoteId("");
+    setPhotos([]);
+    setErrors({});
+    void refreshNotes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialKind]);
+
+  /** Stores this person may work in. */
+  const myStores = useMemo(
+    () => (stores as IStore[]).filter((s) => managesStores || (s.authorizedPersonnel ?? []).map(String).includes(String(user?.id))),
+    [stores, managesStores, user?.id],
+  );
+
+  useEffect(() => {
+    if (open && !storeId && myStores.length === 1) setStoreId(String(myStores[0].id));
+  }, [open, storeId, myStores]);
+
+  // Current stock in the chosen store, to show what's available.
+  useEffect(() => {
+    if (!open || !storeId) return setStock([]);
+    let live = true;
+    apiRequest<{ data: IStockStore[] }>(InventoryEndpoints.ITEM.fetch_store_inventory(storeId), "GET")
+      .then((r) => live && setStock(Array.isArray(r.data) ? r.data : []))
+      .catch(() => live && setStock([]));
+    return () => {
+      live = false;
+    };
+  }, [open, storeId]);
+
+  const have = (itemId: string, unitId: string) => {
+    const row = stock.find((s) => String(s.item?.id ?? s.itemId) === itemId && String(s.unit?.id ?? s.unitId) === unitId);
+    return row ? num(row.qty) : null;
+  };
+
+  const takesOut = kind === "DEPLETION" || kind === "TRANSFER";
+  const itemOptions = useMemo(() => {
+    if (takesOut) {
+      // Only what the store actually has.
+      const seen = new Map<string, string>();
+      stock.filter((s) => num(s.qty) > 0).forEach((s) => seen.set(String(s.item?.id ?? s.itemId), s.item?.name ?? "Item"));
+      return [...seen].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label));
+    }
+    return items.map((i) => ({ value: String(i.id), label: i.name, hint: i.category?.name }));
+  }, [takesOut, stock, items]);
+
+  const unitOptionsFor = (itemId: string) => {
+    if (takesOut) {
+      return stock
+        .filter((s) => String(s.item?.id ?? s.itemId) === itemId && num(s.qty) > 0)
+        .map((s) => ({ value: String(s.unit?.id ?? s.unitId), label: s.unit?.name ?? "Unit", hint: `${qty(s.qty)} available` }));
+    }
+    return units.map((u) => ({ value: String(u.id), label: u.name, hint: (() => { const h = have(itemId, String(u.id)); return h !== null ? `${qty(h)} in store` : undefined; })() }));
+  };
+
+  const setLine = (key: number, patch: Partial<Line>) => {
+    setLines((ls) =>
+      ls.map((l) => {
+        if (l.key !== key) return l;
+        const next = { ...l, ...patch };
+        // Picking an item that the store holds in a single unit fills the unit in.
+        if (patch.itemId !== undefined) {
+          const opts = unitOptionsFor(patch.itemId);
+          next.unitId = opts.length === 1 ? opts[0].value : opts.some((o) => o.value === l.unitId) ? l.unitId : "";
+        }
+        return next;
+      }),
+    );
+    setErrors({});
+  };
+
+  const changeKind = (k: Kind) => {
+    setKind(k);
+    if (k === "DEPLETION" || k === "TRANSFER") setLines([blank()]);
+    setErrors({});
+  };
+
+  const itemName = (id: string) => items.find((i) => String(i.id) === id)?.name ?? stock.find((s) => String(s.item?.id ?? s.itemId) === id)?.item?.name ?? "Item";
+  const unitName = (id: string) => units.find((u) => String(u.id) === id)?.name ?? "";
+  const storeName = (id: string) => (stores as IStore[]).find((s) => String(s.id) === id)?.name ?? "";
+
+  const validate = () => {
+    const e: Record<string, string> = {};
+    if (!storeId) e.storeId = "Choose the store.";
+    if (kind === "TRANSFER" && !toStoreId) e.toStoreId = "Choose where the stock is going.";
+    if (kind === "TRANSFER" && toStoreId && toStoreId === storeId) e.toStoreId = "Choose a different store.";
+    const used = new Set<string>();
+    lines.forEach((l, i) => {
+      if (!l.itemId) e[`items.${i}.itemId`] = "Choose an item.";
+      if (!l.unitId) e[`items.${i}.unitId`] = "Choose a unit.";
+      const n = Number(l.qty);
+      if (l.qty === "" || !Number.isFinite(n) || (kind === "ADJUSTMENT" ? n < 0 : n <= 0)) e[`items.${i}.qty`] = kind === "ADJUSTMENT" ? "Enter the count (0 or more)." : "Enter a quantity above 0.";
+      if (takesOut && l.itemId && l.unitId && Number.isFinite(n)) {
+        const h = have(l.itemId, l.unitId) ?? 0;
+        if (n > h) e[`items.${i}.qty`] = `Only ${qty(h)} available.`;
+      }
+      const k = `${l.itemId}:${l.unitId}`;
+      if (l.itemId && l.unitId && used.has(k)) e[`items.${i}.itemId`] = "Already on another line.";
+      used.add(k);
+    });
+    setErrors(e);
+    return !Object.keys(e).length;
+  };
+
+  const submit = async (ev: FormEvent) => {
+    ev.preventDefault();
+    if (!validate()) return;
+    const verb = { RESTOCK: "Add to", DEPLETION: "Take from", TRANSFER: "Send from", ADJUSTMENT: "Set counts in" }[kind];
+    const ok = await confirm({
+      title: `${verb} ${storeName(storeId)}${kind === "TRANSFER" ? ` to ${storeName(toStoreId)}` : ""}?`,
+      message: KIND_HELP[kind],
+      details: (
+        <ul className="m-0 list-disc pl-5">
+          {lines.map((l) => {
+            const h = have(l.itemId, l.unitId);
+            const after = kind === "RESTOCK" ? (h ?? 0) + Number(l.qty) : kind === "ADJUSTMENT" ? Number(l.qty) : (h ?? 0) - Number(l.qty);
+            return (
+              <li key={l.key}>
+                {qty(l.qty)} {unitName(l.unitId)} {itemName(l.itemId)} <span className="text-brand-muted">({qty(h ?? 0)} → {qty(after)})</span>
+              </li>
+            );
+          })}
+        </ul>
+      ),
+      confirmLabel: kind === "TRANSFER" ? "Send" : "Record",
+    });
+    if (!ok) return;
+
+    setSaving(true);
+    try {
+      const form = new FormData();
+      form.append("category", kind);
+      form.append("storeId", storeId);
+      if (kind === "TRANSFER") form.append("toStoreId", toStoreId);
+      if (source.trim()) form.append("source", source.trim());
+      if (description.trim()) form.append("description", description.trim());
+      if (noteId) form.append("deliveryNoteId", noteId);
+      form.append("items", JSON.stringify(lines.map((l) => ({ itemId: Number(l.itemId), unitId: Number(l.unitId), qty: Number(l.qty) }))));
+      photos.forEach((p) => form.append("files", p));
+      const res = await apiRequest<{ data: IStockMovement[] }>(InventoryEndpoints.STOCK_MVT.create, "POST", form);
+      onSaved(Array.isArray(res.data) ? res.data : []);
+      onClose();
+    } catch (err) {
+      const { field, message } = apiError(err);
+      if (field && message) setErrors({ [field]: message });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const kinds: Array<{ value: Kind; label: string }> = [
+    { value: "RESTOCK", label: "Restock" },
+    { value: "DEPLETION", label: "Depletion" },
+    { value: "TRANSFER", label: "Transfer" },
+    ...(managesStores ? [{ value: "ADJUSTMENT" as Kind, label: "Stock count" }] : []),
   ];
 
-  // Wizard state
-  const [currentStep, setCurrentStep] = useState(1);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Step 1: Basic Details
-  const [basicDetails, setBasicDetails] = useState({
-    category: '',
-    storeId: '',
-    toStoreId: '',
-    source: '',
-    description: '',
-    deliveryNoteId: '',
-  });
-
-  // Step 2: Items
-  const [bulkItems, setBulkItems] = useState<BulkItem[]>([]);
-  const [currentItem, setCurrentItem] = useState({
-    itemId: '',
-    unitId: '',
-    quantity: '',
-  });
-
-  // Step 3: Attachments
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [previews, setPreviews] = useState<string[]>([]);
-  const [attachmentMode, setAttachmentMode] = useState<'deliveryNote' | 'images'>('images');
-
-  // Reset form when modal closes
-  useEffect(() => {
-    if (!visible) {
-      setCurrentStep(1);
-      setBasicDetails({
-        category: '',
-        storeId: '',
-        toStoreId: '',
-        source: '',
-        description: '',
-        deliveryNoteId: '',
-      });
-      setBulkItems([]);
-      setCurrentItem({
-        itemId: '',
-        unitId: '',
-        quantity: '',
-      });
-      setSelectedFiles([]);
-      setPreviews([]);
-      setAttachmentMode('images');
-    }
-  }, [visible]);
-
-  // Handle file selection
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-
-    const fileArray = Array.from(files);
-    setSelectedFiles((prev) => [...prev, ...fileArray]);
-
-    const newPreviews = fileArray.map((file) => URL.createObjectURL(file));
-    setPreviews((prev) => [...prev, ...newPreviews]);
-  };
-
-  // Remove image
-  const removeImage = (index: number) => {
-    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
-    setPreviews((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  // Add item to bulk list
-  const addItem = () => {
-    if (!currentItem.itemId || !currentItem.unitId || !currentItem.quantity) {
-      toast.error('Please fill in all required fields for the item');
-      return;
-    }
-
-    const item = items?.find(i => i.id === currentItem.itemId);
-    const unit = units?.find(u => u.id === currentItem.unitId);
-
-    if (!item || !unit) {
-      toast.error('Invalid item or unit selected');
-      return;
-    }
-
-    const newBulkItem: BulkItem = {
-      id: Date.now().toString(),
-      itemId: currentItem.itemId,
-      itemName: item.name,
-      unitId: currentItem.unitId,
-      unitName: unit.name,
-      quantity: currentItem.quantity,
-    };
-
-    setBulkItems(prev => [...prev, newBulkItem]);
-    setCurrentItem({
-      itemId: '',
-      unitId: '',
-      quantity: '',
-    });
-    toast.success('Item added to list');
-  };
-
-  // Remove item from bulk list
-  const removeItem = (itemId: string) => {
-    setBulkItems(prev => prev.filter(item => item.id !== itemId));
-  };
-
-  // Step validation
-  const validateStep1 = () => {
-    if (!basicDetails.category || !basicDetails.storeId) {
-      toast.error('Please fill in all required fields in Step 1');
-      return false;
-    }
-    if (basicDetails.category === 'TRANSFER' && !basicDetails.toStoreId) {
-      toast.error('Please select destination store for transfer');
-      return false;
-    }
-    return true;
-  };
-
-  const validateStep2 = () => {
-    if (bulkItems.length === 0) {
-      toast.error('Please add at least one item');
-      return false;
-    }
-    return true;
-  };
-
-  // const validateStep3 = () => {
-  //   if (attachmentMode === 'deliveryNote' && !basicDetails.deliveryNoteId) {
-  //     toast.error('Please select a delivery note');
-  //     return false;
-  //   }
-  //   if (attachmentMode === 'images' && selectedFiles.length === 0) {
-  //     toast.error('Please upload at least one evidence image');
-  //     return false;
-  //   }
-  //   return true;
-  // };
-
-  // Navigation
-  const nextStep = () => {
-    if (currentStep === 1 && validateStep1()) {
-      setCurrentStep(2);
-    } else if (currentStep === 2 && validateStep2()) {
-      setCurrentStep(3);
-    }
-  };
-
-  const prevStep = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
-
-  // Submit
-  const handleSubmit = async () => {
-    // if (!validateStep3()) return;
-
-    setIsSubmitting(true);
-
-    try {
-      // Create FormData for each item
-      for (const bulkItem of bulkItems) {
-        const payload = new FormData();
-        payload.append("itemId", bulkItem.itemId);
-        payload.append("storeId", basicDetails.storeId);
-        if (basicDetails.category === 'TRANSFER' && basicDetails.toStoreId) {
-          payload.append("toStoreId", basicDetails.toStoreId);
-        }
-        payload.append("unitId", bulkItem.unitId);
-        payload.append("qty", bulkItem.quantity);
-        payload.append("source", basicDetails.source);
-        payload.append("description", basicDetails.description);
-        payload.append("category", basicDetails.category);
-        payload.append("employeeId", employeeId);
-
-        if (attachmentMode === 'images') {
-          selectedFiles.forEach((file) => {
-            payload.append("files", file);
-          });
-        } else if (attachmentMode === 'deliveryNote' && basicDetails.deliveryNoteId) {
-          payload.append("deliveryNoteId", basicDetails.deliveryNoteId);
-        }
-
-        await axios.post(`${baseURL}${InventoryEndpoints.STOCK_MVT.create}`, payload, {
-          headers: {
-            "Content-Type": "multipart/form-data",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        });
-      }
-
-      toast.success(`${bulkItems.length} items processed successfully`);
-      refresh();
-      onCancel();
-    } catch (error: any) {
-      console.error(error);
-      toast.error(error?.response?.data?.message || "Failed to record restock");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  if (!visible) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="p-6 border-b">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-2xl font-semibold text-gray-800">
-              Record Stock Movement
-            </h3>
-            <button
-              onClick={onCancel}
-              className="text-gray-400 hover:text-gray-600"
-            >
-              ✕
-            </button>
-          </div>
+    <Modal
+      open={open}
+      onClose={onClose}
+      locked={saving}
+      size="xl"
+      title="Record stock movement"
+      description={KIND_HELP[kind]}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button type="submit" form="movement-form" loading={saving}>{kind === "TRANSFER" ? "Send stock" : "Record"}</Button>
+        </>
+      }
+    >
+      <form id="movement-form" onSubmit={submit} noValidate className="space-y-5">
+        {errors.items && <p role="alert" className="m-0 rounded-lg bg-[#FDECEA] px-3 py-2 text-sm text-[#B42318] dark:bg-[#381B19] dark:text-[#F2A29A]">{errors.items}</p>}
+        <Segmented label="Type" required value={kind} onChange={changeKind} options={kinds} />
 
-          {/* Progress Indicator */}
-          <div className="flex items-center justify-center space-x-4">
-            {[1, 2, 3].map((step) => (
-              <div key={step} className="flex items-center">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                  currentStep >= step
-                    ? 'bg-gray-600 text-white'
-                    : 'bg-gray-200 text-gray-600'
-                }`}>
-                  {step}
-                </div>
-                <span className={`ml-2 text-sm font-medium ${
-                  currentStep >= step ? 'text-gray-600' : 'text-gray-500'
-                }`}>
-                  {step === 1 && 'Basic Details'}
-                  {step === 2 && 'Add Items'}
-                  {step === 3 && 'Review & Submit'}
-                </span>
-                {step < 3 && (
-                  <div className={`w-12 h-0.5 mx-4 ${
-                    currentStep > step ? 'bg-gray-600' : 'bg-gray-200'
-                  }`} />
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
-          {/* Step 1: Basic Details */}
-          {currentStep === 1 && (
-            <div className="space-y-4">
-              <h4 className="text-lg font-semibold text-gray-800">Step 1: Movement Details</h4>
-
-              <div className="space-y-4">
-                {/* Movement Type */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Movement Type *</label>
-                  <CustomDropdown
-                    options={categoryOptions}
-                    value={basicDetails.category ? [basicDetails.category] : []}
-                    onChange={(val) => setBasicDetails((prev) => ({ ...prev, category: val[0] || '' }))}
-                    placeholder="Select movement type"
-                    singleSelect
-                  />
-                </div>
-
-                {/* Store */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Store *</label>
-                  <CustomDropdown
-                    options={stores?.map((s: IStore) => ({ label: s.name, value: s.id })) || []}
-                    value={basicDetails.storeId ? [basicDetails.storeId] : []}
-                    onChange={(val) => setBasicDetails((prev) => ({ ...prev, storeId: val[0] || '' }))}
-                    placeholder="Select store"
-                    singleSelect
-                  />
-                </div>
-
-                {/* To Store (Transfer Only) */}
-                {basicDetails.category === 'TRANSFER' && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Destination Store *</label>
-                    <CustomDropdown
-                      options={stores?.map((s: IStore) => ({ label: s.name, value: s.id })) || []}
-                      value={basicDetails.toStoreId ? [basicDetails.toStoreId] : []}
-                      onChange={(val) => setBasicDetails((prev) => ({ ...prev, toStoreId: val[0] || '' }))}
-                      placeholder="Select destination store"
-                      singleSelect
-                    />
-                  </div>
-                )}
-
-                {/* Source */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Source</label>
-                  <CustomTextInput
-                    type="text"
-                    value={basicDetails.source}
-                    onChange={(val) => setBasicDetails((prev) => ({ ...prev, source: val }))}
-                    placeholder="Enter source (optional)"
-                  />
-                </div>
-
-                {/* Description */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                  <CustomTextarea
-                    value={basicDetails.description}
-                    onChange={(val) => setBasicDetails((prev) => ({ ...prev, description: val }))}
-                    placeholder="Enter description (optional)"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Step 2: Add Items */}
-          {currentStep === 2 && (
-            <div className="space-y-6">
-              <h4 className="text-lg font-semibold text-gray-800">Step 2: Add Items</h4>
-
-              {/* Current Items List */}
-              {bulkItems.length > 0 && (
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h5 className="font-medium text-gray-700 mb-3">Items ({bulkItems.length})</h5>
-                  <div className="space-y-2">
-                    {bulkItems.map((item) => (
-                      <div key={item.id} className="flex items-center justify-between bg-white p-3 rounded border">
-                        <div>
-                          <span className="font-medium">{item.itemName}</span>
-                          <span className="text-gray-600 ml-2">
-                            {item.quantity} {item.unitName}
-                          </span>
-                        </div>
-                        <button
-                          onClick={() => removeItem(item.id)}
-                          className="text-red-600 hover:text-red-800 p-1"
-                        >
-                          <FaTrash size={14} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Add New Item Form */}
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h5 className="font-medium text-gray-700 mb-4">Add New Item</h5>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* Item */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Item *</label>
-                    <CustomDropdown
-                      options={items?.map((i: IItem) => ({ label: i.name, value: i.id })) || []}
-                      value={currentItem.itemId ? [currentItem.itemId] : []}
-                      onChange={(val) => setCurrentItem((prev) => ({ ...prev, itemId: val[0] || '' }))}
-                      placeholder="Select item"
-                      singleSelect
-                    />
-                  </div>
-
-                  {/* Unit */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Unit *</label>
-                    <CustomDropdown
-                      options={units?.map((u: IUnit) => ({ label: u.name, value: u.id })) || []}
-                      value={currentItem.unitId ? [currentItem.unitId] : []}
-                      onChange={(val) => setCurrentItem((prev) => ({ ...prev, unitId: val[0] || '' }))}
-                      placeholder="Select unit"
-                      singleSelect
-                    />
-                  </div>
-
-                  {/* Quantity */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Quantity *</label>
-                    <CustomTextInput
-                      type="number"
-                      value={currentItem.quantity}
-                      onChange={(val) => setCurrentItem((prev) => ({ ...prev, quantity: val }))}
-                      placeholder="Enter quantity"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end mt-4">
-                  <CustomButton
-                    label="Add Item"
-                    fn={addItem}
-                    className="flex items-center gap-2"
-                  >
-                    <FaPlus size={14} />
-                    Add to List
-                  </CustomButton>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Step 3: Review & Submit */}
-          {currentStep === 3 && (
-            <div className="space-y-6">
-              <h4 className="text-lg font-semibold text-gray-800">Step 3: Review & Submit</h4>
-
-              {/* Summary */}
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h5 className="font-medium text-gray-700 mb-3">Movement Summary</h5>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="font-medium">Type:</span> {categoryOptions.find(c => c.value === basicDetails.category)?.label}
-                  </div>
-                  <div>
-                    <span className="font-medium">Store:</span> {stores?.find(s => s.id === basicDetails.storeId)?.name}
-                  </div>
-                  {basicDetails.category === 'TRANSFER' && (
-                    <div>
-                      <span className="font-medium">To Store:</span> {stores?.find(s => s.id === basicDetails.toStoreId)?.name}
-                    </div>
-                  )}
-                  <div>
-                    <span className="font-medium">Source:</span> {basicDetails.source || 'Not specified'}
-                  </div>
-                  <div className="md:col-span-2">
-                    <span className="font-medium">Items:</span> {bulkItems.length}
-                  </div>
-                </div>
-              </div>
-
-              {/* Items Review */}
-              <div className="bg-white border rounded-lg">
-                <div className="p-4 border-b">
-                  <h5 className="font-medium text-gray-700">Items</h5>
-                </div>
-                <div className="divide-y">
-                  {bulkItems.map((item) => (
-                    <div key={item.id} className="p-4 flex justify-between items-center">
-                      <div>
-                        <div className="font-medium">{item.itemName}</div>
-                        <div className="text-sm text-gray-600">
-                          {item.quantity} {item.unitName}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Attachment Type */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Attach Evidence</label>
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      name="attachmentMode"
-                      value="images"
-                      checked={attachmentMode === 'images'}
-                      onChange={() => setAttachmentMode('images')}
-                    />
-                    <span>Upload Images</span>
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      name="attachmentMode"
-                      value="deliveryNote"
-                      checked={attachmentMode === 'deliveryNote'}
-                      onChange={() => setAttachmentMode('deliveryNote')}
-                    />
-                    <span>Attach Delivery Note</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* Conditional Attachment */}
-              {attachmentMode === 'images' ? (
-                <div>
-                  <label className="block font-medium mb-2">Upload Evidence Images *</label>
-                  <div className="flex items-center gap-3">
-                    <label
-                      htmlFor="file-upload"
-                      className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg cursor-pointer hover:bg-blue-700"
-                    >
-                      <FaUpload />
-                      <span>Choose Images</span>
-                    </label>
-                    <input
-                      id="file-upload"
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      onChange={handleFileChange}
-                      className="hidden"
-                    />
-                  </div>
-
-                  {previews.length > 0 && (
-                    <div className="mt-4 grid grid-cols-3 gap-3">
-                      {previews.map((src, index) => (
-                        <div key={index} className="relative">
-                          <img
-                            src={src}
-                            alt={`Preview ${index + 1}`}
-                            className="h-28 w-full object-cover rounded-lg border"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => removeImage(index)}
-                            className="absolute top-1 right-1 bg-red-600 text-white p-1 rounded-full hover:bg-red-700"
-                          >
-                            <FaTrash size={12} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div>
-                  <label className="block font-medium mb-2">Select Delivery Note *</label>
-                  <CustomDropdown
-                    options={dns?.map((dn: IDeliveryNote) => ({
-                      label: `${dn.deliveryNoteNumber} - ${dn.name}`,
-                      value: dn.id,
-                    })) || []}
-                    value={basicDetails.deliveryNoteId ? [basicDetails.deliveryNoteId] : []}
-                    onChange={(val) =>
-                      setBasicDetails((prev) => ({ ...prev, deliveryNoteId: val[0] || '' }))
-                    }
-                    placeholder="Select Delivery Note"
-                    singleSelect
-                  />
-                </div>
-              )}
-            </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Combobox
+            label={kind === "TRANSFER" ? "From store" : "Store"}
+            required
+            value={storeId}
+            onChange={(v) => { setStoreId(v); setLines([blank()]); setErrors({}); }}
+            options={myStores.map((s) => ({ value: String(s.id), label: s.name, hint: s.branch?.name }))}
+            searchPlaceholder="Search stores"
+            error={errors.storeId}
+            emptyText="You aren't allowed in any store yet. Ask an administrator to add you to one."
+          />
+          {kind === "TRANSFER" ? (
+            <Combobox label="To store" required value={toStoreId} onChange={(v) => { setToStoreId(v); setErrors({}); }} options={(stores as IStore[]).filter((s) => String(s.id) !== storeId).map((s) => ({ value: String(s.id), label: s.name, hint: s.branch?.name }))} searchPlaceholder="Search stores" error={errors.toStoreId} />
+          ) : (
+            <TextField label="Source / reason" value={source} onChange={setSource} maxLength={120} placeholder={kind === "RESTOCK" ? "e.g. Factory batch 24" : kind === "DEPLETION" ? "e.g. Expired" : "e.g. Monthly count"} />
           )}
         </div>
 
-        {/* Footer */}
-        <div className="p-6 border-t bg-gray-50">
-          <div className="flex justify-between">
-            <CustomButton
-              type="secondary"
-              fn={currentStep === 1 ? onCancel : prevStep}
-              label={currentStep === 1 ? "Cancel" : "Previous"}
-              disabled={isSubmitting}
-            />
-
-            <div className="flex gap-3">
-              {currentStep < 3 ? (
-                <CustomButton
-                  fn={nextStep}
-                  label="Next"
-                  className="flex items-center gap-2"
-                >
-                  Next
-                  <FaArrowRight size={14} />
-                </CustomButton>
-              ) : (
-                <CustomButton
-                  fn={handleSubmit}
-                  label={isSubmitting ? "Submitting..." : "Submit Movement"}
-                  disabled={isSubmitting}
-                  className="flex items-center gap-2"
-                >
-                  <FaCheck size={14} />
-                  {isSubmitting ? "Submitting..." : "Submit Movement"}
-                </CustomButton>
-              )}
-            </div>
+        <section>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h3 className="m-0 text-sm font-semibold text-brand-ink">Items ({lines.length})</h3>
+            <Button size="sm" variant="secondary" icon={<FiPlus aria-hidden="true" />} onClick={() => setLines((ls) => [...ls, blank()])} disabled={lines.length >= 200 || (takesOut && !storeId)}>Add item</Button>
           </div>
+          {takesOut && !storeId && <p className="m-0 mb-2 text-sm text-brand-muted">Choose the store first to see what it has.</p>}
+          {takesOut && storeId && !itemOptions.length && <p className="m-0 mb-2 text-sm text-brand-muted">This store has no stock to take out.</p>}
+          <div className="space-y-3">
+            {lines.map((l, i) => {
+              const h = l.itemId && l.unitId ? have(l.itemId, l.unitId) : null;
+              return (
+                <div key={l.key} className="grid grid-cols-1 gap-3 rounded-xl border border-line p-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)_minmax(0,1fr)_auto] sm:items-start">
+                  <Combobox label="Item" required value={l.itemId} onChange={(v) => setLine(l.key, { itemId: v })} options={itemOptions} searchPlaceholder="Search items" error={errors[`items.${i}.itemId`]} disabled={takesOut && !storeId} />
+                  <Combobox label="Unit" required value={l.unitId} onChange={(v) => setLine(l.key, { unitId: v })} options={l.itemId || !takesOut ? unitOptionsFor(l.itemId) : []} searchPlaceholder="Search units" error={errors[`items.${i}.unitId`]} disabled={!l.itemId} />
+                  <TextField
+                    label={kind === "ADJUSTMENT" ? "Counted" : "Quantity"}
+                    required
+                    inputMode="decimal"
+                    value={l.qty}
+                    onChange={(v) => setLine(l.key, { qty: v.replace(/[^\d.]/g, "") })}
+                    error={errors[`items.${i}.qty`]}
+                    hint={h !== null ? `${qty(h)} in store now` : undefined}
+                  />
+                  <Button size="sm" variant="ghost" icon={<FiTrash2 aria-hidden="true" />} onClick={() => setLines((ls) => (ls.length > 1 ? ls.filter((x) => x.key !== l.key) : [blank()]))} aria-label="Remove this item" className="text-[#C0362C] sm:mt-[22px]" />
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Combobox label="Delivery note" clearable value={noteId} onChange={setNoteId} options={notes.map((n) => ({ value: String(n.id), label: `${n.deliveryNoteNumber} · ${n.name}` }))} placeholder="None" searchPlaceholder="Search delivery notes" hint="Optional: link a delivery note saved under Delivery Notes." error={errors.deliveryNoteId} />
+          <TextArea label="Notes" value={description} onChange={setDescription} maxLength={1000} placeholder="Anything worth knowing later" />
         </div>
-      </div>
-    </div>
+        <PhotoPicker label="Evidence photos" files={photos} onChange={setPhotos} max={10} error={errors.files} hint="Optional: photos of the goods, invoice or damage." />
+      </form>
+    </Modal>
   );
 };
 

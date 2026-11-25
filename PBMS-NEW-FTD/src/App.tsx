@@ -51,6 +51,8 @@ import AttendanceManagement from './pages/humanResource/attendance';
 import PayrollManagement from './pages/humanResource/payroll/index';
 import ClientPurchases from './pages/sales/customers/customerPurchases';
 import DeliveryNotes from './pages/inventory/deliveryNotes';
+import UnitsManagement from './pages/inventory/units';
+import StockLevels from './pages/inventory/stockLevels';
 import ExpensesReport from './pages/reports/expenses/expensesReport';
 import SuppliersManagement from './pages/inventory/suppliers';
 import SupplierDetails from './pages/inventory/suppliers/supplierInfo';
@@ -385,6 +387,22 @@ function App() {
         element={
           <ProtectedRoute>
             <SupplierDetails />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/inventory/units"
+        element={
+          <ProtectedRoute>
+            <UnitsManagement />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/inventory/stock-levels"
+        element={
+          <ProtectedRoute>
+            <StockLevels />
           </ProtectedRoute>
         }
       />
